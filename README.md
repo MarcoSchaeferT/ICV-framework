@@ -135,7 +135,7 @@ npm run start
 ## Inspect the Database
 
 ```bash
-# starts db & opens prisma studio
+# starts db & opens prisma studio 
 npm run db-view
 ```
 
