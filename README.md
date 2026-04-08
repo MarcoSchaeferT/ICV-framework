@@ -13,13 +13,13 @@ Open-source, composable web framework for creating release-ready public health e
 <table style="width:100%; table-layout:fixed;">
     <tr>
         <td style="text-align:center; width:16.6%;">React</td>
-        <td style="text-align:center; width:16.6%;">Node v22.6.0</td>
+        <td style="text-align:center; width:16.6%;">Node 25.8</td>
         <td style="text-align:center; width:16.6%;">Next.js</td>
         <td style="text-align:center; width:16.6%;">Type Script</td>
         <td style="text-align:center; width:16.6%;">Tailwind CSS</td>
         <td style="text-align:center; width:16.6%;">Python 3.12</td>
         <td style="text-align:center; width:16.6%;">Flask API</td>
-        <td style="text-align:center; width:16.6%;">Docker</td>
+        <td style="text-align:center; width:16.6%;">Docker 29.3</td>
         <td style="text-align:center; width:16.6%;">PostgreSQL</td>
         <td style="text-align:center; width:16.6%;">D3</td>
     </tr>
