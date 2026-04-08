@@ -1,0 +1,27 @@
+tags:
+  - REST Endpoints
+summary: Get list of database tables
+description: Retrieves a list of all available database relations (tables) in the public schema, excluding system tables like 'Test' and 'User'.
+responses:
+  200:
+    description: Successful response with dictionary of table names
+    content:
+      application/json:
+        schema:
+          type: object
+          additionalProperties:
+            type: string
+          example: 
+            MosquitoPresenceData: "MosquitoPresenceData"
+            DengueSerotypeCounts: "DengueSerotypeCounts"
+            MosquitoHabitatSuitability: "MosquitoHabitatSuitability"
+  500:
+    description: Internal server error
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+              description: Error message.

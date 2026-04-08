@@ -1,0 +1,31 @@
+CDC-Gathany-Aedes-albopictus-1.jpg
+https://de.wikipedia.org/wiki/Asiatische_Tigerm%C3%BCcke#/media/Datei:CDC-Gathany-Aedes-albopictus-1.jpg
+
+Aedes_aegypti_CDC-Gathany.jpg
+https://de.wikipedia.org/wiki/Gelbfieberm%C3%BCcke#/media/Datei:Aedes_aegypti_CDC-Gathany.jpg
+
+placeholder.svg
+https://www.svgrepo.com/svg/508699/landscape-placeholder
+
+
+west nil virus: 3IYW
+https://www.rcsb.org/3d-view/3IYW/1
+
+Dengue Virus: 1K4R
+https://www.rcsb.org/3d-view/1K4R/1
+
+Chikungunya virus: 3J2W
+https://www.rcsb.org/3d-view/3J2W/1
+
+Zika virus: 6CO8
+https://www.rcsb.org/3d-view/6CO8/1
+
+Yellow Fever virus: 1NA4
+https://www.rcsb.org/3d-view/1NA4/1
+
+Rift-Valley virus: 3OV9
+Info: Structure of the Nucleoprotein from Rift Valley Fever Virus
+https://www.rcsb.org/3d-view/3OV9/1
+
+Mayaro virus: 7KO8
+https://www.rcsb.org/3d-view/7KO8/1

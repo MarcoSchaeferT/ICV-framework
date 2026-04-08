@@ -1,0 +1,42 @@
+tags:
+  - REST Endpoints
+summary: Get column names from a database table
+description: Retrieves all column names from a specified database relation (table).
+parameters:
+  - name: relationName
+    in: query
+    description: Name of the database relation (table) to get column names from.
+    required: true
+    schema:
+      type: string
+      example: "MosquitoPresenceData"
+responses:
+  200:
+    description: Successful response with list of column names
+    content:
+      application/json:
+        schema:
+          type: array
+          items:
+            type: string
+          example: ["id", "latitude", "longitude", "species", "date"]
+  400:
+    description: Bad request - missing or invalid relationName parameter
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+              description: Error message.
+  500:
+    description: Internal server error
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+              description: Error message.

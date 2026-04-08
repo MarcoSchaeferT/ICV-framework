@@ -1,0 +1,26 @@
+tags:
+  - Map Data Endpoints
+summary: Get USA map GeoJSON data
+description: Returns GeoJSON data for USA's geographical boundaries.
+responses:
+  200:
+    description: Successful response with GeoJSON data
+    content:
+      application/json:
+        schema:
+          type: object
+          description: GeoJSON FeatureCollection with USA map data
+          example:
+            type: "FeatureCollection"
+            features: []
+  500:
+    description: Internal server error reading map data
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              description: Error message
+              example: "ERROR reading CSV file: get_usa_map"

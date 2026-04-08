@@ -1,0 +1,369 @@
+{
+    "page_domainInfo": {
+        "MosquitoHeading": "Mückenarten",
+        "VectorHeading": "Mücken-übertragbare Krankheiten"
+    },
+    "page_upload": {
+        "heading": "Laden Sie Ihre CSV-Dateien hoch",
+        "dropZone": "(Drag 'n' drop) - Dateien hierher ziehen oder klicken, um Dateien auszuwählen",
+        "dropZoneIsDragActive": "Dateien hierher ablegen...",
+        "ButtonUpload": "Dateien hochladen",
+        "feedback": {
+            "success": "Dateien wurden erfolgreich hochgeladen!",
+            "error": "Fehler beim Hochladen der Dateien.",
+            "progressText": "hochladen...",
+            "progressButton": "Wird hochgeladen...",
+            "progressWorkingOn": "wird bearbeitet",
+            "progressProcessed": "verarbeitet",
+            "progressDBIntegration": "db integration..."
+        }
+    },
+    "page_docs": {
+        "heading": "Dokumentation"
+    },
+    "page_about": {
+        "main": {
+            "Heading": "ICV - Interaktive kontextreiche Ansichten für Daten der öffentlichen Gesundheit",
+            "projectInfo": "",
+            "ButtonGitHub": "Auf GitHub ansehen",
+            "ButtonFeature": "Feature anfragen",
+            "ButtonBug": "Fehler melden",
+            "ButtonReleases": "Releases"
+        },
+        "FeedbackForm": {
+            "FeedbackTypes": {
+                "feature": "Anfrage eines Features",
+                "bug": "Meldung eines Fehlers",
+                "improvement": "Verbesserungsvorschlag",
+                "general": "Allgemeines Feedback",
+                "question": "Frage"
+            },
+            "heading": "Senden Sie uns Feedback",
+            "subHeading": "Ihr Feedback hilft uns ICV zu verbessern. Lassen Sie uns wissen, was Sie denken!",
+            "InputName": "Name",
+            "InputNameError": "Bitte geben Sie einen gültigen Namen ein! (3 bis 30 Zeichen)",
+            "InputNamePlaceholder": "Ihr Name",
+            "InputEmailPlaceholder": "ihre@email.com",
+            "InputEmailError": "Bitte geben Sie eine gültige E-Mail-Adresse ein!",
+            "InputMessagePlaceholder": "Erzählen Sie uns von Ihren Erfahrungen, Vorschlägen, gewünschten Funktionen oder Problemen, auf die Sie gestoßen sind...",
+            "InputEmail": "E-Mail",
+            "InputMessage": "Nachricht",
+            "InputMessageError": "Bitte geben Sie eine Nachricht ein! (10 > Zeichen)",
+            "FeedbackType": "Feedback-Art",
+            "FeedbacktypePlaceholder": "Feedback-Typ auswählen",
+            "ButtonSend": "Feedback senden",
+            "ButtonSideText": "Danke, dass Sie uns helfen ICV zu verbessern!",
+            "FeedbackDialog": {
+                "alert": {
+                    "title": "Bitte überprüfen Sie die markierten Felder!",
+                    "description": "Etwas ist schiefgelaufen"
+                },
+                "success": {
+                    "title": "Vielen Dank für Ihr Feedback!",
+                    "description": "Daten erfolgreich gesendet"
+                }
+            }
+        }
+    },
+    "page_home": {
+        "pageContent": {
+            "heading": "ICV - Interaktive kontextreiche Ansichten für Daten der öffentlichen Gesundheit",
+            "subHeading": "ICV ist eine Webanwendung, die eine Vielzahl kontextreicher Ansichten bietet. Sie ermöglicht die interaktive Visualisierung und Erkundung von Gesundheitsdaten – von historischen bis hin zu prognostischen Daten.",
+            "funding": "Gefördert durch das Bundesministerium für Gesundheit (BMG) unter der Fördernummer 2523DAT400 (Projekt",
+            "projectName": " AI-DAVis PANDEMICS)",
+            "ShowCases": "Show Cases",
+            "startButton": "Starte hier!"
+        },
+        "subpage_features": {
+            "heading": "Features",
+            "subHeading": "Jede Ansicht konzentriert sich auf eine andere Hauptgeschichte und visualisiert interaktiv Daten zur öffentlichen Gesundheit im Kontext einer Pandemie. Der Schwerpunkt liegt auf den folgenden Merkmalen:",
+            "bottomText": "Für mehr Informationen siehe",
+            "bottomTextOr": "oder",
+            "bottomTextAbout": "Über ICV"
+        },
+        "featureList": {
+            "feature1": {
+                "heading": "Responsives Design",
+                "description": "Lorem ipsum dolor sit amet, consetetur sadipscing."
+            },
+            "feature2": {
+                "heading": "Gitter Layout",
+                "description": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam."
+            },
+            "feature3": {
+                "heading": "Linked und Interaktiv",
+                "description": "Lorem ipsum dolor sit amet, consetetur sadipscing."
+            },
+            "feature4": {
+                "heading": "Trainings Daten Ansicht",
+                "description": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam."
+            },
+            "feature5": {
+                "heading": "Vorhersage Ansicht",
+                "description": "Lorem ipsum dolor sit amet, consetetur sadipscing."
+            },
+            "feature6": {
+                "heading": "Test Ansicht",
+                "description": "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam."
+            }
+        },
+        "ShowCases": {
+            "page_Historical_Data_COVID": {
+                "mainInfo": {
+                    "heading": "Historische Daten zu COVID-19 für Deutschland"
+                },
+                "headingOverview": "Übersichtskarte",
+                "headingDetailView": "Detailansicht"
+            },
+            "page_Suitable_Mosquito_Habitats": {
+                "mainInfo": {
+                    "heading": "Geeignete Mückenhabitate"
+                },
+                "headingOverview": "Übersichtskarte - Eignung für Mückenhabitate",
+                "headingDetailView": "Detailkarte"
+            },
+            "page_USA_Habitats_Sightings": {
+                "mainInfo": {
+                    "heading": "USA Habitate & Sichtungen"
+                },
+                "headingOverview": "USA - Habitateignung & Sichtungen",
+                "headingDetailView": "Detailkarte"
+            },
+            "page_Habitats_Colombia_vs_Germany": {
+                "mainInfo": {
+                    "heading": "Mosquitohabitate verschiedner Länder im Vergleich"
+                },
+                "headingOverview": "Land 1",
+                "headingDetailView": "Land 2"
+            },
+            "page_Climate_and_Habitats": {
+                "card_country": "Land",
+                "card_feature": "Daten-Mermal",
+                "card_colorMap": "Farbschema",
+                "card_dataSet": "Datensatz",
+                "card_temperature": "Temperatur",
+                "card_dewpoint": "Taupunkt",
+                "card_precipitation": "Niederschlag",
+                "card_windSpeed": "Windgeschwindigkeit",
+                "card_map_temperature": "Temperatur",
+                "card_map_dewpoint": "Taupunkt",
+                "card_map_precipitation": "Niederschlag",
+                "card_map_windSpeed": "Windgeschwindigkeit",
+                "card_map_suitability": "Habitat Eignung",
+                "mainInfo": {
+                    "heading": "Klima und Habitate"
+                },
+                "headingOverview": "Übersichtskarte",
+                "headingDetailView": "Detailkarte"
+            },
+            "page_Dengue_Serotype_Counts": {
+                "mainInfo": {
+                    "heading": "Dengue-Serotyp-Anzahlen"
+                },
+                "headingOverview": "Übersichtskarte",
+                "headingDetailView": "Detailkarte"
+            },
+            "page_Uncertainty_Vis": {
+                "mainInfo": {
+                    "heading": "Visualisierung von Unsicherheiten"
+                },
+                "coefficientMap": "Globale Variationskoeffizienten-Karte",
+                "temporalUncertaintyPlot": "Temporale Unsicherheit",
+                "calibrationPlot": "Probabilistische Kalibrierungskurve"
+            }
+        }
+    },
+    "page_publications": {
+        "title": "AI-DAVis-PANDEMICs",
+        "descriptionPart1": "Auflistung an Publikationen, die im Rahmen des Forschungsprojekts ",
+        "descriptionPart2Title": "AI-DAVis-PANDEMICs",
+        "descriptionPart3": "erstellt wurden.",
+        "publicationsTitle": "Publikationen",
+        "sort_dropdown": "Sortierung",
+        "sort_options": {
+            "latest_first": "Neueste zuerst",
+            "alphabetical": "Alphabetisch"
+        },
+        "PublicationCount": {
+            "showing": "zeige",
+            "of": "von",
+            "publications": "Publikation(en)"
+        },
+        "no_publications_found": "Keine Publikationen für die ausgewählten Filter verfügbar."
+    },
+    "localeSwitcher": {
+        "label": "Sprache wechseln",
+        "locale": "{locale, select, en {🇬🇧 Englisch} de {🇩🇪 Deutsch} other {unbekannt}}"
+    },
+    "component_blogTabularAccordion": {
+        "source": "Quelle",
+        "viruses": "Viren",
+        "vectors": "Überträger"
+    },
+    "component_blogPosts": {
+        "source": "Quelle"
+    },
+    "component_copyrightFooter": {
+        "copyright": "alle Rechte vorbehalten.",
+        "funding": "Gefördert durch das Bundesministerium für Gesundheit (BMG) unter der Fördernummer 2523DAT400 (Projekt",
+        "projectName": " AI-DAVis PANDEMICS)",
+        "furtherInfo": "Über"
+    },
+    "swapyHandle_component": {
+        "enable": "Komponententausch aktivieren",
+        "disable": "Komponententausch deaktivieren"
+    },
+    "component_infoCard": {
+        "openFullDocs": "in Dokumentation öffnen",
+        "headingInteractions": "Info",
+        "headingComponentInfo": "Info"
+    },
+    "component_scrollToButton": {
+        "buttontext": "Zurück nach Oben"
+    },
+    "component_D3MapLayerComponent": {
+        "longnitude": "Längengrad",
+        "latitude": "Breitengrad",
+        "data_set": "Datensatz",
+        "opacity": "Deckkraft",
+        "color_map": "Farbschema",
+        "feature": "Daten-Merkmal",
+        "country": "Land",
+        "time_range": "Zeitraum",
+        "select_time_span": "Zeitraum auswählen",
+        "presence_data": {
+            "description": "Mücken-Sichtungsdaten",
+            "dropdownSpecies": "Art",
+            "dropdownYear": "Jahr"
+        },
+        "sequence_Metadata": {
+            "description": "Dengue Serotyp Zählungen",
+            "dropdownType": "Serotyp",
+            "dropdownYear": "Jahr"
+        },
+        "auto_hide_settings": "automatisches Ausblenden der Einstellungen",
+        "tooltip": {
+            "country": "Land",
+            "feature": "Merkmal",
+            "value": "Wert",
+            "latLong": "Lat/Lng"
+        },
+        "tooltipDonut": {
+            "total": "Gesamt",
+            "country": "Land",
+            "relative": "Anteil"
+        },
+        "covid19_world_data": {
+            "complete_data": "Kompletten Datensatz anzeigen",
+            "complete_data_short": "Kompletten Datensatz",
+            "reset_to_2020": "Auf Jahr 2020 zurücksetzen",
+            "clear_map": "Karte leeren",
+            "reset_to_all_countries_short": "Alle Länder",
+            "reset_to_all_countries": "Auf alle Länder zurücksetzen",
+            "country_level": "Länderebene",
+            "subregion_level": "Unterregionebene",
+            "subregion": "Unterregion",
+            "country": "Land",
+            "time_range": "Zeitraum",
+            "time_range_data_short": "Daten für den Zeitraum anzeigen",
+            "time_range_data": "Daten für den ausgewählten Zeitraum anzeigen",
+            "select_country_name": "Land auswählen oder Ländername eingeben"
+        }
+    },
+    "page_covidDashboard": {
+        "mainInfo": {
+            "heading": "Historische Daten zu COVID-19 für Deutschland"
+        }
+    },
+    "page_covidWorldView": {
+        "mainInfo": {
+            "heading": "Historische Daten zu COVID-19 weltweit"
+        },
+        "headingOverview": "Übersichtskarte",
+        "headingDetailView": "Detailkarte"
+    },
+    "page_predictionView": {
+        "mainInfo": {
+            "heading": "Vorhersage Ansicht"
+        },
+        "headingOverview": "Übersichtskarte",
+        "headingDetailView": "Detailkarte"
+    },
+    "page_rawDataView": {
+        "pageContent": {
+            "card_country": "Land",
+            "card_feature": "Daten-Mermal",
+            "card_colorMap": "Farbschema",
+            "card_dataSet": "Datensatz",
+            "card_temperature": "Temperatur",
+            "card_dewpoint": "Taupunkt",
+            "card_precipitation": "Niederschlag",
+            "card_windSpeed": "Windgeschwindigkeit",
+            "tab_linecharts": "Liniendiagramme",
+            "tab_detailView": "Karte Detailansicht",
+            "mainInfo": {
+                "heading": "Trainings Daten Ansicht"
+            }
+        },
+        "linechart": {
+            "dropdown": {
+                "country_average": "Landesdurchschnitt",
+                "grid_cell": "Gitterzelle"
+            }
+        }
+    },
+    "component_linechart": {
+        "dropdown": {
+            "select_filter": "Diagramm-Modus"
+        }
+    },
+    "component_dataTable": {
+        "searchfield": "Suche...",
+        "pageOf": "von",
+        "page": "Seite",
+        "button_previous": "zurück",
+        "button_next": "weiter",
+        "dropdown": "Einträge"
+    },
+    "component_mainInfo": {
+        "additionalInfo": "Weitere Details finden Sie in den Infokarten, die Sie aufrufen können, indem Sie mit der Maus über die folgenden Symbole in der oberen rechten Ecke jeder Komponente fahren.",
+        "componentInfo": "Komponenten-Info",
+        "interactions": "Interaktionen",
+        "button_scroll": "Zur Ansicht scrollen",
+        "button_giveFeedback": "Feedback geben"
+    },
+    "covid_view_barchart": {
+        "federal_state": "Bundesland"
+    },
+    "sidebarLeft": {
+        "heading": "ICV-Einstellungen",
+        "currentSelection": "Aktuelle Auswahl",
+        "transmissionPath": "Übertragungsweg",
+        "disease": "Krankheit / Merkmal",
+        "dropdown": {
+            "transmissionPath": "Wähle einen Übertragungsweg",
+            "disease": "Wähle einen Eintrag"
+        }
+    },
+    "navbar_top": {
+        "mode": "Modus"
+    },
+    "page_metadata": {
+        "heading": "Metadaten Editor",
+        "relation": "Datensatz  ",
+        "selectRelation": "Datensatz auswählen…",
+        "selectRelationPrompt": "Wählen Sie einen Datensatz, um dessen Spalten-Metadaten zu bearbeiten.",
+        "language": "Sprache",
+        "columnName": "Spaltenname",
+        "datatype": "Datentyp",
+        "dimension": "Dimension",
+        "description": "Beschreibung",
+        "availability": "Sichtbar",
+        "save": "Alles speichern",
+        "saving": "Speichern…",
+        "saveSuccess": "Metadaten erfolgreich gespeichert!",
+        "saveError": "Fehler beim Speichern der Metadaten.",
+        "loading": "Spalten werden geladen…",
+        "noColumns": "Dieser Datensatz hat keine Spalten."
+    }
+}

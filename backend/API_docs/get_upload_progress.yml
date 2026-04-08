@@ -1,0 +1,16 @@
+tags:
+  - Utility Endpoints
+summary: Get file upload progress
+description: Returns the current progress percentage of an ongoing file upload operation.
+responses:
+  200:
+    description: Current upload progress
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            progress:
+              type: integer
+              description: Progress percentage from 0 to 100
+              example: 75

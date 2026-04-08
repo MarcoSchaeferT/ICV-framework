@@ -1,0 +1,26 @@
+import { Bookmark} from "lucide-react"
+import { Button } from "@/components/ui/button"
+
+<h2 style={{margin:"8px"}}> Verwendung von ICV</h2>
+
+1.  **Übertragungsweg und Krankheit wählen**  
+ Öffnen Sie die linke Seitenleiste über <span style={{ scale: 0.8, display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle', margin: '0 4px' }}><Button variant="outline" size="sm" className="h-6 w-12 rounded-r-xl shadow-md bg-[#279BBA] border-sidebar-border"><Bookmark className="h-4 w-4 hover:animate-pulse" /></Button></span> in der oberen linken Ecke. Wählen Sie dann einen *Übertragungsweg* und eine *Krankheit* über die Dropdown-Listen aus, um die Anwendung in den gewünschten Modus zu versetzen und eine entsprechende Ansicht zu laden.
+
+2. **Datensatz auswählen**  
+Verwenden Sie die Dropdown-Liste oben in der Karten-Komponente, um  einen gewünschten Datensatz auszuwählen.
+
+3. **Mit der Karte interagieren**  
+Verschieben Sie den Kartenbereich und nutzen Sie die Zoomfunktion, um die Daten zu erkunden und zu analysieren. Weitere Informationen finden Sie unter [Interaktionen](#MapInteractions).
+
+4. **Erkunden und anpassen**  
+   Blenden Sie weitere Informationen mithilfe der [UI-Elemente](#UIElements) ein und passen Sie die Visualisierungen an Ihre Bedürfnisse an.
+
+ > [!NOTE] Der aktuelle **Übertragungsweg** und die aktuelle **Krankheit** werden immer über das Label in der unteren rechten Ecke angezeigt. Je nach Auswahl stehen in der oberen Navigationsleiste verschiedene Ansichten mit unterschiedlichen Datensätzen zur Verfügung.
+
+Nachdem über die Dropdown-Listen in der linken Seitenleiste ein Übertragungsweg und eine Krankheit ausgewählt wurden, ändern sich die verfügbaren Ansichten der oberen Navigationsleiste entsprechend der Auswahl. Zusätzlich wird automatisch die erste verfügbare Ansicht geladen.
+
+Fast jede Ansicht enthält eine Karten-Komponente, in der verschiedene Datensätze über eine Dropdown-Liste oben in der Komponente ausgewählt werden können. Jeder Datensatz entspricht zum Beispiel einer bestimmten Mückenart und einem bestimmten Zeitrahmen (z. B. jährlich, monatlich). Wählen Sie den gewünschten Datensatz aus, um so z.B. die Eignung des Lebensraums für eine Mückenart auf der Karte zu visualisieren.
+
+Verwenden Sie Ihre Maus oder Ihr Touchpad, um die Karte zu vergrößern und zu verkleinern. Klicken und ziehen Sie, um die Karte zu verschieben. Weitere Details zu möglichen Interaktionen und den Elementen der Benutzeroberfläche finden Sie unter [Interaktionen](#MapInteractions) und [UI-Elemente](#UIElements).
+
+Fügen Sie beispielsweise Overlays (Schichten) für [Daten zur Mückensichtungen](#MosquitoPresenceData) und [Dengue Serotyp Zählungen](#DengueSerotypeCounts) hinzu. Passen Sie das Standard-Farbschema (*inferno*) an, das von Dunkelgrau (z.B.: geringe Lebensraumtauglichkeit) bis Hellgelb (z.B.: hohe Lebensraumtauglichkeit) reicht. Sie können die Farbschemata über die Dropdown-Liste rechts neben der Datensatzauswahl ändern. Weitere Informationen zu den verfügbaren Optionen finden Sie unter [Farbschema](#ColorMap).

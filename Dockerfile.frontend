@@ -1,0 +1,109 @@
+# =============================================================================
+# STAGE 1: Base image
+# =============================================================================
+FROM node:22-alpine AS base
+
+# Labels (OCI standard)
+LABEL org.opencontainers.image.title="icv-frontend"
+LABEL org.opencontainers.image.description="ICV Frontend"
+LABEL org.opencontainers.image.version="latest"
+LABEL org.opencontainers.image.source="https://github.com/MarcoSchaeferT/ICV-framework"
+
+# =============================================================================
+# STAGE 2: Install dependencies
+# =============================================================================
+FROM base AS deps
+
+# libc6-compat needed for some native Node modules on Alpine
+RUN apk add --no-cache libc6-compat
+
+WORKDIR /app
+
+# Copy only package files first (better layer caching)
+COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* ./
+
+# Install dependencies based on lockfile
+RUN \
+  if [ -f yarn.lock ]; then \
+  yarn install --frozen-lockfile; \
+  elif [ -f package-lock.json ]; then \
+  npm ci --legacy-peer-deps; \
+  elif [ -f pnpm-lock.yaml ]; then \
+  corepack enable pnpm && pnpm install --frozen-lockfile; \
+  else \
+  echo "Lockfile not found." && exit 1; \
+  fi
+
+# =============================================================================
+# STAGE 3: Build the application
+# =============================================================================
+FROM base AS builder
+
+WORKDIR /app
+
+# Copy dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy only necessary source files
+COPY package.json ./
+COPY next.config.mjs ./
+COPY tsconfig.json ./
+COPY tailwind.config.ts ./
+COPY postcss.config.mjs ./
+COPY components.json ./
+COPY src ./src
+COPY public ./public
+COPY messages ./messages
+
+# Build environment
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV IS_DOCKER=true
+
+# Build the application
+RUN \
+  if [ -f yarn.lock ]; then \
+  yarn run build; \
+  elif [ -f package-lock.json ]; then \
+  npm run next-docker-build; \
+  elif [ -f pnpm-lock.yaml ]; then \
+  corepack enable pnpm && pnpm run build; \
+  else \
+  npm run build; \
+  fi
+
+# =============================================================================
+# STAGE 4: Production runner (minimal image)
+# =============================================================================
+FROM base AS runner
+
+WORKDIR /app
+
+# Production environment
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV IS_DOCKER=true
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# Create non-root user for security
+RUN addgroup --system --gid 1001 nodejs && \
+  adduser --system --uid 1001 nextjs
+
+# Copy public assets
+COPY --from=builder /app/public ./public
+
+# Create .next directory with correct permissions
+RUN mkdir .next && chown nextjs:nodejs .next
+
+# Copy standalone build output
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Switch to non-root user
+USER nextjs
+
+# Expose port
+EXPOSE 3000
+
+# Start the server
+CMD ["node", "server.js"]

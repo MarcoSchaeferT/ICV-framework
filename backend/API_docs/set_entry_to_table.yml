@@ -1,0 +1,53 @@
+tags:
+  - REST Endpoints
+summary: Insert a new entry into a database table
+description: Inserts a new row into the specified database table with the provided column values. Automatically creates the feedback_csv table if it doesn't exist when inserting feedback data.
+consumes:
+  - multipart/form-data
+parameters:
+  - name: relationName
+    in: formData
+    description: Name of the database relation (table) to insert data into.
+    required: true
+    type: string
+    example: "feedback_csv"
+  - name: additionalFields
+    in: formData
+    description: Additional form fields representing column names and their values. Field names should match column names in the target table.
+    required: false
+    type: string
+responses:
+  200:
+    description: Data successfully inserted into the table
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            message:
+              type: string
+              example: "Data inserted successfully"
+  400:
+    description: Bad request - missing or invalid parameters
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              description: Error message.
+  500:
+    description: Internal server error during data insertion
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              description: Detailed error message including the SQL error.
+              example: "ERROR inserting data into table: syntax error at or near 'INSERT'"

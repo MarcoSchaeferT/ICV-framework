@@ -1,0 +1,23 @@
+# Use an official PostgreSQL image as the base
+FROM postgres:17.5-alpine
+
+
+# Tag the image
+LABEL org.opencontainers.image.title="icv-database"
+LABEL org.opencontainers.image.description="ICV Database"
+LABEL org.opencontainers.image.version="latest"
+LABEL org.opencontainers.image.source="https://github.com/MarcoSchaeferT/ICV-framework"
+
+# Set the working directory
+VOLUME /var/lib/postgresql/data
+
+# Expose the port that the database will run on
+EXPOSE 5333
+
+# Command to start the database with the desired port and tuned settings for indexing
+CMD ["postgres", "-c", "port=5333", \
+  "-c", "random_page_cost=1.1", \
+  "-c", "effective_cache_size=1GB", \
+  "-c", "work_mem=64MB", \
+  "-c", "maintenance_work_mem=256MB", \
+  "-c", "effective_io_concurrency=200"]

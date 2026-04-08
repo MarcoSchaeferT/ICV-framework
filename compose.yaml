@@ -1,0 +1,64 @@
+services:
+
+  icv-database:
+    image: ghcr.io/marcoschaefert/icv-database:latest
+    restart: always
+    build:
+      context: .
+      dockerfile: ./db/Dockerfile.db
+      network: host
+    ports:
+      - "5333:5333"
+    environment:
+      POSTGRES_DB: icv-database
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD_SECRET}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - internal-network
+
+  icv-frontend:
+    image: ghcr.io/marcoschaefert/icv-frontend:latest
+    environment:
+      - IS_DOCKER=true
+    build:
+      context: .
+      dockerfile: ./Dockerfile.frontend
+      network: host
+    container_name: icv-frontend
+    ports:
+      - "3000:3000"
+    networks:
+      - internal-network
+    # Local dev only: maps icv-database to host machine. Not needed for Kubernetes.
+    extra_hosts:
+      - "icv-database:host-gateway"
+
+  icv-backend:
+    image: ghcr.io/marcoschaefert/icv-backend:latest
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile.backend
+      network: host
+    container_name: icv-backend
+    # Local dev only: maps icv-database to host machine. Not needed for Kubernetes.
+    extra_hosts:
+      - "icv-database:host-gateway"
+    ports:
+      - "5222:5222"
+    networks:
+      - internal-network
+    environment:
+      DATABASE_URL: ${DATABASE_URL_SECRET}
+      IS_DOCKER: "true"
+
+volumes:
+  db-data:
+
+
+networks:
+  internal-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"

@@ -1,0 +1,27 @@
+tags:
+  - Data Management Endpoints
+summary: Get list of available datasets
+description: Returns a list of all CSV datasets available in the data directory.
+responses:
+  200:
+    description: Successful response with dataset list
+    content:
+      application/json:
+        schema:
+          type: object
+          additionalProperties:
+            type: string
+          description: Dictionary where keys are dataset names and values are file paths
+          example:
+            MosquitoPresenceData: "/backend/assets/uploads_tmp/MosquitoPresenceData.csv"
+            DengueSerotypeCounts: "/backend/assets/uploads_tmp/DengueSerotypeCounts.csv"
+  500:
+    description: Internal server error reading directory
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              description: Error message

@@ -1,0 +1,17 @@
+import { OpenInBrowser} from "iconoir-react";
+import { InfoIcon } from "lucide-react"
+
+### Verwendung
+1. **Datensatz auswählen**  
+Verwenden Sie die Dropdown-Liste oben auf der Karte, um den gewünschten Datensatz auszuwählen.
+
+2. **Mit der Karte interagieren**  
+Verwenden Sie die Verschiebe- und Zoomfunktionen für den Kartenausschnitt, um die Daten zu erkunden und zu analysieren. Weitere Informationen finden Sie über das Symbol <span style={{ display: "inline-flex", verticalAlign: "middle" }}><OpenInBrowser className="h-4" /></span>.
+
+3. **Erkunden und anpassen**  
+Blenden Sie über die Kartendarstellung weitere Informationen ein und passen Sie die Visualisierungen an Ihre Bedürfnisse an.
+
+Fast jede Ansicht enthält eine Karten-Komponente, in der verschiedene Datensätze über eine Dropdown-Liste oben in der Komponente ausgewählt werden können. Jeder Datensatz entspricht beispielsweise einer bestimmten Mückenart und einem bestimmten Zeitrahmen (z. B. jährlich, monatlich). Wählen Sie den gewünschten Datensatz aus, um so beispielsweise die Lebensraumtauglichkeit für eine Mückenart auf der Karte zu visualisieren.
+Verwenden Sie Ihre Maus oder Ihr Touchpad, um die Karte zu vergrößern oder zu verkleinern. Klicken und ziehen Sie, um die Karte zu verschieben. Weitere Details zu möglichen **Interaktionen** und den Elementen der Benutzeroberfläche finden Sie in der Infokarte direkt neben diesem <span style={{ display: "inline-flex", verticalAlign: "middle" }}><InfoIcon size={16} /></span> Symbol auf der linken Seite, wenn Sie mit der Maus über das <span style={{ display: "inline-flex", verticalAlign: "middle" }}><OpenInBrowser className="h-4" /></span> Symbol fahren. 
+
+Fügen Sie weitere Overlays (Schichten) hinzu, beispielsweise für *Mücken-Sichtungsdaten* und *Dengue-Serotyp-Zählungen*. Passen Sie die Standardfarbkarte (*inferno*) an, welche von Dunkelgrau (z. B.: geringe Mücken-Lebensraumtauglichkeit) bis Hellgelb (z. B.: hohe Mücken-Lebensraumtauglichkeit) reicht. Sie können das **Farbschema** über die Dropdown-Liste rechts neben der Auswahl für den Datensatz ändern.  Weitere Informationen zu den verfügbaren Optionen finden Sie über das  <span style={{ display: "inline-flex", verticalAlign: "middle" }}><OpenInBrowser className="h-4" /></span> Symbol.

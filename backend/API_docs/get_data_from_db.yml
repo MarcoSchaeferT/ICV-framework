@@ -1,0 +1,121 @@
+tags:
+  - REST Endpoints
+summary: Get data from database
+description: Retrieves data from a specified database relation (table) with support for filtering, feature scanning, aggregation, and various data retrieval tasks.
+parameters:
+  - name: relationName
+    in: query
+    description: Name of the database relation (table) to fetch data from.
+    required: true
+    schema:
+      type: string
+      example: "MosquitoPresenceData"
+  - name: feature
+    in: query
+    description: Name of the feature (column) to fetch. Use `*` at the end for feature scan (e.g., 'species*'). Use 'ALL' to fetch all columns.
+    required: true
+    schema:
+      type: string
+      example: "latitude"
+  - name: filterBy
+    in: query
+    description: Column name(s) to filter the data by. Multiple values can be provided.
+    required: false
+    schema:
+      type: string
+      example: "species"
+  - name: filterValue
+    in: query
+    description: Value(s) to filter by. Can be a string, integer, or number. Must correspond to filterBy parameter.
+    required: false
+    schema:
+      type: string
+      example: "Aedes aegypti"
+  - name: startDate
+    in: query
+    description: Start date for date range filtering (optional).
+    required: false
+    schema:
+      type: string
+      format: date
+      example: "2020-01-01"
+  - name: endDate
+    in: query
+    description: End date for date range filtering (optional).
+    required: false
+    schema:
+      type: string
+      format: date
+      example: "2020-12-31"
+  - name: task
+    in: query
+    description: Special task to perform on the data. Options include 'getUniqueEntries', 'getCount', or leave blank for standard retrieval.
+    required: false
+    schema:
+      type: string
+      enum: ["getUniqueEntries", "getCount"]
+      example: "getCount"
+  - name: aggregation_level
+    in: query
+    description: Level of data aggregation (optional, used for filtering by aggregation level).
+    required: false
+    schema:
+      type: string
+      example: "0"
+responses:
+  200:
+    description: Successful response with queried data
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            relationName:
+              type: string
+              description: Name of the queried relation
+              example: "MosquitoPresenceData"
+            header:
+              type: array
+              items:
+                type: string
+              description: Column names in the relation
+              example: ["id", "latitude", "longitude", "species", "date"]
+            response:
+              type: object
+              description: The actual data retrieved from the database
+            error:
+              type: string
+              nullable: true
+              description: Error message if any occurred during query
+  400:
+    description: Validation error in the request parameters.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            relationName:
+              type: string
+            header:
+              type: array
+            response:
+              type: object
+            error:
+              type: string
+              description: Error message with validation details
+  500:
+    description: Internal server error during database query
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            relationName:
+              type: string
+            header:
+              type: array
+            response:
+              type: object
+            error:
+              type: string
+              description: Detailed error message about the database query failure

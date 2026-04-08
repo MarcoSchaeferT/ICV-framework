@@ -1,0 +1,26 @@
+tags:
+  - Map Data Endpoints
+summary: Get Germany map GeoJSON data
+description: Returns GeoJSON data for Germany's geographical boundaries at medium resolution.
+responses:
+  200:
+    description: Successful response with GeoJSON data
+    content:
+      application/json:
+        schema:
+          type: object
+          description: GeoJSON FeatureCollection with Germany map data
+          example:
+            type: "FeatureCollection"
+            features: []
+  500:
+    description: Internal server error reading map data
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              description: Error message
+              example: "ERROR reading data: get_germany_map"

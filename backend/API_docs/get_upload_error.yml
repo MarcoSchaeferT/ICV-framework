@@ -1,0 +1,16 @@
+tags:
+  - Utility Endpoints
+summary: Get file upload errors
+description: Returns any errors that occurred during the file upload process. Returns false if no errors occurred.
+responses:
+  200:
+    description: Error status of file upload
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              description: Error message or "false" if no errors
+              example: "false"

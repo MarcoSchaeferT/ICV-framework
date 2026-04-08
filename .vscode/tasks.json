@@ -1,0 +1,34 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "generate-prisma-client",
+            "command": "npm run dev",
+            "problemMatcher": []
+        },
+        {
+            "type": "docker-run",
+            "label": "docker-run: flask-server",
+            "dockerRun": {
+                "image": "ICV-framework:latest",
+                "env": {
+                    "FLASK_ENV": "development",
+                    "FLASK_DEBUG": "1"
+                },
+                "volumes": [
+                    {
+                        "containerPath": "/backend",
+                        "localPath": "${workspaceFolder}/backend"
+                    }
+                ],
+                "ports": [
+                    {
+                        "containerPort": 5222,
+                        "hostPort": 5222
+                    }
+                ]
+            }
+        }
+    ]
+}

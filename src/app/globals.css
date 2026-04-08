@@ -1,0 +1,220 @@
+@import 'tailwindcss';
+/* Import Leaflet CSS for map styling */
+@import 'leaflet/dist/leaflet.css';
+
+/* Leaflet tooltip styling */
+.leaflet-tooltip {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Leaflet scale control custom styling */
+.leaflet-control-scale {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border: 1px solid #454444af !important;
+  border-radius: 6px !important;
+  padding: 5px 8px !important;
+  margin: 4px !important;
+  box-shadow: none !important;
+  width: 120px !important;
+  height: 35px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+}
+
+.leaflet-control-scale-line {
+  border: 2px solid #000 !important;
+  border-top: none !important;
+  background: rgba(255, 255, 255, 0.0) !important;
+  height: 15px !important;
+  color: #000 !important;
+  font-size: 11px !important;
+  line-height: 1.1 !important;
+  padding: 2px 5px 1px !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  margin: 0 auto !important;
+}
+
+@config '../../tailwind.config.ts';
+
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@layer utilities {
+  :root {
+    --foreground-rgb: 0, 0, 0;
+    --background-start-rgb: 200, 200, 200;
+    --background-end-rgb: 247, 247, 247;
+  }
+
+  /*
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+    */
+}
+
+@layer utilities {
+  .inverted {
+    filter: invert(100%);
+  }
+}
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+  }
+}
+
+.leaflet-container {
+  cursor: default !important;
+}
+
+.markdown-alert {
+  --github-alert-default-color: #24292f;
+  --github-alert-note-color: #0969da;
+  --github-alert-tip-color: #2da44e;
+  --github-alert-important-color: #8250df;
+  --github-alert-warning-color: #bf8700;
+  --github-alert-caution-color: #cf222e;
+
+  padding: 0.5rem 1rem;
+  margin-bottom: 16px;
+  border-left: 0.25em solid var(--github-alert-default-color);
+}
+
+.markdown-alert>:first-child {
+  margin-top: 0;
+}
+
+.markdown-alert>:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-alert-note {
+  border-left-color: var(--github-alert-note-color);
+}
+
+.markdown-alert-tip {
+  border-left-color: var(--github-alert-tip-color);
+}
+
+.markdown-alert-important {
+  border-left-color: var(--github-alert-important-color);
+}
+
+.markdown-alert-warning {
+  border-left-color: var(--github-alert-warning-color);
+}
+
+.markdown-alert-caution {
+  border-left-color: var(--github-alert-caution-color);
+}
+
+.markdown-alert-title {
+  display: flex;
+  margin-bottom: 4px;
+  align-items: center;
+}
+
+.markdown-alert-title>svg {
+  margin-right: 8px;
+}
+
+.markdown-alert-note .markdown-alert-title {
+  color: var(--github-alert-note-color);
+}
+
+.markdown-alert-tip .markdown-alert-title {
+  color: var(--github-alert-tip-color);
+}
+
+.markdown-alert-important .markdown-alert-title {
+  color: var(--github-alert-important-color);
+}
+
+.markdown-alert-warning .markdown-alert-title {
+  color: var(--github-alert-warning-color);
+}
+
+.markdown-alert-caution .markdown-alert-title {
+  color: var(--github-alert-caution-color);
+}
+
+/* Reduce line spacing between list items */
+
+
+li {
+  margin: 0.1em 0;
+  /* reduce gap between items */
+  line-height: 1.8;
+  /* keep it readable */
+}
+
+/* Style second-level bullets differently */
+ul ul {
+  list-style-type: circle;
+  /* hollow circle for level 2 */
+  margin-top: 0.1em;
+  margin-bottom: 0.1em;
+}
+
+ul ul ul {
+  list-style-type: square;
+
+  /* small square for level 3 */
+  /* Optional: if you want numbered lists to look consistent */
+  ol {
+    list-style-type: decimal;
+  }
+
+  ol ol {
+    list-style-type: lower-alpha;
+    /* a, b, c for nested numbers */
+  }
+
+
+
+  background: transparent !important;
+  box-shadow: none !important;
+}

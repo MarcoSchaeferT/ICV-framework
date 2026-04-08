@@ -1,0 +1,25 @@
+import { Bookmark} from "lucide-react"
+import { Button } from "@/components/ui/button"
+
+<h2 style={{margin:"8px"}}> How To Use -  ICV</h2>
+
+1.  **Select transmission path & disease**  
+    Open the left sidebar via <span style={{ scale: 0.8, display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle', margin: '0 4px' }}><Button variant="outline" size="sm" className="h-6 w-12 rounded-r-xl shadow-md bg-[#279BBA] border-sidebar-border"><Bookmark className="h-4 w-4 hover:animate-pulse" /></Button></span> at the top left corner. Then select a *Transmission Path* and a *Disease* from dropdown menus to set the application into the desired mode and to load a corresponding view.
+
+2. **Select a data set**  
+   Use the dropdown menu at the top of the map component to select the desired data set.
+
+3. **Interact with the map**  
+   Pan and zoom to explore and analyze the data. See [Map Interactions](#MapInteractions) for details.
+4. **Explore and adjust**  
+   Overlay further information using the [Map UI Elements](#UIElements) and adjust the visualizations to your needs.
+
+ > [!NOTE] The current **Transmission Path** and **Disease** are always indicated via the label in the bottom right corner. Dependent on the selection different views with different data sets are available in navigation bar at the top.
+
+After a transmission path and disease are selected via the dropdown menus of the left sidebar, the available views of the navigation bar at the top change accordingly to the selection. Additionally, the first available view will be automatically loaded.
+
+Almost each view contains a map component, where different data sets are available for selection via a dropdown menu at the top of a map component. Each data set, e.g., corresponds to a specific mosquito species and a particular time frame (e.g., yearly, monthly). Choose the desired data set to visualize, for example, the habitat suitability for a mosquito species on the map.
+
+Use your mouse or touchpad to zoom in and out, and click and drag to pan across the map. More details on possible **interactions** and the user interface elements are given in [Map Interactions](#MapInteractions) and [Map UI Elements](#UIElements).
+
+Add overlays, for instance, for [Mosquito Presence Data](#MosquitoPresenceData) and [Dengue Serotype Counts](#DengueSerotypeCounts). Adjust the default color map that is set to *inferno*, ranging from dark gray (e.g.: low habitat suitability) to light yellow (e.g.: high habitat suitability). You can change the color map using the dropdown menu on the right of the data set selection. For more details on available options, see [Color Map](#ColorMap) for details.

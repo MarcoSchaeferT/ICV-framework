@@ -1,0 +1,37 @@
+tags:
+  - Utility Endpoints
+summary: Get compressed JSON data from URL
+description: Fetches a compressed JSON file from a URL, decompresses it using LZMA, and returns the parsed JSON data.
+parameters:
+  - name: url
+    in: query
+    description: URL of the compressed JSON file to fetch
+    required: true
+    schema:
+      type: string
+      example: "https://example.com/data.json.xz"
+responses:
+  200:
+    description: Successful response with decompressed JSON data
+    content:
+      application/json:
+        schema:
+          type: object
+          description: The decompressed JSON data
+  400:
+    description: No URL provided
+    content:
+      text/plain:
+        schema:
+          type: string
+          example: "ERROR: No URL provided!"
+  500:
+    description: Error fetching or decompressing data
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              description: Error message with details

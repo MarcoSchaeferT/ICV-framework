@@ -1,0 +1,35 @@
+
+# Upload: File Requirements  
+This document describes the requirements that a file must meet in order to be processed by the system.
+## Overview
+- The uploaded file must be a CSV file encoded in UTF-8
+- The CSV must include a header row and the data is tabular.
+- The CSV field separator must be a comma (`,`)
+- The data needs to be grid-based, meaning that each row represents a grid cell with a defined rectangular footprint
+- One column must contain a GeoJSON-like POLYGON that defines a rectangle (grid footprint). All other columns can be named and used freely.
+- Floating-point values must be formatted as decimal numbers with (`.`) (e.g., `12.34` and not `12,34`).
+## Geometry column requirements
+- There must be exactly one geometry column named (`geometry`).
+- Coordinates must follow GeoJSON order: `[longitude, latitude]`.
+- The POLYGON must define a rectangle using 5 coordinate points: the four corners plus a repeat of the first point to close the polygon.
+- Example of a valid rectangle polygon (POLYGON ((2 2, 3 2, 3 3, 2 3, 2 2))):
+
+## Mapping to the Views
+- **Prediction View**: the filename must contain `probability`. (e.g. *mosquito_habitat_probability_2020.csv*)
+- **Training Data View**: the filename must contain `named` and must not contain `probability`. (e.g. *mosquito_training_data_named_2020.csv*)
+
+## Sample valid data 
+```
+id, country, geometry, precipitation
+1, Germany, "POLYGON ((2 2, 3 2, 3 3, 2 3, 2 2))", 22
+2, Germany, "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))", 45
+3, France, "POLYGON ((30 30, 31 30, 31 31, 30 31, 30 30))", 10
+```
+
+
+| id | country   | `geometry`                                                                                         | precipitation |
+|----|--------|-------------------------------------------------------------------------------------------------------|---------------|
+| 1  | Germany | "POLYGON ((2 2, 3 2, 3 3, 2 3, 2 2))"                                                                | 22            |
+| 2  | Germany | "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))"                                                                | 45            |
+| 3  | France | "POLYGON ((30 30, 31 30, 31 31, 30 31, 30 30))"                                                       | 10            |
+

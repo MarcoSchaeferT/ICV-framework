@@ -1,0 +1,35 @@
+
+# Hochladen: Daten-Anforderungen
+Dieses Dokument beschreibt die Anforderungen, die eine Datei erfüllen muss, um vom System verarbeitet werden zu können.
+## Allgemeine Anforderungen
+- Die hochgeladene Datei muss eine CSV-Datei sein, die in UTF-8 kodiert ist.
+- Die CSV-Datei muss eine Kopfzeile enthalten und tabellarische Daten enthalten.
+- Das CSV-Trennzeichen muss ein Komma (`,`) sein.
+- Die Daten müssen gitterbasiert sein, d. h. jede Zeile repräsentiert eine Gitterzelle mit einer definierten rechteckigen Grundfläche.
+- Eine Spalte muss ein GeoJSON-ähnliches POLYGON enthalten, das ein Rechteck (Gitterfläche) definiert. Alle anderen Spalten können frei benannt und verwendet werden.
+- Gleitkommazahlen müssen als Dezimalzahlen mit (`.`) formatiert sein (z. B. `12.34` und nicht `12,34`).
+## Anforderungen an die Geometriespalte
+- Es muss genau eine Geometriespalte mit dem Namen (`geometry`) vorhanden sein.
+- Die Koordinaten müssen der GeoJSON-Reihenfolge entsprechen: `[Längengrad, Breitengrad]`.
+- Das POLYGON muss ein Rechteck mit 5 Koordinatenpunkten definieren: die vier Ecken plus eine Wiederholung des ersten Punktes, um das Polygon zu schließen.
+- Beispiel für ein gültiges Rechteckpolygon (POLYGON ((2 2, 3 2, 3 3, 2 3, 2 2))):
+
+## Zuordnung zu den Views
+- **Vorhersage Ansicht**: der Dateiname muss `probability` enthalten. (z. B. *mosquito_habitat_probability_2020.csv*)
+- **Trainingsdaten Ansicht**: der Dateiname muss `named` enthalten und darf nicht `probability` enthalten. (z. B. *mosquito_training_data_named_2020.csv*)
+
+## Beispiel für valide Daten
+```
+id, country, geometry, precipitation
+1, Germany, "POLYGON ((2 2, 3 2, 3 3, 2 3, 2 2))", 22
+2, Germany, "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))", 45
+3, France, "POLYGON ((30 30, 31 30, 31 31, 30 31, 30 30))", 10
+```
+| id | country   | `geometry`                                                                                         | precipitation |
+|----|--------|-------------------------------------------------------------------------------------------------------|---------------|
+| 1  | Germany | "POLYGON ((2 2, 3 2, 3 3, 2 3, 2 2))"                                                                | 22            |
+| 2  | Germany | "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))"                                                                | 45            |
+| 3  | France | "POLYGON ((30 30, 31 30, 31 31, 30 31, 30 30))"                                                       | 10            |
+
+
+

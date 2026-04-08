@@ -1,0 +1,15 @@
+world map:
+https://geojson-maps.kyd.au/ 
+  
+germany map: 
+https://github.com/isellsoap/deutschlandGeoJSON/blob/main/2_bundeslaender/3_mittel.geo.json
+https://github.com/isellsoap/deutschlandGeoJSON
+
+highRes worl map:
+https://datahub.io/core/geo-countries 
+
+USA map:
+https://eric.clst.org/tech/usgeojson/  
+
+City names and coordinates
+https://www.amcharts.com/demos/capitals-map/

@@ -1,0 +1,47 @@
+
+
+#### Dengue Serotyp Zählungen
+
+Dieses Element steuert die Visualisierung der Anzahl der [Dengue-Serotypen](https://en.wikipedia.org/wiki/Dengue_fever#Virology) unter Verwendung eines nicht repräsentativen Datensatzes. Pro Land zeigt ein Donut-Diagramm  die Verteilung der vier Serotypen. Die Gesamtanzahl wird oberhalb des Diagrammms angezeigt. Die Hintergrundfarbe der Beschriftung enkodiert die Anzahl der Fälle im Vergleich zu anderen Ländern an (siehe Farbschema in diesem Steuerelement). (Datenquelle: [Nextstrain](https://nextstrain.org/dengue/all/E))
+
+**Interaktionen:**
+Die Donut-Diagramme können aktiviert/deaktiviert werden. Zusätzlich ist die Größe anpassbar. Beim Überfahren eines Donut-Segments mit der Maus werden weitere Details eingeblendet. Zusätzlich kann über die Dropdown-Listen nach einem Jahr und nach einem Serotyp gefiltert werden, wobei dann nur Donut-Diagramme angezeigt werden, die diesen Serotyp enthalten.
+
+import { categoricalColors } from "../../..//src/app/const_store";
+
+<table>
+  <thead>
+    <tr>
+      <th>Serotypen (je Land)</th>
+      <th>Jahre</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        <div style={{display:"inline-flex", flexWrap:"wrap", columnGap:"0.75rem", rowGap:"0.25rem"}}>
+          <span style={{display:"inline-flex", alignItems:"center", gap:"0.25rem"}}>
+            <span style={{width:"0.75rem", height:"0.75rem", backgroundColor: categoricalColors[0], borderRadius:"2px"}} />
+            <span>denv1</span>
+          </span>
+          <span style={{display:"inline-flex", alignItems:"center", gap:"0.25rem"}}>
+            <span style={{width:"0.75rem", height:"0.75rem", backgroundColor: categoricalColors[1], borderRadius:"2px"}} />
+            <span>denv2</span>
+          </span>
+          <span style={{display:"inline-flex", alignItems:"center", gap:"0.25rem"}}>
+            <span style={{width:"0.75rem", height:"0.75rem", backgroundColor: categoricalColors[2], borderRadius:"2px"}} />
+            <span>denv3</span>
+          </span>
+          <span style={{display:"inline-flex", alignItems:"center", gap:"0.25rem"}}>
+            <span style={{width:"0.75rem", height:"0.75rem", backgroundColor: categoricalColors[3], borderRadius:"2px"}} />
+            <span>denv4</span>
+          </span>
+        </div>
+      </td>
+      <td>1905 - 2024</td>
+    </tr>
+  </tbody>
+</table>
+
+> [!WARNING]
+> Haftungsausschluss: Die Anzahl der Serotypen kann nicht als Anzahl der Dengue-Fälle interpretiert werden. Es handelt sich hierbei nicht um einen repräsentativen Datensatz, sondern um eine Teilmenge von Fällen, in denen der Serotyp bestimmt wurde. Die Daten stammen aus verschiedenen Laboren, die unterschiedliche Methoden verwendet haben.

@@ -1,0 +1,102 @@
+ {/* General Information */}
+import HowToUse from "../../general/howToUse_en.mdx"
+import MapInteractionsGeneral from "../../general/mapInteractionGeneral_en.mdx"
+
+ {/* Map UI Elements */}
+import DataSet from "../../MapUI/dataSet_en.mdx"
+import DataFeature from "../../MapUI/dataFeature_en.mdx"
+import ColorMap from "../../MapUI/colorMap_en.mdx"
+import MosquitoPresenceData from "../../MapUI/mosquitoPresenceData_en.mdx"
+import DengueSerotypeCounts from "../../MapUI/dengueSerotypeCounts_en.mdx"
+
+export const layoutStyle = "block p-5 rounded-lg my-6"
+export const rawDatasetsStyle = "bg-white border-l-4 border-l-fuchsia-800 border border-gray-200 shadow-sm " + layoutStyle
+
+
+<div style={{ display: "flex", flexDirection: "row", alignItems: "flex-start" }}>
+   <div style={{ minHeight: "60px" }}></div>
+  {/* Table of Contents Column */}
+  <div style={{
+    background: "#eeeeee",
+    padding: "8px",
+    position: "sticky",
+    width: "320px",
+    borderRadius: "12px",
+    border: "1px solid #cccccc",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.10)"
+  }}>
+     <style>{`
+       .purple-links a { color: purple !important; }
+     `}</style>
+     <div className="purple-links">
+        <h3 style={{margin:"8px"}}> Contents:</h3>
+   - [How To Use - ICV](#HowToUse)
+   - [Map Component](#MapComponent)
+      - [Interactions](#MapInteractions)
+      - [UI Elements](#UIElements)
+         - [Data Set](#DataSet)
+         - [Data Feature](#DataFeature)
+         - [Color Map](#ColorMap)
+         - [Mosquito Presence Data](#MosquitoPresenceData)
+         - [Dengue Serotype Counts](#DengueSerotypeCounts)
+   </div>
+   </div>
+   <div style={{ flex: 1, minWidth: "260px", marginLeft: "24px", marginRight: "0px" }}>
+
+      <div
+         id="scrollRefx"
+           style={{
+            flex: 3,
+            minWidth: 0,
+            maxHeight: "90vh",
+            overflowY: "auto",
+
+            /* Appearance */
+            background: "#fdfcff", // A very light, clean off-white
+            padding: "32px",
+            borderRadius: "14px", // A slightly larger radius feels more modern
+            border: "1px solid #ede9f9",
+
+            /* A softer, more realistic shadow */
+            boxShadow: "0 2px 4px rgba(60, 30, 90, 0.05), 0 8px 16px rgba(60, 30, 90, 0.05)",
+
+            /* Smooth transition for the hover effect */
+            transition: "all 0.3s ease-in-out",
+           }}
+      >
+
+
+ {/* General Information */}
+<span className={rawDatasetsStyle} id="HowToUse"><HowToUse /></span>
+-----------------
+
+
+
+ {/* Map UI Elements */}
+<a id="MapComponent"></a>
+## Map Component
+<span className={rawDatasetsStyle} id="MapInteractions">
+<MapInteractionsGeneral /></span>
+-------
+
+
+<a id="UIElements"></a>
+### UI Elements
+<span className={rawDatasetsStyle} id="DataSet"><DataSet/></span>
+
+<span className={rawDatasetsStyle} id="DataFeature"><DataFeature/></span>
+<span className={rawDatasetsStyle} id="ColorMap"><ColorMap/></span>
+<span className={rawDatasetsStyle} id="MosquitoPresenceData"><MosquitoPresenceData/></span>
+<span className={rawDatasetsStyle} id="DengueSerotypeCounts"><DengueSerotypeCounts/></span>
+-------
+
+
+
+
+
+[↑ back to the very top](#HowToUse)
+
+-------
+      </div>
+   </div>
+</div>

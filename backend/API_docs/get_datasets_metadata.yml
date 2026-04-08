@@ -1,0 +1,42 @@
+tags:
+  - Data Management Endpoints
+summary: Get datasets metadata
+description: Returns metadata for all datasets including descriptions, data types, and other information in the specified language.
+parameters:
+  - name: LANGID
+    in: query
+    description: Language ID for metadata (e.g., 'en' for English, 'de' for German). Defaults to 'en' if not provided.
+    required: false
+    schema:
+      type: string
+      example: "en"
+responses:
+  200:
+    description: Successful response with metadata
+    content:
+      application/json:
+        schema:
+          type: object
+          additionalProperties:
+            type: object
+          description: Dictionary containing metadata for each dataset
+  400:
+    description: Invalid or missing metadata file
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              example: "Invalid or missing metadata"
+  500:
+    description: Internal server error reading metadata
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              description: Error message

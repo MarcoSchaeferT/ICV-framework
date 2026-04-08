@@ -1,0 +1,17 @@
+import { OpenInBrowser} from "iconoir-react";
+import { InfoIcon } from "lucide-react"
+
+### How To Use
+1. **Select a data set**  
+   Use the dropdown menu at the top of the map to select the desired data set.
+
+2. **Interact with the map**  
+   Pan and zoom to explore and analyze the data. See <span style={{ display: "inline-flex", verticalAlign: "middle" }}><OpenInBrowser className="h-4" /></span> for details.
+3. **Explore and adjust**  
+   Overlay further information using the map UI and adjust the visualizations to your needs.
+
+Almost each view contains a map component, where different data sets are available for selection via a dropdown menu at the top of a map component. Each data set, e.g., corresponds to a specific mosquito species and a particular time frame (e.g., yearly, monthly). Choose the desired data set to visualize, for example, the habitat suitability for a mosquito species on the map.
+
+Use your mouse or touchpad to zoom in and out, and click and drag to pan across the map. More details on possible **interactions** and the user interface elements are given in the info card right next to this <span style={{ display: "inline-flex", verticalAlign: "middle" }}><InfoIcon size={16} /></span> on the left while hovering over the symbol. <span style={{ display: "inline-flex", verticalAlign: "middle" }}><OpenInBrowser className="h-4" /></span>
+
+Add overlays, for instance, for *Mosquito Presence Data* and *Dengue Serotype Counts*. Adjust the default color map that is set to *inferno*, ranging from dark gray (e.g.: low mosquito habitat suitability) to light yellow (e.g.: high mosquito habitat suitability). You can change the **color map** using the dropdown menu on the right of the data set selection.  For more details on available options, see <span style={{ display: "inline-flex", verticalAlign: "middle" }}><OpenInBrowser className="h-4" /></span> for details.

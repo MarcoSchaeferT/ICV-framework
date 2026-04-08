@@ -1,0 +1,61 @@
+tags:
+  - REST Endpoints
+summary: Upload CSV files to database
+description: Uploads one or more CSV files to the database, creating new tables or updating existing ones. The endpoint processes the files, parses the CSV data, creates appropriate database schema, and inserts the data. After successful upload, it syncs the Prisma schema with the database.
+consumes:
+  - multipart/form-data
+parameters:
+  - name: files
+    in: formData
+    description: One or more CSV files to upload to the database. Files are temporarily saved before being processed and inserted into the database.
+    required: true
+    type: file
+    collectionFormat: multi
+responses:
+  200:
+    description: Files successfully uploaded and processed
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            SUCCESS:
+              type: string
+              example: "Files uploaded successfully"
+            file_paths:
+              type: array
+              items:
+                type: string
+              description: List of file paths where the files were saved.
+              example: ["/backend/assets/uploads_tmp/mosquito_data.csv"]
+  400:
+    description: Bad request - no files provided or invalid request
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              description: Error message.
+          examples:
+            no_files_part:
+              value:
+                ERROR: "No files part in the request"
+            no_selected_files:
+              value:
+                ERROR: "No selected files"
+            no_files_saved:
+              value:
+                ERROR: "No files were saved"
+  500:
+    description: Internal server error during file processing or database insertion
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              description: Detailed error message.
+              example: "Error saving file: Permission denied"

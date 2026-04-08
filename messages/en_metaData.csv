@@ -1,0 +1,139 @@
+valuename,datatype,dimension,description,availability
+x,float,longitude,coordinate,0
+y,float,latitude,coordinate,0
+year,string,Year,the measured year,0
+t2m_1,float,K,Temperature at 2m average for January,1
+t2m_2,float,K,Temperature at 2m average for February,1
+t2m_3,float,K,Temperature at 2m average for March,1
+t2m_4,float,K,Temperature at 2m average for April,1
+t2m_5,float,K,Temperature at 2m average for May,1
+t2m_6,float,K,Temperature at 2m average for June,1
+t2m_7,float,K,Temperature at 2m average for July,1
+t2m_8,float,K,Temperature at 2m average for August,1
+t2m_9,float,K,Temperature at 2m average for September,1
+t2m_10,float,K,Temperature at 2m average for October,1
+t2m_11,float,K,Temperature at 2m average for November,1
+t2m_12,float,K,Temperature at 2m average for December,1
+d2m_1,float,K,Dew-point temperature at 2m average for January,1
+d2m_2,float,K,Dew-point temperature at 2m average for February,1
+d2m_3,float,K,Dew-point temperature at 2m average for March,1
+d2m_4,float,K,Dew-point temperature at 2m average for April,1
+d2m_5,float,K,Dew-point temperature at 2m average for May,1
+d2m_6,float,K,Dew-point temperature at 2m average for June,1
+d2m_7,float,K,Dew-point temperature at 2m average for July,1
+d2m_8,float,K,Dew-point temperature at 2m average for August,1
+d2m_9,float,K,Dew-point temperature at 2m average for September,1
+d2m_10,float,K,Dew-point temperature at 2m average for October,1
+d2m_11,float,K,Dew-point temperature at 2m average for November,1
+d2m_12,float,K,Dew-point temperature at 2m average for December,1
+tp_1,float,m,Total precipitation average for January,1
+tp_2,float,m,Total precipitation average for February,1
+tp_3,float,m,Total precipitation average for March,1
+tp_4,float,m,Total precipitation average for April,1
+tp_5,float,m,Total precipitation average for May,1
+tp_6,float,m,Total precipitation average for June,1
+tp_7,float,m,Total precipitation average for July,1
+tp_8,float,m,Total precipitation average for August,1
+tp_9,float,m,Total precipitation average for September,1
+tp_10,float,m,Total precipitation average for October,1
+tp_11,float,m,Total precipitation average for November,1
+tp_12,float,m,Total precipitation average for December,1
+si10_1,float,m/s,Wind speed at 10 m average for January,1
+si10_2,float,m/s,Wind speed at 10 m average for February,1
+si10_3,float,m/s,Wind speed at 10 m average for March,1
+si10_4,float,m/s,Wind speed at 10 m average for April,1
+si10_5,float,m/s,Wind speed at 10 m average for May,1
+si10_6,float,m/s,Wind speed at 10 m average for June,1
+si10_7,float,m/s,Wind speed at 10 m average for July,1
+si10_8,float,m/s,Wind speed at 10 m average for August,1
+si10_9,float,m/s,Wind speed at 10 m average for September,1
+si10_10,float,m/s,Wind speed at 10 m average for October,1
+si10_11,float,m/s,Wind speed at 10 m average for November,1
+si10_12,float,m/s,Wind speed at 10 m average for December,1
+population_density,float,people/km2,Population density per km2,1
+land_use_0,float,%,Proportion of LC type "ocean",1
+land_use_11,float,%,Proportion of LC type "urban",1
+land_use_22,float,%,Proportion of LC type "cropland",1
+land_use_33,float,%,Proportion of LC type "pasture/rangeland",1
+land_use_44,float,%,Proportion of LC type "forest",1
+land_use_55,float,%,Proportion of LC type "unmanaged grass/shrubland",1
+land_use_66,float,%,Proportion of LC type "sparse/no vegetation",1
+land_use_77,float,%,Proportion of LC type "water",1
+geometry,string,polygon,4 vertices each in longitude and latitude: Geometry of the grid cell,0
+prob_1,float,%, Vector Habitat Suitability,1
+prob_2,float,%,Inverted vector Habitat Suitability,1
+longitude,float,longitude,coordinate,0
+latitude,float,latitude,coordinate,0
+unnamed___0,string,NA,NA,0
+target_class_prediction,string,yes/no,Binary classification of whether a habitat is suitable,1
+index_right,float,NA,NA,0
+admin,string,NA,the full country name,0
+iso_a3,string,NA,the 3 letter country name,0
+iso_a2,string,NA,the 2 letter country name,0
+p_label,string,NA,undefined,0
+id,int,NA,NA,0
+Count,int,NA,NA,0
+Year,string,Year,Year of the observation,1
+Month,string,Month,Month of the observation,1
+Day,string,Day,Day of the observation,1
+Country,string,Country,Country of the observation,1
+Region,string,Region,Region of the observation,1
+County,string,County,County of the observation,1
+Municipality,string,Municipality,Municipality of the observation,1
+Species,string,Species,Species of the observation,1
+PointType,string,PointType,Type of the observation point,1
+Source,string,Source,Source of the observation,1
+id,int,NA,ID,0
+idbundesland,int,ID,ID of the federal state,0
+datenstand,string,NA,Date of the data status,0
+meldedatum,string,NA,Reporting date,0
+bundesland,string,Name,Name of the federal state,0
+accucases,int,,Accumulated number of cases,1
+newcases,int,,New cases,1
+accucasesperweek,int,,Accumulated cases per week,1
+newcasesperweek,int,,New cases per week,1
+accudeaths,int,,Accumulated number of deaths,1
+newdeaths,int,,New deaths,1
+accudeathsperweek,int,,Accumulated deaths per week,1
+newdeathsperweek,int,,New deaths per week,1
+accurecovered,int,,Accumulated number of recoveries,1
+newrecovered,int,,New recoveries,1
+population,int,,Population count,1
+date,date,NA,Date of the observation,1
+longitude_1,float,longitude,coordinate,0
+iso_3166_1_alpha_3,string,NA,the 3 letter country name,1
+cumulative_confirmed,float,cumulative_confirmed,cumulative confirmed cases,0
+cumulative_recovered,float,cumulative_recovered,cumulative recovered cases,0
+cumulative_deceased,float,cumulative_deceased,cumulative deceased cases,0
+cumulative_tested,float,cumulative_tested,cumulative tested cases,0
+new_confirmed,float,confirmed,Confirmed Cases,1
+new_recovered,float,recovered,Total Recoveries,1
+new_deceased,float,deceased,Total Deaths,1
+new_tested,float,tested,Total Tests,1
+id,int,id,id,0
+location_key,string,location_key,location key,0
+openstreetmap_id,string,openstreetmap_id,OpenStreetMap ID,0
+latitude,float,latitude,latitude,0
+longitude,float,longitude,longitude,0
+elevation_m,string,elevation_m,elevation in meters,0
+area_sq_km,string,area_sq_km,area in square kilometers,0
+area_rural_sq_km,string,area_rural_sq_km,area of rural land in square kilometers,0
+area_urban_sq_km,string,area_urban_sq_km,area of urban land in square kilometers,0
+date,date,date,Date of the observation,0
+place_id,string,place_id,Place ID,0
+wikidata_id,string,wikidata_id,Wikidata ID,0
+datacommons_id,string,datacommons_id,Data Commons ID,0
+country_code,string,country_code,country code,0
+country_name,string,country_name,country name,0
+subregion1_code,string,subregion1_code,subregion 1 code,0
+subregion1_name,string,subregion1_name,subregion 1 name,0
+subregion2_code,string,subregion2_code,subregion 2 code,0
+subregion2_name,string,subregion2_name,subregion 2 name,0
+locality_code,string,locality_code,locality code,0
+locality_name,string,locality_name,locality name,0
+iso_3166_1_alpha_2,string,iso_3166_1_alpha_2,2 letter country code,0
+iso_3166_1_alpha_3,string,iso_3166_1_alpha_3,3 letter country code,0
+aggregation_level,string,aggregation_level,aggregation level,0
+created_at,date,NA,Creation date,1
+cv,float, ,Coefficient of variation,1
+

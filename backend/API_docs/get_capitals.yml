@@ -1,0 +1,26 @@
+tags:
+  - Map Data Endpoints
+summary: Get capital cities GeoJSON data
+description: Returns GeoJSON data for world capital cities locations.
+responses:
+  200:
+    description: Successful response with GeoJSON data
+    content:
+      application/json:
+        schema:
+          type: object
+          description: GeoJSON FeatureCollection with capital cities data
+          example:
+            type: "FeatureCollection"
+            features: []
+  500:
+    description: Internal server error reading data
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              description: Error message
+              example: "ERROR reading CSV file: get_capitals"

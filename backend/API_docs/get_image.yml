@@ -1,0 +1,41 @@
+tags:
+  - Utility Endpoints
+summary: Get image file
+description: Retrieves an image file from the backend assets directory.
+parameters:
+  - name: imagePath
+    in: query
+    description: Relative path to the image within the images directory
+    required: true
+    schema:
+      type: string
+      example: "mosquito.jpg"
+responses:
+  200:
+    description: Successful response with image data
+    content:
+      image/jpeg:
+        schema:
+          type: string
+          format: binary
+  400:
+    description: Invalid or missing image path
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              example: "Invalid or missing image path"
+  500:
+    description: Internal server error reading image file
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              description: Error message
+              example: "ERROR reading image file: load_image"

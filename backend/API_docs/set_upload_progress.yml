@@ -1,0 +1,26 @@
+tags:
+  - Utility Endpoints
+summary: Set file upload progress
+description: Manually sets the upload progress percentage value. This is used internally during file upload operations to track progress.
+parameters:
+  - name: progressVal
+    in: query
+    description: Progress percentage value to set (0-100)
+    required: true
+    schema:
+      type: integer
+      minimum: 0
+      maximum: 100
+      example: 50
+responses:
+  200:
+    description: Progress value successfully set
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            progress:
+              type: integer
+              description: The updated progress value
+              example: 50

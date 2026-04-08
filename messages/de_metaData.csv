@@ -1,0 +1,137 @@
+valuename,datatype,dimension,description,availability
+x,float,Längengrad,Koordinate,0
+y,float,Breitengrad,Koordinate,0
+year,string,Year, Jahr der Messungen,0
+t2m_1,float,K,Temperatur auf 2m Durchschnitt für Januar,1
+t2m_2,float,K,Temperatur auf 2m Durchschnitt für Februar,1
+t2m_3,float,K,Temperatur auf 2m Durchschnitt für März,1
+t2m_4,float,K,Temperatur auf 2m Durchschnitt für April,1
+t2m_5,float,K,Temperatur auf 2m Durchschnitt für Mai,1
+t2m_6,float,K,Temperatur auf 2m Durchschnitt für Juni,1
+t2m_7,float,K,Temperatur auf 2m Durchschnitt für Juli,1
+t2m_8,float,K,Temperatur auf 2m Durchschnitt für August,1
+t2m_9,float,K,Temperatur auf 2m Durchschnitt für September,1
+t2m_10,float,K,Temperatur auf 2m Durchschnitt für Oktober,1
+t2m_11,float,K,Temperatur auf 2m Durchschnitt für November,1
+t2m_12,float,K,Temperatur auf 2m Durchschnitt für Dezember,1
+d2m_1,float,K,Taupunkttemperatur auf 2m Durchschnitt für Januar,1
+d2m_2,float,K,Taupunkttemperatur auf 2m Durchschnitt für Februar,1
+d2m_3,float,K,Taupunkttemperatur auf 2m Durchschnitt für März,1
+d2m_4,float,K,Taupunkttemperatur auf 2m Durchschnitt für April,1
+d2m_5,float,K,Taupunkttemperatur auf 2m Durchschnitt für Mai,1
+d2m_6,float,K,Taupunkttemperatur auf 2m Durchschnitt für Juni,1
+d2m_7,float,K,Taupunkttemperatur auf 2m Durchschnitt für Juli,1
+d2m_8,float,K,Taupunkttemperatur auf 2m Durchschnitt für August,1
+d2m_9,float,K,Taupunkttemperatur auf 2m Durchschnitt für September,1
+d2m_10,float,K,Taupunkttemperatur auf 2m Durchschnitt für Oktober,1
+d2m_11,float,K,Taupunkttemperatur auf 2m Durchschnitt für November,1
+d2m_12,float,K,Taupunkttemperatur auf 2m Durchschnitt für Dezember,1
+tp_1,float,m,Summe Niederschlag Durchschnitt für Januar,1
+tp_2,float,m,Summe Niederschlag Durchschnitt für Februar,1
+tp_3,float,m,Summe Niederschlag Durchschnitt für März,1
+tp_4,float,m,Summe Niederschlag Durchschnitt für April,1
+tp_5,float,m,Summe Niederschlag Durchschnitt für Mai,1
+tp_6,float,m,Summe Niederschlag Durchschnitt für Juni,1
+tp_7,float,m,Summe Niederschlag Durchschnitt für Juli,1
+tp_8,float,m,Summe Niederschlag Durchschnitt für August,1
+tp_9,float,m,Summe Niederschlag Durchschnitt für September,1
+tp_10,float,m,Summe Niederschlag Durchschnitt für Oktober,1
+tp_11,float,m,Summe Niederschlag Durchschnitt für November,1
+tp_12,float,m,Summe Niederschlag Durchschnitt für Dezember,1
+si10_1,float,m/s,Windgeschwindigkeit auf 10m Durchschnitt für Januar,1
+si10_2,float,m/s,Windgeschwindigkeit auf 10m Durchschnitt für Februar,1
+si10_3,float,m/s,Windgeschwindigkeit auf 10m Durchschnitt für März,1
+si10_4,float,m/s,Windgeschwindigkeit auf 10m Durchschnitt für April,1
+si10_5,float,m/s,Windgeschwindigkeit auf 10m Durchschnitt für Mai,1
+si10_6,float,m/s,Windgeschwindigkeit auf 10m Durchschnitt für Juni,1
+si10_7,float,m/s,Windgeschwindigkeit auf 10m Durchschnitt für Juli,1
+si10_8,float,m/s,Windgeschwindigkeit auf 10m Durchschnitt für August,1
+si10_9,float,m/s,Windgeschwindigkeit auf 10m Durchschnitt für September,1
+si10_10,float,m/s,Windgeschwindigkeit auf 10m Durchschnitt für Oktober,1
+si10_11,float,m/s,Windgeschwindigkeit auf 10m Durchschnitt für November,1
+si10_12,float,m/s,Windgeschwindigkeit auf 10m Durchschnitt für Dezember,1
+population_density,float,people/km2,Bevölkerungsdichte pro km2,1
+land_use_0,float,%,Anteil der Landbedeckung Typ "Ozean",1
+land_use_11,float,%,Anteil der Landbedeckung Typ "städtisch",1
+land_use_22,float,%,Anteil der Landbedeckung Typ "Ackerland",1
+land_use_33,float,%,Anteil der Landbedeckung Typ "Weideland",1
+land_use_44,float,%,Anteil der Landbedeckung Typ "Wald",1
+land_use_55,float,%,Anteil der Landbedeckung Typ "ungenutztes Gras/Strauchland",1
+land_use_66,float,%,Anteil der Landbedeckung Typ "spärliche/keine Vegetation",1
+land_use_77,float,%,Anteil der Landbedeckung Typ "Wasser",1
+geometry,string,polygon,4 Eckpunkte jeweils in Längengrad und Breitengrad: Geometrie der Gitterzelle,0
+prob_1,float,%,Wahrscheinlichkeit für geeigneten Vektorlebensraum,1
+prob_2,float,%,Invertierte Wahrscheinlichkeit für geeigneten Vektorlebensraum,1
+longitude,float,longitude,Koordinate,0
+latitude,float,latitude,Koordinate,0
+unnamed___0,string,NA,NA,0
+target_class_prediction,string,ja/nein,Binäre Klassifizierung ob ein Lebensraum geeignet ist,1
+index_right,float,NA,NA,0
+admin,string,NA,Der vollständige Ländername,0
+iso_a3,string,NA,Der 3-Buchstaben-Ländercode,0
+iso_a2,string,NA,Der 2-Buchstaben-Ländercode,0
+p_label,string,NA,undefined,0
+Count,int,NA,NA,0
+Year,string,Jahr,Jahr der Beobachtung,1
+Month,string,Monat,Monat der Beobachtung,1
+Day,string,Tag,Tag der Beobachtung,1
+Country,string,Land,Land der Beobachtung,1
+Region,string,Region,Region der Beobachtung,1
+County,string,Bezirk,Bezirk der Beobachtung,1
+Municipality,string,Gemeinde,Gemeinde der Beobachtung,1
+Species,string,Species,Art der Beobachtung,1
+PointType,string,PointType,Typ des Beobachtungspunkts,1
+Source,string,Quelle,Quelle der Beobachtung,1
+id,int,NA,ID,0
+idbundesland,int,ID,ID des Bundeslandes,0
+datenstand,string,NA,Datum des Datenstandes,0
+meldedatum,string,NA,Meldedatum,0
+bundesland,string,Name,Name des Bundeslandes,0
+accucases,int,,Kumulierte Anzahl der Fälle,1
+newcases,int,,Neue Fälle,1
+accucasesperweek,int,,Kumulierte Fälle pro Woche,1
+newcasesperweek,int,,Neue Fälle pro Woche,1
+accudeaths,int,,Kumulierte Anzahl der Todesfälle,1
+newdeaths,int,,Neue Todesfälle,1
+accudeathsperweek,int,,Kumulierte Todesfälle pro Woche,1
+newdeathsperweek,int,,Neue Todesfälle pro Woche,1
+accurecovered,int,,Kumulierte Anzahl der Genesenen,1
+newrecovered,int,,Neue Genesene,1
+population,int,,Bevölkerungsanzahl,1
+date,date,NA,Datum der Beobachtung,1
+longitude_1,float,NA,Koordinate,0
+iso_3166_1_alpha_3,string,NA,Der 3-Buchstaben-Ländercode,1
+cumulative_confirmed,float,cumulative_confirmed,Kumulative bestätigte Fälle,0
+cumulative_recovered,float,cumulative_recovered,Kumulative Genesungen,0
+cumulative_deceased,float,cumulative_deceased,Kumulative Todesfälle,0
+cumulative_tested,float,cumulative_tested,Kumulative getestete Fälle,0
+new_confirmed,float,confirmed,Bestätigte Fälle,1
+new_recovered,float,recovered,Genesungen,1
+new_deceased,float,deceased,Todesfälle,1
+new_tested,float,tested,Getestete Fälle,1
+id,int,id,id,0
+location_key,string,location_key,location key,0
+openstreetmap_id,string,openstreetmap_id,OpenStreetMap ID,0
+latitude,float,latitude,latitude,0
+longitude,float,longitude,longitude,0
+elevation_m,string,elevation_m,elevation in meters,0
+area_sq_km,string,area_sq_km,area in square kilometers,0
+area_rural_sq_km,string,area_rural_sq_km,Rurale Fläche in sqm,0
+area_urban_sq_km,string,area_urban_sq_km,Urbane Fläche in sqkm,0
+date,date,date,Datum,0
+place_id,string,place_id,Place ID,0
+wikidata_id,string,wikidata_id,Wikidata ID,0
+datacommons_id,string,datacommons_id,Data Commons ID,0
+country_code,string,country_code,Länderkürzel,0
+country_name,string,country_name,Ländername,0
+subregion1_code,string,subregion1_code,subregion 1 code,0
+subregion1_name,string,subregion1_name,subregion 1 name,0
+subregion2_code,string,subregion2_code,subregion 2 code,0
+subregion2_name,string,subregion2_name,subregion 2 name,0
+locality_code,string,locality_code,locality code,0
+locality_name,string,locality_name,locality name,0
+iso_3166_1_alpha_2,string,iso_3166_1_alpha_2,2-stelliges Länderkürzel,0
+iso_3166_1_alpha_3,string,iso_3166_1_alpha_3,3-stelliges Länderkürzel,0
+aggregation_level,string,aggregation_level,aggregation level,0
+created_at,date, ,Erstellungsdatum,1
+cv,float, ,Variationskoeffizient,1
