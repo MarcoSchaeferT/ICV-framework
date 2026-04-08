@@ -1,0 +1,32 @@
+name: Cleanup Old Package Versions
+
+on:
+  workflow_dispatch: # Allows you to run this manually from the Actions tab
+  #schedule:
+  #  - cron: '0 0 * * 0' # Optional: Runs every Sunday at midnight
+
+jobs:
+  delete-versions:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - uses: actions/delete-package-versions@v5
+        with:
+          package-name: 'icv-frontend'
+          package-type: 'container' # Options: npm, maven, rubygems, nuget, docker, container
+          min-versions-to-keep: 1
+          delete-only-untagged-versions: 'true'
+      - uses: actions/delete-package-versions@v5
+        with:
+          package-name: 'icv-database'
+          package-type: 'container' 
+          min-versions-to-keep: 1
+          delete-only-untagged-versions: 'true' 
+      - uses: actions/delete-package-versions@v5
+        with:
+          package-name: 'icv-backend'
+          package-type: 'container'
+          min-versions-to-keep: 1
+          delete-only-untagged-versions: 'true'
