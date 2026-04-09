@@ -143,7 +143,7 @@ async def getDBdata_singleCol( relationName: str, feature: str, filterBy: Option
     if feature:
       query += f"{conditionBuilderFeatureNotEmpty(feature, query, feature_type)}"
     if startDate and endDate:
-      query += f"{conditionBuilderRange(startDate, endDate, "date", query)}"
+      query += f"{conditionBuilderRange(startDate, endDate, 'date', query)}"
     if aggregation_level and "aggregation_level" in column_names:
       start_keyword = " WHERE " if "WHERE" not in query else " AND "
       query += f" {start_keyword} aggregation_level = '{aggregation_level}'"
