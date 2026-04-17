@@ -1,0 +1,8 @@
+##### Datenverarbeitung
+Die Rohdatenquellen werden mit folgenden Methoden auf die angestrebte Gitterauflösung (0.25° x 0.25°) verarbeitet und aggregiert:
+
+- **[Klimadaten](#climate-data)** – für jedes Gebiet der gewählten Größe wurden die Durchschnittstemperatur, Taupunkttemperatur, Windgeschwindigkeit und der Niederschlag für jeden Monat des Jahres gemittelt.
+
+- **[Landnutzungsdaten](#land-use-data)** – für jedes Gebiet der gewählten Größe wird der Anteil jeder Datenkategorie bestimmt, indem zunächst die Zellen aufsummiert werden, die zu dieser Kategorie gehören, und diese Summe dann durch die Gesamtzahl der Zellen in allen bekannten Kategorien innerhalb des ausgewählten Gebiets geteilt wird.
+
+- **[Bevölkerungsdaten](#population-data)** – für jedes Gebiet der gewählten Größe werden die Bevölkerungszahlen aufsummiert und dann durch die Anzahl der Quadratkilometer innerhalb dieses Gebiets geteilt. Für die Jahre zwischen den 5-Jahres-Schritten wurden die Bevölkerungsdaten linear interpoliert.

@@ -64,8 +64,9 @@ import { Locale } from '@/i18n/routing';
 import { useGetJSONData } from "../hooks/customFetchAndCache";
 import { LoadingSpinner } from "./plots/maps/helpers";
 
-// Stable empty array reference to prevent re-render loops
+// Stable references to prevent re-render loops
 const EMPTY_ARRAY: any[] = [];
+const NO_DATA_FALLBACK: any[] = [{ no_data: "" }];
 
 // define the values and types for the DataTableComponent
 export interface dataTableComponentT {
@@ -190,12 +191,13 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
   const metaData = (rawMetaData || {}) as unknown as metaDataT;
 
   // *** SAFEGUARD 2: Extract response array safely ***
-  // Use stable empty array reference to prevent re-render loops when no data
+  
+  const responseArray = tableData.response;
   const safeTableData = useMemo(() => 
-    Array.isArray(tableData.response) && tableData.response.length > 0 
-      ? tableData.response 
+    Array.isArray(responseArray) && responseArray.length > 0 
+      ? responseArray 
       : EMPTY_ARRAY,
-    [tableData.response]
+    [responseArray]
   );
   const hasData = safeTableData.length > 0;
 
@@ -219,7 +221,7 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
 
     // *** SAFEGUARD 4: Only access index [0] if we know it exists (checked by hasData) ***
     Object.keys(safeTableData[0]).forEach((key) => {
-      if (!key.startsWith("_") && !key.includes("geometry")) {
+      if (!key.startsWith("_") && !key.includes("geometry") && key !== "id") {
         columnDefs.push({
           header: key,
           accessorKey: key,
@@ -245,7 +247,8 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
   // *** setup table config **** //
   const table = useReactTable({
     // *** SAFEGUARD 5: Ensure data matches the fallback column ***
-    data: hasData ? safeTableData : [{ no_data: "" }], 
+
+    data: hasData ? safeTableData : NO_DATA_FALLBACK, 
     columns,
     filterFns: {
       fuzzy: fuzzyFilter,
@@ -300,14 +303,15 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
 
   // *** APPLY EXTERNAL SELECTIONS TO TABLE **** //
   // when selectedStateID changes, update the selected row in the table
-  // Note: We use safeTableData.length instead of `table` in dependencies to avoid infinite loops
-  // since `table` is recreated on every render by useReactTable
+  
+  const selectedStateID = dataTableCONTEXT.selectedStateID;
   useEffect(() => {
     if(!hasData || !isMounted.current) return;
+    if(selectedStateID === -1) return; // no selection — nothing to sync
     
     const sortedRows = table.getSortedRowModel().rows;
 
-    const stateName = CovidDataStates.mapperFunctions.Map__ID_to_State(dataTableCONTEXT.selectedStateID);
+    const stateName = CovidDataStates.mapperFunctions.Map__ID_to_State(selectedStateID);
     // Use optional chaining for safety
     const matchingRow = sortedRows.findIndex(row => (row.original as any)?.bundesland === stateName)
     const pageSize = table.getState().pagination.pageSize;
@@ -321,7 +325,7 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
       table.setPageIndex(curPage);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataTableCONTEXT.selectedStateID, sorting, hasData, safeTableData.length]);
+  }, [selectedStateID, sorting, hasData, safeTableData.length]);
 
 
   // *** create the table **** //
@@ -381,7 +385,7 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
                           colSpan={header.colSpan}
                           className="px-2.5 py-2 text-start font-semibold hover:bg-gray-300 transition-colors"
                         >
-                          <div title={metaData[header.column.id]?.description} 
+                          <div title={metaData && !('error' in metaData) ? metaData[header.column.id]?.description : undefined} 
                             className={twMerge(
                               "flex items-center gap-2",
                                "cursor-pointer",

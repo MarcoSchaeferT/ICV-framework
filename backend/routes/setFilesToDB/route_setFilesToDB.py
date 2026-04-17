@@ -94,12 +94,17 @@ async def setFilesToDB():
     try:
       from backend.routes.setFilesToDB.db_utils import query_raw
       from backend.routes.setFilesToDB.parseCSVdata import sanitize_names
+      from psycopg import sql
       for file_path in saved_files:
         table_name = sanitize_names([Path(file_path).stem])[0]
-        result = await query_raw(f"SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = '{table_name}')")
-        tables_exist= bool(result[0].get('exists', False)) if result else False
-    except Exception:
+        # Use parameterized query for table existence check
+        check_query = sql.SQL("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = %s)")
+        result = await query_raw(check_query, (table_name,))
+        tables_exist = bool(result[0].get('exists', False)) if result else False
+    except Exception as e:
+      print(f"Error checking table existence: {e}")
       pass
+
     
     return (
       jsonify(

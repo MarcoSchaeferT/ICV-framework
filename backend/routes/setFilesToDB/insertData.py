@@ -30,7 +30,9 @@ async def insertData(data: ParsedData):
             with conn.cursor() as cur:
                 # COPY is very efficient - can handle large chunks with constant memory
                 chunk_size = 10000  # 10k rows per COPY operation
-                columns = ', '.join(data.sanitized_column_names)
+                
+                # Use psycopg.sql for safe identifiers
+                safe_columns = [sql.Identifier(col) for col in data.sanitized_column_names]
                 
                 # Create a buffer for COPY data
                 buffer = io.StringIO()
@@ -82,9 +84,7 @@ async def insertData(data: ParsedData):
                         
                         try:
                             # Use COPY FROM for bulk insert
-                            column_identifiers = sql.SQL(', ').join(
-                                sql.Identifier(col) for col in data.sanitized_column_names
-                            )
+                            column_identifiers = sql.SQL(', ').join(safe_columns)
                             copy_query = sql.SQL("COPY {} ({}) FROM STDIN").format(
                                 sql.Identifier(data.db_name),
                                 column_identifiers
@@ -103,7 +103,7 @@ async def insertData(data: ParsedData):
                             # Fall back to row-by-row insert for this chunk
                             buffer.seek(0)
                             success = await _fallback_insert(
-                                conn, cur, data.db_name, columns, 
+                                conn, cur, data.db_name, safe_columns, 
                                 buffer, i, chunk_size, fileUploadErrors
                             )
                             if not success:
@@ -125,7 +125,7 @@ async def insertData(data: ParsedData):
 
 
 async def _fallback_insert(
-    conn, cur, table_name: str, columns: str,
+    conn, cur, table_name: str, safe_columns: list[sql.Identifier],
     buffer: io.StringIO, current_row: int, chunk_size: int,
     fileUploadErrors: dict
 ) -> bool:
@@ -135,8 +135,14 @@ async def _fallback_insert(
     
     for j, row_data in enumerate(reader):
         try:
-            placeholders = ', '.join(['%s'] * len(row_data))
-            query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+            # Build safe parameterized INSERT query
+            placeholders = sql.SQL(", ").join(sql.Placeholder() * len(row_data))
+            columns_sql = sql.SQL(", ").join(safe_columns)
+            query = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+                sql.Identifier(table_name),
+                columns_sql,
+                placeholders
+            )
             cur.execute(query, row_data)
             conn.commit()
         except Exception as row_error:

@@ -23,6 +23,9 @@ export interface UIContextI {
     setIsSwapy: React.Dispatch<React.SetStateAction<boolean>>;
     curDocsNameRef: React.MutableRefObject<string>;
     updateHash: React.MutableRefObject<number>;
+    isDemoModeDialogOpen: boolean;
+    setIsDemoModeDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    demoMode: boolean;
 }
 
 export interface SidebarSelectionI {
@@ -47,6 +50,16 @@ function UIContextProvider({children}: any) {
     const [isSwapy, setIsSwapy] = useState<boolean>(false)
     const curDocsNameRef = useRef<string>(' General ');
     const updateHash = useRef(0);
+    const [isDemoModeDialogOpen, setIsDemoModeDialogOpen] = useState<boolean>(false);
+    const [demoMode, setDemoMode] = useState<boolean>(false);
+
+    // Fetch demo mode on mount
+    React.useEffect(() => {
+        fetch('/api/demo-mode')
+            .then(res => res.json())
+            .then(data => setDemoMode(data.demoMode))
+            .catch(err => console.error('Failed to fetch demo mode:', err));
+    }, []);
 
    const contextValue = {
        sidebarSelection, setSidebarSelection,
@@ -67,7 +80,9 @@ function UIContextProvider({children}: any) {
             curDocsMDXContent, setCurMDXContent,
             isSwapy, setIsSwapy,
             curDocsNameRef,
-            updateHash
+            updateHash,
+            isDemoModeDialogOpen, setIsDemoModeDialogOpen,
+            demoMode
            }}>
             {children}
          </UIContext.Provider>

@@ -1,8 +1,9 @@
-"""Shared database utilities"""
 import os
 import psycopg
-from psycopg import errors as psycopg_errors
+from psycopg import errors as psycopg_errors, sql
 from contextlib import contextmanager
+from typing import Optional, Union
+
 
 SQL_DATATYPES = {
     "string": "varchar",
@@ -18,7 +19,7 @@ def get_db_connection_params() -> dict:
     
     if not database_url:
         raise ValueError("DATABASE_URL environment variable is not set. Check your .env file and ensure python-dotenv is installed.")
-        
+    
     # Format: postgresql://user:password@host:port/database
     if database_url.startswith("postgresql://"):
         database_url = database_url[13:]  # Remove 'postgresql://'
@@ -60,13 +61,13 @@ def get_db_connection():
         conn.close()
 
 
-async def query_raw(query: str) -> list[dict]:
+async def query_raw(query: Union[str, sql.SQL, sql.Composed], params: Optional[Union[tuple, dict]] = None) -> list[dict]:
     """Execute a raw query and return results as list of dicts"""
     conn_params = get_db_connection_params()
     try:
         with psycopg.connect(**conn_params) as conn:
             with conn.cursor() as cur:
-                cur.execute(query)
+                cur.execute(query, params)
                 if cur.description:
                     columns = [desc[0] for desc in cur.description]
                     return [dict(zip(columns, row)) for row in cur.fetchall()]
@@ -81,13 +82,13 @@ async def query_raw(query: str) -> list[dict]:
         raise
 
 
-async def execute_raw(query: str) -> None:
+async def execute_raw(query: Union[str, sql.SQL, sql.Composed], params: Optional[Union[tuple, dict]] = None) -> None:
     """Execute a raw query without returning results"""
     conn_params = get_db_connection_params()
     try:
         with psycopg.connect(**conn_params) as conn:
             with conn.cursor() as cur:
-                cur.execute(query)
+                cur.execute(query, params)
                 conn.commit()
     except psycopg_errors.UndefinedTable as e:
         print(f"Table does not exist: {e}")
@@ -95,3 +96,4 @@ async def execute_raw(query: str) -> None:
     except psycopg_errors.Error as e:
         print(f"Database error in execute_raw: {e}")
         raise
+

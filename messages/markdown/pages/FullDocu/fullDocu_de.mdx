@@ -9,6 +9,18 @@ import ColorMap from "../../MapUI/colorMap_de.mdx"
 import MosquitoPresenceData from "../../MapUI/mosquitoPresenceData_de.mdx"
 import DengueSerotypeCounts from "../../MapUI/dengueSerotypeCounts_de.mdx"
 
+ {/* Data Set Details */}
+import DengueSerotypeCounts_dataset from "../../DataSetDetails/Mosquito/DengueSerotypeCounts_de.mdx"
+import MosquitoPresenceData_dataset from "../../DataSetDetails/Mosquito/MosquitoPresenceData_de.mdx"
+import MosquitoHabitatSuitability_dataset from "../../DataSetDetails/Mosquito/MosquitoHabitatSuitability_de.mdx"
+import MosquitoTrainingData_dataset from "../../DataSetDetails/Mosquito/MosquitoTrainingData_de.mdx"
+import MosquitoObservationData_dataset from "../../DataSetDetails/Mosquito/ObservationData_de.mdx"
+import ChoiceOfCovariates from "../../DataSetDetails/Mosquito/ChoiceOfCovariates_de.mdx"
+import ClimateData from "../../DataSetDetails/Mosquito/ClimateData_de.mdx"
+import LandUseData from "../../DataSetDetails/Mosquito/LandUseData_de.mdx"
+import PopulationData from "../../DataSetDetails/Mosquito/PopulationData_de.mdx"
+import DataProcessing from "../../DataSetDetails/Mosquito/DataProcessing_de.mdx"
+
 export const layoutStyle = "block p-5 rounded-lg my-6"
 export const rawDatasetsStyle = "bg-white border-l-4 border-l-fuchsia-800 border border-gray-200 shadow-sm " + layoutStyle
 
@@ -39,6 +51,20 @@ export const rawDatasetsStyle = "bg-white border-l-4 border-l-fuchsia-800 border
          - [Farbschema](#ColorMap)
          - [Mücken-Sichtungsdaten](#MosquitoPresenceData)
          - [Dengue Serotyp Zählungen](#DengueSerotypeCounts)
+   - [Datensatz Details](#DataSetDetails)
+      - [Mücken](#DataSetDetails_mosquito)
+         1. [Rohdatensätze](#raw-datasets)
+            - [Beobachtungsdaten](#mosquito-observation-data)
+            - [Klimadaten](#climate-data)
+            - [Landnutzungsdaten](#land-use-data)
+            - [Bevölkerungsdaten](#population-data)
+         2. [Datenvorverarbeitung](#data-preprocessing)
+            - [Auswahl der Kovariaten](#choice-of-covariates)
+            - [Datenverarbeitung](#data-processing)
+         3. [Trainingsdaten](#mosquito-training-data)
+         4. [Habitateignung](#mosquito-habitat-suitability)
+         - [Sichtungsdaten](#mosquito-presence-data)
+         - [Dengue Serotypen](#dengue-serotype-counts)
    </div>
    </div>
    <div style={{ flex: 1, minWidth: "260px", marginLeft: "24px", marginRight: "0px" }}>
@@ -91,6 +117,40 @@ export const rawDatasetsStyle = "bg-white border-l-4 border-l-fuchsia-800 border
 -------
 
 
+
+
+
+ {/* Data Set Details */}
+<a id="DataSetDetails"></a>
+## Datensatz Details
+
+
+<a id="DataSetDetails_mosquito"></a>
+### Mücken
+
+<a id="raw-datasets"></a>
+#### 1. Rohdatensätze
+   <span className={rawDatasetsStyle} id="mosquito-observation-data"><MosquitoObservationData_dataset/></span>
+   <span className={rawDatasetsStyle} id="climate-data"><ClimateData/></span>
+   <span className={rawDatasetsStyle} id="land-use-data"><LandUseData/></span>
+   <span className={rawDatasetsStyle} id="population-data"><PopulationData/></span>
+
+<a id="data-preprocessing"></a>
+#### 2. Datenvorverarbeitung
+   <span className={rawDatasetsStyle} id="choice-of-covariates"><ChoiceOfCovariates/></span>
+   <span className={rawDatasetsStyle} id="data-processing"><DataProcessing/></span>
+
+#### 3. Trainingsdaten
+<span className={rawDatasetsStyle} id="mosquito-training-data"><MosquitoTrainingData_dataset/></span>
+
+#### 4. Habitateignung
+<span className={rawDatasetsStyle} id="mosquito-habitat-suitability"><MosquitoHabitatSuitability_dataset/></span>
+
+-----------------
+
+<span className={rawDatasetsStyle} id="mosquito-presence-data"><MosquitoPresenceData_dataset/></span>
+-----------------
+<span className={rawDatasetsStyle} id="dengue-serotype-counts"><DengueSerotypeCounts_dataset/></span>
 
 [↑ zurück nach ganz oben](#HowToUse)
 

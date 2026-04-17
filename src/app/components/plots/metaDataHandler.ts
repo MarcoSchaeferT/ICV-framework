@@ -35,11 +35,12 @@ export function alignFeature_to_Metadata(value: number, featureName: string, met
   if (metaData[featureName] != undefined) {
     unit = metaData[featureName].dimension;
   } else {
-    // Only warn for non-empty feature names; empty string is the expected initial state
-    if (featureName !== "") {
+    // Only warn for non-empty feature names; empty string is the expected initial state.
+    // Also ignore "id" column used by the database.
+    if (featureName !== "" && featureName !== "id") {
       console.warn("Feature not found in metadata: ", featureName);
     }
-    return { value, unit };
+    return { value: d, unit };
   }
 
 

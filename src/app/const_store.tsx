@@ -7,6 +7,8 @@ export const consts: { [key: string]: string } =
         "API_ADDRES": "http://localhost:3000/api"
     };
 
+export const IS_DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
 
 export type LayoutSizesT = {
     rowSpanSize: number;
@@ -306,3 +308,7 @@ export const categoricalColors = [
     ];
 
     export const categoricalColors2 = d3.schemeCategory10.concat(d3.schemeSet3).concat(d3.schemeTableau10).concat(d3.schemePaired).concat(d3.schemePastel1).concat(d3.schemePastel2);
+
+    export const dataSourceURLs: { [key: string]: string } = {
+        "mosquito": "https://zenodo.org/records/19615975",
+    };

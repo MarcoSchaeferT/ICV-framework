@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { apiRoutes } from "@/app/api_routes";
+import { useUIContext } from "@/app/components/contexts/UIContext";
 
 interface Relation {
   table_name: string;
@@ -9,6 +10,7 @@ interface Relation {
 }
 
 export default function ManageDBPage() {
+  const { setIsDemoModeDialogOpen, demoMode } = useUIContext();
   const [relations, setRelations] = useState<Relation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +38,10 @@ export default function ManageDBPage() {
 
   /* ───────── Delete handler ───────── */
   const handleDelete = async (name: string) => {
+    if (demoMode) {
+      setIsDemoModeDialogOpen(true);
+      return;
+    }
     const confirmed = window.confirm(
       `Are you sure you want to permanently delete the table "${name}"?\n\nThis action cannot be undone.`
     );

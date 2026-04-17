@@ -41,18 +41,36 @@ function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boole
 
     const shouldFetch = url !== "" && isAllowed !== false;
     
-    // STEP 1: Initialize state
-    // Start as loading=true when we know a fetch is needed, so consumers
-    // don't see a false "not loading" state before the effect runs.
-    const [isLoadingData, setLoading] = useState(shouldFetch);
-    const [data, setData] = useState<dbDATA>(EMPTY_DATA);
+    // STEP 1: Initialize state with synchronous cache check.
+    // By reading the cache inside useState's lazy initializer we guarantee
+    // that cached data is available from the very first render — no gap
+    // between mount and effect, so no need for workarounds in the return.
+    const [isLoadingData, setLoading] = useState(() => {
+        if (!shouldFetch) return false;
+        const cached = dataCache.get(url);
+        if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+            return false; // cache hit → not loading
+        }
+        return true; // need to fetch
+    });
+
+    const [data, setData] = useState<dbDATA>(() => {
+        if (!shouldFetch) return EMPTY_DATA;
+        const cached = dataCache.get(url);
+        if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+            return cached.data; // start with cached data immediately
+        }
+        return EMPTY_DATA;
+    });
     
     const abortControllerRef = useRef<AbortController | null>(null);
    
     // STEP 2: Effect to handle URL changes and fetch data
     useEffect(() => {
         if (!shouldFetch) {
-            // No setState needed here — return values are derived below
+            // Reset to idle state when fetching is disabled (e.g. empty URL)
+            setLoading(false);
+            setData(EMPTY_DATA);
             return;
         }
 
@@ -173,7 +191,7 @@ function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boole
     }, [url, shouldFetch]);
 
     if (!shouldFetch) return [false, EMPTY_DATA];
-    return [isLoadingData || data === EMPTY_DATA, data];
+    return [isLoadingData, data];
 }
 
 /**

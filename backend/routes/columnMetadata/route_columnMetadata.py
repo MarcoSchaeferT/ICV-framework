@@ -81,8 +81,8 @@ def _alter_column_type(cur, relation_name: str, column_name: str, datatype: str)
 def _ensure_table(cur, lang: str):
     """Create the metadata table if it does not exist yet."""
     table = _table_name(lang)
-    cur.execute(f"""
-        CREATE TABLE IF NOT EXISTS "{table}" (
+    cur.execute(sql.SQL("""
+        CREATE TABLE IF NOT EXISTS {} (
             id SERIAL PRIMARY KEY,
             relation_name VARCHAR NOT NULL,
             column_name   VARCHAR NOT NULL,
@@ -92,11 +92,14 @@ def _ensure_table(cur, lang: str):
             availability  INT DEFAULT 0,
             UNIQUE(relation_name, column_name)
         )
-    """)
-    cur.execute(f"""
-        CREATE INDEX IF NOT EXISTS "idx_{table}_relation"
-        ON "{table}" USING btree (relation_name)
-    """)
+    """).format(sql.Identifier(table)))
+    
+    index_name = f"idx_{table}_relation"
+    cur.execute(sql.SQL("""
+        CREATE INDEX IF NOT EXISTS {}
+        ON {} USING btree (relation_name)
+    """).format(sql.Identifier(index_name), sql.Identifier(table)))
+
 
 
 def ensure_metadata_tables():

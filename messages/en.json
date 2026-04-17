@@ -204,7 +204,8 @@
         "source": "source"
     },
     "component_copyrightFooter": {
-        "copyright": "all rights reserved.",
+        "copyright": "© 2026 ICV Contributors. Licensed under GNU GPL-3.0 - see ",
+        "copyrightRest": " file for details.",
         "funding": "Funded by the Federal Ministry of Health (BMG) under grant No. 2523DAT400 (project: ",
         "projectName": " AI-DAVis PANDEMICS)",
         "furtherInfo": "About"

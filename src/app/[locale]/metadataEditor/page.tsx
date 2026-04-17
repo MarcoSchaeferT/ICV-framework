@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { apiRoutes } from "../../api_routes";
+import { useUIContext } from "@/app/components/contexts/UIContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -33,6 +34,7 @@ const DATATYPE_OPTIONS = ["string", "float", "int", "date"];
 export default function MetadataEditorPage() {
   const t = useTranslations("page_metadata");
   const locale = useLocale();
+  const { setIsDemoModeDialogOpen, demoMode } = useUIContext();
 
   // ── state ──────────────────────────────────────────────────────────
   const [relations, setRelations] = useState<string[]>([]);
@@ -129,6 +131,10 @@ export default function MetadataEditorPage() {
 
   // ── save all ───────────────────────────────────────────────────────
   const handleSave = async () => {
+    if (demoMode) {
+      setIsDemoModeDialogOpen(true);
+      return;
+    }
     if (!selectedRelation) return;
     setSaving(true);
     setFeedback(null);

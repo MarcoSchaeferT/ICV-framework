@@ -119,7 +119,7 @@ export default function Home() {
   p2.isApplyTransitions = false;
   p2.isSyncMapCoordsOnTheFly_RECIEVER = true;
   //p2.mapUIsettings.defaultDatasetName =   "t_2019_ocsvm_albopictus_probability_predictions_named";
-  p2.mapUIsettings.defaultDatasetName =   "t_2024_monthly_mean_5_ocsvm_albopictus_predictions_2023_mod";
+  p2.mapUIsettings.defaultDatasetName =   "t_2024_monthly_mean_4_ocsvm_albopictus_predictions_2023_mod";
   p2.mapInteractions = {
     disableMouse: true,
     disableScroll: true,

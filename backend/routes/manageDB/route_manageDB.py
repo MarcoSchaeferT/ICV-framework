@@ -2,6 +2,7 @@
 
 from flask import request, jsonify, Blueprint, Response
 from backend.routes.setFilesToDB.db_utils import query_raw, execute_raw
+from psycopg import sql
 
 # Blueprint configuration
 route_manageDB = Blueprint('manageDB', __name__)
@@ -43,9 +44,11 @@ async def list_relations() -> Response:
     for r in result:
         if r["row_count"] <= 0:
             try:
-                count_result = await query_raw(
-                    f'SELECT COUNT(*) AS cnt FROM "{r["table_name"]}"'
+                # Use sql.Identifier for safe table name injection
+                count_query = sql.SQL("SELECT COUNT(*) AS cnt FROM {}").format(
+                    sql.Identifier(r["table_name"])
                 )
+                count_result = await query_raw(count_query)
                 r["row_count"] = count_result[0]["cnt"] if count_result else 0
             except Exception:
                 r["row_count"] = 0
@@ -64,10 +67,14 @@ async def delete_relation() -> Response:
     if relation_name in PROTECTED_TABLES:
         return jsonify({"error": f"Table '{relation_name}' is protected and cannot be deleted."}), 403
 
-    # Use double-quoting to support mixed-case / special-char identifiers
+    # Use sql.Identifier for safe drop table command
     try:
-        await execute_raw(f'DROP TABLE IF EXISTS "{relation_name}" CASCADE')
+        drop_query = sql.SQL("DROP TABLE IF EXISTS {} CASCADE").format(
+            sql.Identifier(relation_name)
+        )
+        await execute_raw(drop_query)
     except Exception as e:
         return jsonify({"error": f"Failed to drop table: {e}"}), 500
 
     return jsonify({"success": True, "deleted": relation_name})
+

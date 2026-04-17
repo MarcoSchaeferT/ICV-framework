@@ -101,13 +101,13 @@ function Calendar({
           defaultClassNames.day
         ),
         range_start: cn(
-          "rounded-l-md bg-slate-100 dark:bg-slate-800",
+          "rounded-l-md bg-purple-100 dark:bg-purple-900",
           defaultClassNames.range_start
         ),
-        range_middle: cn("rounded-none", defaultClassNames.range_middle),
-        range_end: cn("rounded-r-md bg-slate-100 dark:bg-slate-800", defaultClassNames.range_end),
+        range_middle: cn("rounded-none bg-purple-50 dark:bg-purple-950", defaultClassNames.range_middle),
+        range_end: cn("rounded-r-md bg-purple-100 dark:bg-purple-900", defaultClassNames.range_end),
         today: cn(
-          "bg-slate-100 text-slate-900 rounded-md data-[selected=true]:rounded-none dark:bg-slate-800 dark:text-slate-50",
+          "bg-slate-100 text-slate-900 rounded-md data-[selected=true]:bg-transparent data-[selected=true]:text-inherit dark:bg-slate-800 dark:text-slate-50",
           defaultClassNames.today
         ),
         outside: cn(
@@ -188,18 +188,20 @@ function CalendarDayButton({
       variant="ghost"
       size="icon"
       data-day={day.date.toLocaleDateString()}
-      data-selected-single={
-        modifiers.selected &&
-        !modifiers.range_start &&
-        !modifiers.range_end &&
-        !modifiers.range_middle
-      }
-      data-range-start={modifiers.range_start}
-      data-range-end={modifiers.range_end}
-      data-range-middle={modifiers.range_middle}
       className={cn(
-        "data-[selected-single=true]:bg-slate-900 data-[selected-single=true]:text-slate-50 data-[range-middle=true]:bg-slate-100 data-[range-middle=true]:text-slate-900 data-[range-start=true]:bg-slate-900 data-[range-start=true]:text-slate-50 data-[range-end=true]:bg-slate-900 data-[range-end=true]:text-slate-50 group-data-[focused=true]/day:border-ring group-data-[focused=true]/day:ring-ring/50 dark:hover:text-slate-900 flex aspect-square size-auto w-full min-w-(--cell-size) flex-col gap-1 leading-none font-normal group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:ring-[3px] data-[range-end=true]:rounded-md data-[range-end=true]:rounded-r-md data-[range-middle=true]:rounded-none data-[range-start=true]:rounded-md data-[range-start=true]:rounded-l-md [&>span]:text-xs [&>span]:opacity-70 dark:data-[selected-single=true]:bg-slate-50 dark:data-[selected-single=true]:text-slate-900 dark:data-[range-middle=true]:bg-slate-800 dark:data-[range-middle=true]:text-slate-50 dark:data-[range-start=true]:bg-slate-50 dark:data-[range-start=true]:text-slate-900 dark:data-[range-end=true]:bg-slate-50 dark:data-[range-end=true]:text-slate-900 dark:dark:hover:text-slate-50",
-        defaultClassNames.day,
+        "flex aspect-square size-auto w-full min-w-(--cell-size) flex-col gap-1 leading-none font-normal group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:ring-[3px] group-data-[focused=true]/day:ring-ring/50",
+        // Base hover
+        "hover:bg-slate-100 dark:hover:bg-slate-800",
+        // Range middle background (lowest priority)
+        modifiers.range_middle && "bg-purple-50 text-purple-900 dark:bg-purple-950 dark:text-purple-100 rounded-none",
+        // Selected / Start / End (highest priority)
+        (modifiers.selected || modifiers.range_start || modifiers.range_end) && "bg-purple-800 text-white dark:bg-purple-600 dark:text-white !opacity-100 hover:bg-purple-700 dark:hover:bg-purple-500",
+        // Specific rounding
+        modifiers.range_start && "rounded-l-md",
+        modifiers.range_end && "rounded-r-md",
+        (modifiers.selected && !modifiers.range_start && !modifiers.range_end) && "rounded-md",
+        // Ensure span text is visible
+        "[&>span]:text-xs [&>span]:opacity-70",
         className
       )}
       {...props}

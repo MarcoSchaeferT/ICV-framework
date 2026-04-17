@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useUIContext } from "./contexts/UIContext";
 import { Progress } from "@/components/ui/progress";
 import { X, Upload, FileIcon } from "lucide-react";
 import { Check } from "iconoir-react";
@@ -17,6 +18,7 @@ export default function FileUploadForm() {
   
   // Localization
   const t = useTranslations('page_upload');
+  const { setIsDemoModeDialogOpen, demoMode } = useUIContext();
 
   const files = useRef<File[]>([]);
   const [curFile, setCurFile] = useState<string>("");
@@ -106,6 +108,10 @@ export default function FileUploadForm() {
   let jsonResponse: any = null;
 
   const handleUpload = async () => {
+    if (demoMode) {
+      setIsDemoModeDialogOpen(true);
+      return;
+    }
     
     processedFilesRef.current = {};
     setuploadResponse({});

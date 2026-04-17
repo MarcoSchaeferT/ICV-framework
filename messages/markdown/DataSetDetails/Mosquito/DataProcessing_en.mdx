@@ -1,0 +1,9 @@
+
+##### Data Processing
+The raw data sources are processed and aggregated to the target grid resolution (0.25° x 0.25°) using the following methods:
+
+- **[Climate data](#climate-data)** – for each area of the selected size, the average temperature, dewpoint temperature, wind speed and precipitation were averaged for each month of the year.
+
+- **[Land usage data](#land-use-data)** – for each area of the selected size, the proportion of each data category is determined by first summing the cells that belong to that category and then dividing that sum by the total number of cells across all known categories within the selected area.
+
+- **[Population data](#population-data)** – for each area of the selected size, the population counts are summed and then divided by the number of square kilometres within that area. For the years in between the 5-year time step, population count data were linearly interpolated.

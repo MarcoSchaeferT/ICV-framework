@@ -8,6 +8,7 @@ import { LayoutSizesT } from '../../const_store';
 import { useEffect } from "react";
 import NavbarLeft from "./navbarLeft";
 import FpsIndicator from "./fpsIndicator";
+import DemoModeDialog from "./DemoModeDialog";
 
 interface DynamicUIProps {
   children: React.ReactNode;
@@ -34,6 +35,7 @@ export default function DynamicUI({children, layoutSizes}: DynamicUIProps) {
       </div>
     </div>
     {isPerformanceIndicator && <FpsIndicator />}
+    <DemoModeDialog />
     </UIContextProvider>
     </>
   )

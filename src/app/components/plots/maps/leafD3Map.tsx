@@ -70,7 +70,7 @@ import {
 import LeafletMapComponent, {LeafletComponentPorps} from './baseMap';
 import type { LeafletMouseEvent } from 'leaflet';
 
-import { format, set, setDate } from "date-fns";
+import { format, set, setDate, addMonths, isAfter } from "date-fns";
 import { Calendar as CalendarIcon, CheckCircle2Icon, PopcornIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -101,8 +101,7 @@ const leafletLogoHeight = 14;
 let NumbersAfterComma = 3;
 let calcer = Math.pow(10, NumbersAfterComma);
 
-const min_date = new Date("2020-01-01");
-const max_date = new Date("2022-12-31");
+// Default dates moved to state within the component
 
 
 /**
@@ -597,7 +596,7 @@ const baseStyle: Leaflet.PathOptions = {
     const [curColroMapType, setColorMapType] = useState<string>(props.mapUIsettings.defaultFeatureColorMap || defaultColorMap);
     const [layerOpacity, setLayerOpacity] = useState(props.mapUIsettings.defaultLayerOpacity || contextT.curLayerOpacity);
     const [selectedFilter, setSelectedFilter] = useState<string>("")
-    const [dateRange, setDateRange] = useState<{from: Date; to: Date;}>();
+    const [dateRange, setDateRange] = useState<{ from: Date | undefined; to?: Date | undefined; } | undefined>();
     const [selectedFeature, setSelectedFeature] = useState<string>(props.mapUIsettings.defaultFeatureName || "");
     const [selectedCountry, setSelectedCountry] = useState<string>("");
     const [isSettingsOpen, setIsSettingsOpen] = useState(true);
@@ -612,6 +611,45 @@ const baseStyle: Leaflet.PathOptions = {
     const [showSuccessCountryDropdown, setShowSuccessCountryDropdown] = useState(false);
     const [showSuccessTimerangeDropdown, setShowSuccesTimerangeDropdown] = useState(false);
     const highlightedCountryRef = useRef<L.GeoJSON | null>(null);
+
+    const [min_date, setMinDate] = useState<Date>(new Date("2020-01-01"));
+    const [max_date, setMaxDate] = useState<Date>(new Date("2024-12-31"));
+
+    // set default dataset URL
+    if (props.mapUIsettings.defaultDatasetURL === "" && props.mapUIsettings.defaultDatasetName !== "") {
+        props.mapUIsettings.defaultDatasetURL = apiRoutes.fetchDbData({ relationName: props.mapUIsettings.defaultDatasetName, feature: props.mapUIsettings.defaultFeatureName });
+    } else {
+        props.mapUIsettings.defaultDatasetURL = "";
+    }
+
+    // mosquito data (grid data)
+    const [selectedDatasetURL, setSelectedDataset] = useState<string>(props.mapUIsettings.defaultDatasetURL);
+
+    // Fetch dynamic min/max dates when dataset changes
+    useEffect(() => {
+        const fetchMinMax = async () => {
+            const dataset = curDatasetname.current;
+            if (!dataset) return;
+            
+            const url = apiRoutes.fetchDbData({
+                relationName: dataset,
+                feature: "date",
+                task: "getMinMax"
+            });
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data && data.response && data.response.min_val && data.response.max_val) {
+                    setMinDate(new Date(data.response.min_val));
+                    setMaxDate(new Date(data.response.max_val));
+                }
+            } catch (error) {
+                console.error("Error fetching dynamic dates:", error);
+            }
+        };
+        fetchMinMax();
+    }, [selectedDatasetURL]);
 
 
     let isLoadingSpinner = useRef(false);
@@ -642,9 +680,12 @@ const baseStyle: Leaflet.PathOptions = {
     useEffect(() => {
         if (!isLoading_ColumnNames && !isLoading_Metadata && rawColumnNames && Array.isArray(rawColumnNames) && rawColumnNames.length > 0 && props.mapUIsettings.defaultFeatureName === "") {
             let selectedColumnName = "";
+            const filteredRawColumnNames = rawColumnNames.filter((name: string) => name !== "id");
+            if (filteredRawColumnNames.length === 0) return;
+
             const metaData = rawMetaData as unknown as metaDataT | undefined;
             // First pass: look for a column that is in metadata and has availability set to 1
-            for (const columnName of rawColumnNames) {
+            for (const columnName of filteredRawColumnNames) {
                 if (metaData && metaData[columnName as keyof typeof metaData]) {
                     const columnMeta = metaData[columnName as keyof typeof metaData];
                     if (columnMeta.availability === "1" || columnMeta.availability === undefined) {
@@ -654,9 +695,9 @@ const baseStyle: Leaflet.PathOptions = {
                 }
             }
 
-            // Final fallback: use the first column
+            // Final fallback: use the first column of the filtered names
             if (selectedColumnName === "") {
-                selectedColumnName = rawColumnNames[0];
+                selectedColumnName = filteredRawColumnNames[0];
             }
 
             props.mapUIsettings.defaultFeatureName = selectedColumnName;
@@ -665,18 +706,7 @@ const baseStyle: Leaflet.PathOptions = {
     }, [isLoading_ColumnNames, isLoading_Metadata, rawColumnNames, rawMetaData]);
 
     
-        // set default dataset URL
-    if (props.mapUIsettings.defaultDatasetURL === "" && props.mapUIsettings.defaultDatasetName !== "") {
-        props.mapUIsettings.defaultDatasetURL = apiRoutes.fetchDbData({ relationName: props.mapUIsettings.defaultDatasetName, feature: props.mapUIsettings.defaultFeatureName });
-    }else{
-        props.mapUIsettings.defaultDatasetURL = "";
 
-
-    }
-
-
-    // mosquito data (grid data)
-    const [selectedDatasetURL, setSelectedDataset] = useState<string>(props.mapUIsettings.defaultDatasetURL);
     const [isLoading_MosquitoData, rawMosquitoData] = useGetJSONData(selectedDatasetURL, props.mapDataSets.isGridData || props.mapUIsettings.inCovidDataView);
     
    
@@ -1012,7 +1042,7 @@ const baseStyle: Leaflet.PathOptions = {
     renderLoop(); // start the loop
 
     return () => cancelAnimationFrame(frameRef.current);
-}, [map, gridData, metaData, isLoading_MosquitoData, L, contextT.selectedGridcellID]);
+}, [map, gridData, metaData, isLoading_MosquitoData, L, contextT.selectedGridcellID, curColroMapType]);
 
 
 
@@ -1058,7 +1088,7 @@ const baseStyle: Leaflet.PathOptions = {
 
     const colNames = useMemo(() => {
         if(mosquitoData.response !== undefined && mosquitoData.header && mosquitoData.error == null && mosquitoData.response.length > 1) {
-            return mosquitoData.header;
+            return mosquitoData.header.filter((name: string) => name !== "id");
         }
         else {
             return [] as string[];
@@ -2027,17 +2057,14 @@ const HandleMouseMoveX = useCallback(
             [minGoodVal, maxGoodVal] = getGoodReadableRange(minGoodVal, maxGoodVal);
 
             const cMap = d3.scaleSequential(availableColorMaps[curColroMapType as keyof typeof availableColorMaps]);
+            cMap.domain([minGoodVal, maxGoodVal]);
             if (curColroMapType === "interpolateRdBu") {
                 const cUnit = alignFeature_to_Metadata(minVal, selectedFeature, metaData).unit;
-                if ((minGoodVal < 0 && maxGoodVal > 0) && (cUnit === "K" || cUnit === "°C")) {
+                if ((minGoodVal < 0 && maxGoodVal > 0) || (cUnit === "K" || cUnit === "°C")) {
                     const m = Math.max(Math.abs(minGoodVal), Math.abs(maxGoodVal));
                     minGoodVal = -m;
                     maxGoodVal = m;
-                    cMap.domain([maxGoodVal, minGoodVal]);
-                } else {
-                    cMap.domain([maxGoodVal, minGoodVal]);
                 }
-            } else {
                 cMap.domain([maxGoodVal, minGoodVal]);
             }
 
@@ -2212,7 +2239,7 @@ const HandleMouseMoveX = useCallback(
             .text(`${curGridCellID.current} [idx: ${curGridCellDat?.visDatIdx ?? "N/A"}]`);
         }
 
-    }, 16), [map, L, gridData, isLoading_MosquitoData, metaData, selectedFeature, locale, t, contextT.selectedGridcellID]);
+    }, 16), [map, L, gridData, isLoading_MosquitoData, metaData, selectedFeature, locale, t, contextT.selectedGridcellID, curColroMapType]);
  // first call of draw function: keeps rectangle correctly projected during zooming/panning   
 DrawSelectedGridCell(contextT.selectedGridcellID);
 
@@ -2513,12 +2540,27 @@ const radiusScale = useMemo(() => {
 
 const colorMap = useMemo(() => {
     const c = d3.scaleSequential(availableColorMaps[curColroMapType as keyof typeof availableColorMaps]);
-    c.domain([minVal, maxVal]);
+    
+    let minG = alignFeature_to_Metadata(minVal, selectedFeature, metaData).value;
+    let maxG = alignFeature_to_Metadata(maxVal, selectedFeature, metaData).value;
+    [minG, maxG] = getGoodReadableRange(minG, maxG);
+
+    c.domain([minG, maxG]);
     if (curColroMapType === "interpolateRdBu") {
-        c.domain([maxVal, minVal]);
+        const u = alignFeature_to_Metadata(minVal, selectedFeature, metaData).unit;
+        if ((minG < 0 && maxG > 0) || u === "K" || u === "°C") {
+            const m = Math.max(Math.abs(minG), Math.abs(maxG));
+            minG = -m;
+            maxG = m;
+        }
+        c.domain([maxG, minG]);
     }
-    return c;
-}, [curColroMapType, minVal, maxVal]);
+    
+    return (v: number) => {
+        const aligned = alignFeature_to_Metadata(v, selectedFeature, metaData).value;
+        return c(aligned);
+    };
+}, [curColroMapType, minVal, maxVal, selectedFeature, metaData]);
 
 
 function resetTimeout( ref: React.MutableRefObject<ReturnType<typeof setTimeout> | null> = layerUpdateHandlerTime) {
@@ -3656,8 +3698,8 @@ useEffect(() => {
                 <SelectGroup>
                     <SelectLabel></SelectLabel>
                         {colNames.map((name) => {
-                            const isAvailable = metaData[name as keyof typeof metaData]?.availability === "1" ||
-                                metaData[name as keyof typeof metaData]?.availability === undefined;
+                            const isAvailable = (metaData[name as keyof typeof metaData]?.availability === "1" ||
+                                metaData[name as keyof typeof metaData]?.availability === undefined) && name !== "id";
                             const filterStr = props.mapUIsettings.filterString_for_availableFeature;
                             const passesFilter = !filterStr || name.includes(filterStr);
 
@@ -4281,27 +4323,71 @@ useEffect(() => {
                 truncate min-w-0 px-4 rounded text-sm whitespace-nowrap overflow-hidden text-ellipsis" 
                 >
                 <CalendarIcon className="mr-0.5 w-4 h-4  shrink-0"/>
-                {dateRange?.from && dateRange?.to
-                    ? `${format(dateRange.from, "PP")} - ${format(dateRange.to, "PP")}`
+                {dateRange?.from
+                    ? (dateRange.to 
+                        ? `${format(dateRange.from, "PP")} - ${format(dateRange.to, "PP")}`
+                        : `${format(dateRange.from, "PP")} - ...`
+                      )
                     : <span>{t.rich('select_time_span', {...t_richConfig})}</span>}
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0">
-                <Calendar
-                    mode="range"
-                    selected={dateRange}
-                    defaultMonth={dateRange?.from ? dateRange?.from : new Date('2021-01-01')}
-                    captionLayout="dropdown"
-                    startMonth={new Date(2020, 0)}
-                    endMonth={new Date(2023, 12)}
-                    onSelect={(range) => {
-                        if (range?.from && range?.to) {
-                            console.log("Selected date range:", range);
-                            setDateRange({ from: range.from, to: range.to });
-                            contextT.setDateRange({ from: range.from, to: range.to });
-                        }
-                    }}
-                />
+            <PopoverContent className="w-auto p-0" align="start">
+                <div className="flex flex-col md:flex-row bg-white dark:bg-slate-950 rounded-md overflow-hidden">
+                    <div className="flex flex-col p-3 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800">
+                        <div className="px-3 pb-2 text-[10px] font-bold text-purple-800 dark:text-purple-400 uppercase tracking-widest flex items-center opacity-70">
+                             {t.rich('covid19_world_data.time_range', {...t_richConfig})} (From)
+                        </div>
+                        <Calendar
+                            mode="single"
+                            selected={dateRange?.from}
+                            onSelect={(date) => {
+                                let newRange = { from: date, to: dateRange?.to };
+                                if (newRange.from && newRange.to && isAfter(newRange.from, newRange.to)) {
+                                    newRange = { from: newRange.to, to: newRange.from };
+                                }
+                                setDateRange(newRange);
+                                contextT.setDateRange(newRange);
+                            }}
+                            modifiers={{
+                                range_start: dateRange?.from,
+                                range_end: dateRange?.to,
+                                range_middle: (dateRange?.from && dateRange?.to) ? { from: dateRange.from, to: dateRange.to } : undefined
+                            }}
+                            defaultMonth={dateRange?.from || min_date}
+                            captionLayout="dropdown"
+                            numberOfMonths={1}
+                            startMonth={min_date}
+                            endMonth={max_date}
+                        />
+                    </div>
+                    <div className="flex flex-col p-3">
+                        <div className="px-3 pb-2 text-[10px] font-bold text-purple-800 dark:text-purple-400 uppercase tracking-widest flex items-center opacity-70">
+                             {t.rich('covid19_world_data.time_range', {...t_richConfig})} (To)
+                        </div>
+                        <Calendar
+                            mode="single"
+                            selected={dateRange?.to}
+                            onSelect={(date) => {
+                                let newRange = { from: dateRange?.from, to: date };
+                                if (newRange.from && newRange.to && isAfter(newRange.from, newRange.to)) {
+                                    newRange = { from: newRange.to, to: newRange.from };
+                                }
+                                setDateRange(newRange);
+                                contextT.setDateRange(newRange);
+                            }}
+                            modifiers={{
+                                range_start: dateRange?.from,
+                                range_end: dateRange?.to,
+                                range_middle: (dateRange?.from && dateRange?.to) ? { from: dateRange.from, to: dateRange.to } : undefined
+                            }}
+                            defaultMonth={dateRange?.to || (dateRange?.from ? addMonths(dateRange.from, 1) : min_date)}
+                            captionLayout="dropdown"
+                            numberOfMonths={1}
+                            startMonth={min_date}
+                            endMonth={max_date}
+                        />
+                    </div>
+                </div>
             </PopoverContent>
             </Popover>
             <Button

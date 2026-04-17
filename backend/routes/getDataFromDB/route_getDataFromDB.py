@@ -7,7 +7,7 @@ from typing import Optional, List, Union
 from flasgger import swag_from
 import re
 import json as JSON
-from psycopg import errors as psycopg_errors
+from psycopg import errors as psycopg_errors, sql
 
 # Blueprint configuration
 route_getDataFromDB = Blueprint('getDataFromDB', __name__)
@@ -109,6 +109,8 @@ async def getDataFromDB():
         match params.task:
           case "getUniqueEntries":
              [response_json.response, response_json.error] = await getDBdata_singleColUnique(relationName, feature)
+          case "getMinMax":
+             [response_json.response, response_json.error] = await getDBdata_singleColMinMax(relationName, feature)
           case "getCount":
              [response_json.response, response_json.error] = await getDBdata_singleColCount(relationName, feature, filterBy, filterValue)
           case _:
@@ -124,43 +126,78 @@ async def getDataFromDB():
 
 async def getDBdata_singleCol( relationName: str, feature: str, filterBy: Optional[List[str]], filterValue: Optional[List[str]], startDate: Optional[str], endDate: Optional[str], aggregation_level: Optional[str] = None) -> tuple[object, str | None]:
   start_time = time.time()
-  query_columns = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{relationName}'"
-  columns = await query_raw(query_columns)
+  
+  # 1. Get column names to set up filters
+  query_columns = sql.SQL("SELECT column_name FROM information_schema.columns WHERE table_name = %s")
+  columns = await query_raw(query_columns, (relationName,))
   column_names = [col["column_name"] for col in columns]
-  bundesland_filter = "bundesland, " if "bundesland" in column_names else ""
-  latitude_filter = ", latitude" if "latitude" in column_names else ""  
-  longitude_filter = ", longitude " if "longitude" in column_names else ""
-  subregion_name = ", subregion1_name " if "subregion1_name" in column_names else ""
-  country_name = ", country_name " if "country_name" in column_names else ""
+  
+  # 2. Build safe selection list
+  select_items = [sql.Identifier("id"), sql.Identifier("geometry"), sql.Identifier(feature)]
+  
+  if "bundesland" in column_names: select_items.append(sql.Identifier("bundesland"))
+  if "latitude" in column_names: select_items.append(sql.Identifier("latitude"))
+  if "longitude" in column_names: select_items.append(sql.Identifier("longitude"))
+  if "subregion1_name" in column_names: select_items.append(sql.Identifier("subregion1_name"))
+  if "country_name" in column_names: select_items.append(sql.Identifier("country_name"))
+  
   feature_type = await get_feature_column_type(relationName, feature)
 
+  # 3. Build WHERE clause
+  conditions = []
+  params = []
+  
+  # Equality filters
+  where_sql, filter_params = conditionBuilderEquals(filterBy, filterValue)
+  if where_sql:
+    
+     pass
 
-  query = f"SELECT id, {bundesland_filter} geometry, {feature} {latitude_filter} {longitude_filter} {subregion_name} {country_name} FROM {relationName}"
-  if filterBy and filterValue:
-    where_clause = conditionBuilderEquals(filterBy, filterValue)
-    query = f"SELECT id, {bundesland_filter} geometry, {feature} {latitude_filter} {longitude_filter} {subregion_name} {country_name} FROM {relationName} {where_clause}"
-    print("queryWHERE", query)
-    if feature:
-      query += f"{conditionBuilderFeatureNotEmpty(feature, query, feature_type)}"
-    if startDate and endDate:
-      query += f"{conditionBuilderRange(startDate, endDate, 'date', query)}"
-    if aggregation_level and "aggregation_level" in column_names:
-      start_keyword = " WHERE " if "WHERE" not in query else " AND "
-      query += f" {start_keyword} aggregation_level = '{aggregation_level}'"
-    query += " ORDER BY id"
-    print("**query", query)
+  # Let's simplify: build conditions list manually
+  if filterBy and filterValue and filterBy[0] != "" and filterValue[0] != "":
+      for fb, fv in zip(filterBy, filterValue):
+          if fv != "ALL" and fv != "" and fb != "":
+              if fb == "date":
+                  conditions.append(sql.SQL("EXTRACT(YEAR FROM {}) = %s").format(sql.Identifier(fb)))
+                  params.append(fv)
+              else:
+                  conditions.append(sql.SQL("{} = %s").format(sql.Identifier(fb)))
+                  params.append(fv)
+  
+  if feature:
+      conditions.append(conditionBuilderFeatureNotEmpty(feature, feature_type, params))
+      
+  if startDate and endDate:
+      conditions.append(conditionBuilderRange(startDate, endDate, 'date', params))
+
+  if aggregation_level and "aggregation_level" in column_names:
+
+      conditions.append(sql.SQL("aggregation_level = %s"))
+      params.append(aggregation_level)
+
+  # 4. Construct final query
+  query = sql.SQL("SELECT {} FROM {}").format(
+      sql.SQL(", ").join(select_items),
+      sql.Identifier(relationName)
+  )
+  
+  if conditions:
+      query += sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions)
+      
+  query += sql.SQL(" ORDER BY id")
+  
+  print("**query", query)
   try:
-    records_raw = await query_raw(query)
+    records_raw = await query_raw(query, params)
   except Exception as e:
     print("ERROR DB QUERY", e)
     data = "ERROR DB QUERY " + str(e)
     return ("", data)
 
   end_time = time.time()
-
   print(f"Query execution time: {end_time - start_time} seconds")
+  
   start_processing_time = time.time()
-
   records_json = []
   if len(records_raw) == 0:
      records_json = [{
@@ -175,18 +212,18 @@ async def getDBdata_singleCol( relationName: str, feature: str, filterBy: Option
             {
               "id": record["id"],
               "geometry": record["geometry"],
-              "feature": record[str(feature)],
-              "bundesland": record["bundesland"] if bundesland_filter != "" else "",
-              "latitude": record["latitude"] if "latitude" in record else None,
-              "longitude": record["longitude"] if "longitude" in record else None,
-              "subregion_name": record["subregion1_name"] if "subregion1_name" in record else "",
-              "country_name": record["country_name"] if "country_name" in record else ""
+              "feature": record[feature],
+              "bundesland": record.get("bundesland", ""),
+              "latitude": record.get("latitude"),
+              "longitude": record.get("longitude"),
+              "subregion_name": record.get("subregion1_name", ""),
+              "country_name": record.get("country_name", "")
             }
             for record in records_raw
         ]
     except Exception as e:
-      print("ERROR DB QUERY", e)
-      data: str = "ERROR DB QUERY " + str(e)+" does not exist"
+      print("ERROR DB QUERY-PROCESSING", e)
+      data: str = "ERROR DB QUERY " + str(e)
       return ("", data)
 
   end_processing_time = time.time()
@@ -195,15 +232,21 @@ async def getDBdata_singleCol( relationName: str, feature: str, filterBy: Option
 
 
 
+
 async def getDBdata_singleColCount( relationName, feature, filterBy, filterValue) -> tuple[object, str | None]:
   start_time = time.time()
   
-  where_clause = conditionBuilderEquals(filterBy, filterValue)
-  query = f"SELECT {feature}, COUNT(*) AS {feature}_count FROM {relationName} {where_clause} GROUP BY {feature}"
+  where_clause, params = conditionBuilderEquals(filterBy, filterValue)
+  query = sql.SQL("SELECT {}, COUNT(*) AS count FROM {} {} GROUP BY {}").format(
+      sql.Identifier(feature),
+      sql.Identifier(relationName),
+      where_clause if where_clause else sql.SQL(""),
+      sql.Identifier(feature)
+  )
   print("query", query)
  
   try:
-    records_raw = await query_raw(query)
+    records_raw = await query_raw(query, params)
   except Exception as e:
     print("ERROR DB QUERY", e)
     data = "ERROR DB QUERY " + str(e)
@@ -219,7 +262,7 @@ async def getDBdata_singleColCount( relationName, feature, filterBy, filterValue
     records_json = [
         {
             "feature": record[feature],
-            "count": record[feature + "_count"]
+            "count": record["count"]
         }
         for record in records_raw
     ]
@@ -234,14 +277,24 @@ async def getDBdata_singleColCount( relationName, feature, filterBy, filterValue
 
 
 
+
 async def getDBdata_singleColUnique( relationName, feature) -> tuple[object, str | None]:
 
-  query = f"SELECT DISTINCT {feature} FROM {relationName} ORDER BY {feature}"
   result_key = feature
   if feature == "date":
-    # Extract year from date if filterBy is 'date'
-    query = f"SELECT DISTINCT EXTRACT(YEAR FROM {feature}) AS year FROM {relationName} ORDER BY year"
+    # Extract year from date if feature is 'date'
+    query = sql.SQL("SELECT DISTINCT EXTRACT(YEAR FROM {}) AS year FROM {} ORDER BY year").format(
+        sql.Identifier(feature),
+        sql.Identifier(relationName)
+    )
     result_key = "year"
+  else:
+    query = sql.SQL("SELECT DISTINCT {} FROM {} ORDER BY {}").format(
+        sql.Identifier(feature),
+        sql.Identifier(relationName),
+        sql.Identifier(feature)
+    )
+    
   try:
     records_raw = await query_raw(query)
   except Exception as e:
@@ -264,72 +317,105 @@ async def getDBdata_singleColUnique( relationName, feature) -> tuple[object, str
 
   return (records_json, None)
 
+
+async def getDBdata_singleColMinMax(relationName, feature) -> tuple[object, str | None]:
+  query = sql.SQL("SELECT MIN({}) AS min_val, MAX({}) AS max_val FROM {}").format(
+      sql.Identifier(feature),
+      sql.Identifier(feature),
+      sql.Identifier(relationName)
+  )
+  try:
+    records_raw = await query_raw(query)
+    if records_raw and len(records_raw) > 0:
+        return (records_raw[0], None)
+    return (None, "No data found")
+  except Exception as e:
+    print("ERROR DB QUERY", e)
+    return (None, str(e))
+
+
 async def getDBdata_HEADER(relationName):
-  query = f"SELECT * FROM {relationName} LIMIT 1"
+  query = sql.SQL("SELECT * FROM {} LIMIT 1").format(sql.Identifier(relationName))
   first_record = await query_raw(query)
   return first_record
+
 
 
 
 async def getDBdata_multiCol( relationName: str, feature: str, filterBy: Optional[List[str]], filterValue: Optional[List[str]], startDate: Optional[str], endDate: Optional[str], aggregation_level: Optional[str]= None) -> tuple[object, str | None]:
 
   start_time = time.time()
-  query_columns = f"SELECT column_name FROM information_schema.columns WHERE table_name = '{relationName}'"
-  columns = await query_raw(query_columns)
+  query_columns_query = sql.SQL("SELECT column_name FROM information_schema.columns WHERE table_name = %s")
+  columns = await query_raw(query_columns_query, (relationName,))
   column_names = [col["column_name"] for col in columns]
-  bundesland_filter = "bundesland, " if "bundesland" in column_names else ""
-  latitude_filter = ", latitude" if "latitude" in column_names else ""  
-  longitude_filter = ", longitude " if "longitude" in column_names else ""
-  subregion_name = ", subregion1_name " if "subregion1_name" in column_names else ""
-
 
   records_rawStore = []
   featureExists = True
   i = 0
-  records_raw = []  
   while(featureExists):
     i += 1
     tmpFeature = feature + str(i)
-    feature_type = await get_feature_column_type(relationName, tmpFeature)
-    print("***tmpFeature", tmpFeature)
-    query = f"SELECT * FROM {relationName} LIMIT 1"
-    first_record = []
-    try:
-      first_record = await query_raw(query)
-    except Exception as e:
-      featureExists = False
-    if not first_record or tmpFeature not in first_record[0].keys():
+    if tmpFeature not in column_names:
       featureExists = False
       print("feature_", tmpFeature, "does not exist")
-    else:
-      print("feature_", tmpFeature)
-      query = f"SELECT {bundesland_filter} geometry, {tmpFeature} {latitude_filter} {longitude_filter} {subregion_name} FROM {relationName}"
-      if filterBy and filterValue:
-        where_clause = conditionBuilderEquals(filterBy, filterValue)
-        query = f"SELECT {bundesland_filter} geometry, {tmpFeature} {latitude_filter} {longitude_filter} {subregion_name} FROM {relationName} {where_clause}"
-      if tmpFeature:
-        query += f"{conditionBuilderFeatureNotEmpty(tmpFeature, query, feature_type)}"
-      if startDate and endDate:
-        query += f"{conditionBuilderRange(startDate, endDate, 'date', query)}"
-      if aggregation_level and "aggregation_level" in column_names:
-        start_keyword = " WHERE " if "WHERE" not in query else " AND "
-        query += f" {start_keyword} aggregation_level = '{aggregation_level}'"
-      query += " ORDER BY id"
-      print("**query", query)
-      try:
-        records_raw = await query_raw(query)
-      except Exception as e:
-        print("ERROR DB QUERY-", e)
-        data = "ERROR DB QUERY " + str(e)
-        return ("", data)
-      print("records_raw", len(records_raw))
+      break
+      
+    print("feature_", tmpFeature)
+    feature_type = await get_feature_column_type(relationName, tmpFeature)
+    
+    # Selection list
+    select_items = [sql.Identifier("geometry"), sql.Identifier(tmpFeature)]
+    if "bundesland" in column_names: select_items.append(sql.Identifier("bundesland"))
+    if "latitude" in column_names: select_items.append(sql.Identifier("latitude"))
+    if "longitude" in column_names: select_items.append(sql.Identifier("longitude"))
+    if "subregion1_name" in column_names: select_items.append(sql.Identifier("subregion1_name"))
+
+    # Build conditions
+    conditions = []
+    params = []
+    
+    if filterBy and filterValue and filterBy[0] != "" and filterValue[0] != "":
+      for fb, fv in zip(filterBy, filterValue):
+          if fv != "ALL" and fv != "" and fb != "":
+              if fb == "date":
+                  conditions.append(sql.SQL("EXTRACT(YEAR FROM {}) = %s").format(sql.Identifier(fb)))
+                  params.append(fv)
+              else:
+                  conditions.append(sql.SQL("{} = %s").format(sql.Identifier(fb)))
+                  params.append(fv)
+    
+    conditions.append(conditionBuilderFeatureNotEmpty(tmpFeature, feature_type, params))
+    
+    if startDate and endDate:
+      conditions.append(conditionBuilderRange(startDate, endDate, 'date', params))
+      
+    if aggregation_level and "aggregation_level" in column_names:
+
+      conditions.append(sql.SQL("aggregation_level = %s"))
+      params.append(aggregation_level)
+
+    # Build and run query
+    query = sql.SQL("SELECT {} FROM {}").format(
+        sql.SQL(", ").join(select_items),
+        sql.Identifier(relationName)
+    )
+    if conditions:
+        query += sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions)
+    query += sql.SQL(" ORDER BY id")
+    
+    print("**query", query)
+    try:
+      records_raw = await query_raw(query, params)
       records_rawStore.append(records_raw)
+    except Exception as e:
+      print("ERROR DB QUERY-", e)
+      data = "ERROR DB QUERY " + str(e)
+      return ("", data)
 
   end_time = time.time()
-
   print(f"Query execution time: {end_time - start_time} seconds")
+  
   start_processing_time = time.time()
-
   records_json = {}
   if len(records_rawStore) == 0:
     records_json["geometry"] = ['POLYGON ((-2.370000000000005 47.53, -2.060000000000002 47.53, -2.060000000000002 47.22, -2.370000000000005 47.22, -2.370000000000005 47.53))']
@@ -340,14 +426,14 @@ async def getDBdata_multiCol( relationName: str, feature: str, filterBy: Optiona
   records_json["features"] = []
   
   for i, records_raw in enumerate(records_rawStore):
-    i += 1
-    tmpFeature = feature + str(i)
+    num = i + 1
+    tmpFeatureName = feature + str(num)
     try:
-        feature_values = [record[str(tmpFeature)] for record in records_raw]
+        feature_values = [record[tmpFeatureName] for record in records_raw]
         records_json["features"].append(feature_values)
     except Exception as e:
       print("ERROR DB QUERY JSON CREATION", e)
-      data = "ERROR DB QUERY JSON CREATION " + str(e) + " does not exist"
+      data = "ERROR DB QUERY JSON CREATION " + str(e)
       return ("", data)
 
   end_processing_time = time.time()
@@ -355,11 +441,11 @@ async def getDBdata_multiCol( relationName: str, feature: str, filterBy: Optiona
   return (records_json, None)
 
 
+
 async def getDBdata_allCols(relationName) -> tuple[object, str | None]:
   start_time = time.time()
   
-
-  query = f"SELECT * FROM {relationName}"
+  query = sql.SQL("SELECT * FROM {}").format(sql.Identifier(relationName))
   records_raw  = None
   print("query", query)
   try:
@@ -388,8 +474,8 @@ async def getDBdata_allCols(relationName) -> tuple[object, str | None]:
 
 
 
-def consumeARGSvalues(argsValues) -> list[str]:
 
+def consumeARGSvalues(argsValues) -> list[str]:
   if argsValues is None:
     return [""]
   print("consumeARGSvalues", argsValues)
@@ -403,70 +489,75 @@ def consumeARGSvalues(argsValues) -> list[str]:
     consumedValues.append(value.replace("'", ""))
   return consumedValues
 
-def conditionBuilderEquals(filterBy, filterValue) -> str:
+def conditionBuilderEquals(filterBy: List[str], filterValue: List[str]) -> tuple[Optional[sql.Composed], Optional[list]]:
    if isinstance(filterBy, list) and isinstance(filterValue, list):
-      conditions = []
       if len(filterBy) != len(filterValue):
-        return "ERROR: filterBy and filterValue must have the same length"
+        return None, None
       if filterBy[0] == "" or filterValue[0] == "":
-        return ""
+        return None, None
+      
+      conditions = []
+      params = []
       for fb, fv in zip(filterBy, filterValue):
         if fv != "ALL" and fv != "" and fb != "":
           if fb == "date":
             # Extract year from date if filterBy is 'date'
-            conditions.append(f"EXTRACT(YEAR FROM {fb}) = '{fv}'")
+            conditions.append(sql.SQL("EXTRACT(YEAR FROM {}) = %s").format(sql.Identifier(fb)))
+            params.append(fv)
           else:
-            conditions.append(f"{fb} = '{fv}'")
-      where_clause = " AND ".join(conditions)
-      if "=" not in where_clause:
-        return ""
-      return " WHERE "+ where_clause
-   else:
-      return ""
+            conditions.append(sql.SQL("{} = %s").format(sql.Identifier(fb)))
+            params.append(fv)
+      
+      if not conditions:
+        return None, None
+      
+      where_clause = sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions)
+      return where_clause, params
+   return None, None
 
-def conditionBuilderFeatureNotEmpty(feature, query, feature_type) -> str:
-  start_keyword = " WHERE " if "WHERE" not in query else " AND "
+def conditionBuilderFeatureNotEmpty(feature: str, feature_type: str, params: list) -> sql.Composed:
   not_in_values = get_not_in_values(feature_type)
+  placeholders = sql.SQL(", ").join(sql.Placeholder() * len(not_in_values))
+  params.extend(not_in_values)
+  
+  return sql.SQL(" {} IS NOT NULL AND {} NOT IN ({})").format(
+      sql.Identifier(feature),
+      sql.Identifier(feature),
+      placeholders
+  )
 
-  return f" {start_keyword} {feature} IS NOT NULL AND {feature} NOT IN({', '.join(not_in_values)})"
 
-def get_not_in_values(feature_type: str):
-    feature_type = feature_type.lower()
+def get_not_in_values(feature_type: str) -> list:
+    feature_type = feature_type.lower() if feature_type else ""
 
     if feature_type in {"integer", "bigint", "smallint"}:
-        # integer-like types
-        return ["-9223372036854775808"]
-
+        return [-9223372036854775808]
     elif feature_type in {"decimal", "numeric", "real", "double precision"}:
-        # floating-point or numeric types
-        return ["'nan'", "'NaN'"]
-
+        return ["nan", "NaN"]
     elif feature_type in {"varchar", "char", "text", "string"}:
-        # textual types
-        return ["'NULL'", "'nan'", "'NaN'"]
-
+        return ["NULL", "nan", "NaN"]
     elif feature_type in {"date", "timestamp", "datetime"}:
-        # temporal types
-        return ["'NULL'"]
-
+        return ["NULL"]
     elif feature_type in {"boolean", "bool"}:
-        # boolean types
-        return ["false", "'NULL'"]
-
+        return ["false", "NULL"]
     else:
-        # default fallback (unknown type)
-        return ["'NULL'"]
+        return ["NULL"]
 
-def conditionBuilderRange(start, end, attribute, query) -> str:
-  start_keyword = " WHERE " if "WHERE" not in query else " AND "
-  return f" {start_keyword}{attribute} >= '{start}' AND date <= '{end}'"
+def conditionBuilderRange(start: str, end: str, attribute: str, params: list) -> sql.Composed:
+  params.extend([start, end])
+  return sql.SQL(" {} >= %s AND {} <= %s ").format(
+      sql.Identifier(attribute),
+      sql.Identifier(attribute)
+  )
+
 
 async def get_feature_column_type(relationName: str, feature: str) -> str:
   query = (
-    f"SELECT data_type FROM information_schema.columns "
-    f"WHERE table_name = '{relationName}' AND column_name = '{feature}'"
+    sql.SQL("SELECT data_type FROM information_schema.columns ") +
+    sql.SQL("WHERE table_name = %s AND column_name = %s")
   )
-  result = await query_raw(query)
+  result = await query_raw(query, (relationName, feature))
   if result and len(result) > 0:
     return result[0]["data_type"]
   return ""
+

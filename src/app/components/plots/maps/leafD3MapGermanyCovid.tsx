@@ -372,7 +372,7 @@ const LeafD3MapGermanyComponent = ({props}: {props: LeafD3MapGermanyProps}) => {
     const colNames = useMemo(() => {
         if(mosquitoData.response !== undefined && !isLoading_MosquitoData && mosquitoData.error === null) {
             //console.log("data:", mosquitoData);
-            return mosquitoData.header;
+            return mosquitoData.header.filter((name: string) => name !== "id");
         }
         else {
             return [] as string[];
@@ -488,8 +488,8 @@ const LeafD3MapGermanyComponent = ({props}: {props: LeafD3MapGermanyProps}) => {
             setisUpdate(!isUpdate);
             isLoadingSpinner.current = false;
             delay = 1000;
-            if (map &&  props.isStaticAutoFitFullSize) {
-                const geoLayer = L.geoJSON(mapData); // Ensure geoLayer is initialized with mapData
+            if (map && props.isStaticAutoFitFullSize && mapData && !mapData.error && mapData.type) {
+                const geoLayer = L.geoJSON(mapData); 
                 let bounds = geoLayer.getBounds();
                 bounds = bounds.pad(-1.05);
                 map.fitBounds(bounds);
@@ -542,9 +542,9 @@ function DrawMapPolygons() {
             }
         });
         let geoLayer: any;
-       try{
-           
-            geoLayer = L.geoJSON(mapData, {
+        try {
+            if (mapData && !mapData.error && mapData.type) {
+                geoLayer = L.geoJSON(mapData, {
                 style: (feature: GeoJSON.Feature) => {
                     const country = feature?.properties?.name || "";
                     const id = stateMappersGermany.Map__State_to_ID(country);
@@ -712,7 +712,7 @@ function DrawMapPolygons() {
                     });
                 },
             }).addTo(map);
-           
+           }
         }
         catch(e) {
             let erroMsg = { ERROR: "ERROR: while retriving geo data." +e};
@@ -1626,13 +1626,18 @@ function MapDrawLayer() {
             <SelectContent>
             <SelectGroup>
                 <SelectLabel></SelectLabel>
-                    {colNames.map((name, index) => ( 
-                        (metaData[colNames[index] as keyof typeof metaData]?.availability === "1" ||  metaData[colNames[index] as keyof typeof metaData]?.availability === undefined) && (
-                        <SelectItem key={index} value={colNames[index]}>
-                            <b>{colNames[index]+" ["+metaData[colNames[index] as keyof typeof metaData]?.dimension+"]"}</b>
-                            <i>{" "+metaData[colNames[index] as keyof typeof metaData]?.description}</i>
-                        </SelectItem>)
-                    ))}
+                    {colNames.map((name, index) => {
+                        const isAvailable = (metaData[colNames[index] as keyof typeof metaData]?.availability === "1" ||  metaData[colNames[index] as keyof typeof metaData]?.availability === undefined) && colNames[index] !== "id";
+                        if (isAvailable) {
+                            return (
+                                <SelectItem key={index} value={colNames[index]}>
+                                    <b>{colNames[index]+" ["+metaData[colNames[index] as keyof typeof metaData]?.dimension+"]"}</b>
+                                    <i>{" "+metaData[colNames[index] as keyof typeof metaData]?.description}</i>
+                                </SelectItem>
+                            );
+                        }
+                        return null;
+                    })}
                    </SelectGroup>
       </SelectContent>
     </Select>

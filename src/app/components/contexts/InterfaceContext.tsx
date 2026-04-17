@@ -42,8 +42,8 @@ export interface interfaceContextI {
     setIsSequenceMetaData: React.Dispatch<React.SetStateAction<boolean>>;
     pieSize_sequenceMetaData: number;
     setPieSize_sequenceMetaData: React.Dispatch<React.SetStateAction<number>>;
-    dateRange: { from: Date; to: Date; };
-    setDateRange(arg0: { from: Date; to: Date; }): unknown;
+    dateRange: { from: Date | undefined; to?: Date | undefined; } | undefined;
+    setDateRange(arg0: { from: Date | undefined; to?: Date | undefined; } | undefined): unknown;
     curMonth: number;
     setCurMonth: React.Dispatch<React.SetStateAction<number>>;
     curPresenceDatasetName: string;
@@ -102,7 +102,7 @@ function InterfaceContextProvider({children}: any) {
     const [isSequenceMetaData, setIsSequenceMetaData] = useState<boolean>(false);
     const [pieSize_sequenceMetaData, setPieSize_sequenceMetaData] = useState<number>(40);
     const mouseEvent = useRef<mapMouseEvents>({ type: "null", position: [0, 0], event: undefined });
-    const [dateRange, setDateRange] = useState<{ from: Date; to: Date; }>({ from: new Date("2020-01-01"), to: new Date("2020-12-31")});
+    const [dateRange, setDateRange] = useState<{ from: Date | undefined; to?: Date | undefined; } | undefined>({ from: new Date("2020-01-01"), to: new Date("2020-12-31")});
     const [isSubregionLevelData, setIsSubregionLevelData] = useState<boolean>(false);
     const [isCountryLevelData, setIsCountryLevelData] = useState<boolean>(false);
 

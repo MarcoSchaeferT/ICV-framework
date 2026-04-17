@@ -43,7 +43,7 @@ export const showCasesList: Record<Locale, ShowcaseItem[]> = {
     },
     {
       title: "Climate and Habitats",
-      description: "Inspect climate data, land usage and further factors in context",
+      description: "Inspect habitat suitability in context of climate factors",
       backgroundImage: "/showCases/climate_and_habitats.png",
       icon: <Cloud className="w-6 h-6" />,
       link: "/home/showCases/Climate_and_Habitats",
@@ -94,7 +94,7 @@ export const showCasesList: Record<Locale, ShowcaseItem[]> = {
     },
     {
       title: "Klima und Lebensräume",
-      description: "Betrachten Sie Klimadaten, Landnutzung und weitere Faktoren im Kontext",
+      description: "Untersuchen Sie die Lebensraumeignung im Kontext von Klimafaktoren",
       backgroundImage: "/showCases/climate_and_habitats.png",
       icon: <Cloud className="w-6 h-6" />,
       link: "/home/showCases/Climate_and_Habitats",

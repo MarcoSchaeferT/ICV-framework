@@ -21,7 +21,8 @@ services:
   icv-frontend:
     image: ghcr.io/marcoschaefert/icv-frontend:latest
     environment:
-      - IS_DOCKER=true
+      IS_DOCKER: "true"
+      NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE}
     build:
       context: .
       dockerfile: ./Dockerfile.frontend

@@ -3,8 +3,9 @@ from pathlib import Path
 import os
 from os import listdir
 from flasgger import swag_from
-from backend.routes.setFilesToDB.db_utils import query_raw, execute_raw
-from psycopg import errors as psycopg_errors
+from backend.routes.setFilesToDB.db_utils import query_raw, execute_raw, get_db_connection_params
+import psycopg
+from psycopg import errors as psycopg_errors, sql
 
 
 
@@ -19,36 +20,43 @@ route_setEntryToTable = Blueprint('setEntryToTable', __name__)
 async def setEntryToTable():
   if request.method == "POST":
     relation_name = request.form.get('relationName')
+    if not relation_name:
+      return jsonify({"ERROR": "Missing relationName parameter"}), 400
+      
     print(relation_name)
 
     if relation_name == "feedback_csv":
       print("Creating feedback_csv table if it doesn't exist")
       await ensure_feedback_csv_exists()
 
+    columns = []
+    values = []
+    for key, value in request.form.items():
+      if key != 'relationName':
+        columns.append(sql.Identifier(key))
+        values.append(value)
+    
+    if not columns:
+      return jsonify({"ERROR": "No data provided to insert"}), 400
 
-    if relation_name != None or relation_name != "":
-      columns = []
-      values = []
-      for key, value in request.form.items():
-        if key != 'relationName':
-          columns.append(f'"{key}"')
-          values.append(f"'{value}'")
-      # Add created_at column with current timestamp if it exists in the relation
-      
-     
-      insert_query = f'INSERT INTO "{relation_name}" ({", ".join(columns)}) VALUES ({", ".join(values)});'
-      print(insert_query)
-      from backend.index import fileUploadErrors
+    # Build safe INSERT query
+    insert_query = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
+        sql.Identifier(relation_name),
+        sql.SQL(", ").join(columns),
+        sql.SQL(", ").join(sql.Placeholder() * len(values))
+    )
+    
+    print(insert_query.as_string(psycopg.connect(**get_db_connection_params())))
 
-      # insert the data into the table
-      try:
-        await execute_raw(insert_query)
-      except psycopg_errors.UndefinedTable:
-        data = {"ERROR": f"Table '{relation_name}' does not exist. Please create the table first."}
-        return jsonify(data), 404
-      except Exception as e:
-        data = {"ERROR": f"Error inserting data into table: {str(e)}"}
-        return jsonify(data), 500
+    # insert the data into the table
+    try:
+      await execute_raw(insert_query, tuple(values))
+    except psycopg_errors.UndefinedTable:
+      data = {"ERROR": f"Table '{relation_name}' does not exist. Please create the table first."}
+      return jsonify(data), 404
+    except Exception as e:
+      data = {"ERROR": f"Error inserting data into table: {str(e)}"}
+      return jsonify(data), 500
 
     return (
       jsonify(
@@ -56,6 +64,7 @@ async def setEntryToTable():
       ),
       200,
     )
+
   
 
 async def create_Feedback_Relation():

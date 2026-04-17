@@ -30,6 +30,7 @@ from backend.routes.manageDB.route_manageDB import route_manageDB
 from backend import metadata_utils
 from backend.metadata_utils import getMetaDataPath, loadMetadataCSV
 from backend.routes.processData.uncertaintyVis import create_uncertainty_visualizations
+from backend.routes.processData.route_processData import route_processData
 import json
 
 
@@ -130,6 +131,7 @@ app.register_blueprint(route_getDataFromDB, url_prefix='/api/getDataFromDB')
 app.register_blueprint(route_setEntryToTable, url_prefix='/api/setEntryToTable')
 app.register_blueprint(route_columnMetadata, url_prefix='/api/columnMetadata')
 app.register_blueprint(route_manageDB, url_prefix='/api/manageDB')
+app.register_blueprint(route_processData, url_prefix='/api/processData')
 
 # Create column_metadata_en/de tables if they don't exist (no Prisma needed)
 ensure_metadata_tables()
@@ -456,6 +458,11 @@ def get_uncertainty_svg():
         return svg_data, 200, {"Content-Type": "image/svg+xml"}
     except Exception as e:
         return jsonify({"ERROR": str(e)}), 500
+
+@app.route('/health')
+def health():
+    """Simple health check endpoint."""
+    return {"status": "healthy"}, 200
 
    
 

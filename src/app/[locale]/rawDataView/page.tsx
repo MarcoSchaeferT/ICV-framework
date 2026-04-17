@@ -53,7 +53,7 @@ export default function Home() {
   mapPropsWorld1.mapUIsettings.isColorMap_legend = true;
   mapPropsWorld1.mapUIsettings.isCountrySelection_dropdown = false;
   mapPropsWorld1.mapUIsettings.isDatePicker = false;
-  mapPropsWorld1.mapUIsettings.filterString_for_availableDataset_include = "named";
+  mapPropsWorld1.mapUIsettings.filterString_for_availableDataset_include = "climate_data";
   mapPropsWorld1.mapUIsettings.filterString_for_availableDataset_exclude = "proba";
   mapPropsWorld1.mapUIsettings.isPresenceData = true;
   mapPropsWorld1.mapUIsettings.isSequenceMetaData = true;

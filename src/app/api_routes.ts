@@ -1,3 +1,5 @@
+import { dataSourceURLs } from './const_store';
+
 // ─── Helper: build a URL string from a base path + typed params object ────────
 
 function buildUrl(basePath: string, params?: Record<string, string | number | undefined>): string {
@@ -48,6 +50,9 @@ class apiRoutes {
 
     // Manage DB relations (list & delete)
     public static readonly MANAGE_DB: string = `${apiRoutes.API_URL}/manageDB`;
+
+    // assign countries to dataset
+    public static readonly ASSIGN_COUNTRIES_TO_DATASET: string = `${apiRoutes.API_URL}/processData/assignCountries`;
 
     // ── Parameterised endpoints (typed function signatures) ───────────────
 

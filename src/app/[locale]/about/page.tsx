@@ -211,7 +211,7 @@ export default function Component() {
                 </Button>
                 </div>
                  <div className="min-w-fit flex flex-row items-center gap-2">
-                  <Badge variant="secondary">v0.4.1</Badge>
+                  <Badge variant="secondary">v0.9.5</Badge>
                   {/*<Badge className="bg-green-100 text-green-800">Active</Badge>*/}
                   </div>
               </div>

@@ -1,0 +1,68 @@
+#### Dengue Serotype
+A non-representative data set of dengue serotypes that enables counting serotypes per country and year. (Data source: [Nextstrain](https://nextstrain.org/dengue/all/E))
+
+import { categoricalColors } from "../../../../src/app/const_store";
+
+
+<table>
+  <thead>
+    <tr>
+      <th>Serotypes (per country)</th>
+      <th>Years</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        <div style={{display:"inline-flex", flexWrap:"wrap", columnGap:"0.75rem", rowGap:"0.25rem"}}>
+          <span style={{display:"inline-flex", alignItems:"center", gap:"0.25rem"}}>
+            <span style={{width:"0.75rem", height:"0.75rem", backgroundColor: categoricalColors[0], borderRadius:"2px"}} />
+            <span>denv1</span>
+          </span>
+          <span style={{display:"inline-flex", alignItems:"center", gap:"0.25rem"}}>
+            <span style={{width:"0.75rem", height:"0.75rem", backgroundColor: categoricalColors[1], borderRadius:"2px"}} />
+            <span>denv2</span>
+          </span>
+          <span style={{display:"inline-flex", alignItems:"center", gap:"0.25rem"}}>
+            <span style={{width:"0.75rem", height:"0.75rem", backgroundColor: categoricalColors[2], borderRadius:"2px"}} />
+            <span>denv3</span>
+          </span>
+          <span style={{display:"inline-flex", alignItems:"center", gap:"0.25rem"}}>
+            <span style={{width:"0.75rem", height:"0.75rem", backgroundColor: categoricalColors[3], borderRadius:"2px"}} />
+            <span>denv4</span>
+          </span>
+        </div>
+      </td>
+      <td>1905 - 2024</td>
+    </tr>
+  </tbody>
+</table>
+
+
+> [!WARNING]
+> Disclaimer: Serotype counts cannot be interpreted as dengue cases. This is not a representative data set, but rather a subset of cases in which the serotype was determined. The data comes from different laboratories that used different methods. 
+
+> [!NOTE]
+Determined serotypes with missing country information are excluded. Serotypes with missing year information are assigned to N/A in the **Year** dropdown menu. The serotype counts of the following smaller countries or oceans are currently not considered/visualized:
+
+| Column 1                        | Column 2                        |
+|----------------------------------|----------------------------------|
+| American Samoa                   | Antigua and Barbuda              |
+| Aruba                            | Atlantic Ocean                   |
+| Bahamas                          | Barbados                         |
+| Borneo                           | Cape Verde                       |
+| Cook Islands                     | Côte d`Ivoire                    |
+| Dominica                         | French Guiana                    |
+| French Polynesia                 | Grenada                          |
+| Guadeloupe                       | Kiribati                         |
+| Maldives                         | Marshall Islands                 |
+| Micronesia                       | Nauru                            |
+| Netherlands Antilles             | Niue                             |
+| Palau                            | Pacific Ocean                    |
+| Saint Barthélemy                 | Saint Kitts and Nevis            |
+| Saint Lucia                      | Saint Martin                     |
+| Saint Vincent and the Grenadines | Samoa                            |
+| Seychelles                       | Singapore                        |
+| Timor-Leste                      | Tonga                            |
+| Tuvalu                           | Union of the Comoros             |
+| Virgin Islands                   | Tanzania                         |
