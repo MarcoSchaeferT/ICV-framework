@@ -1,5 +1,3 @@
-# Dashboard
-
 <div align="center">
 
 <img src="public/iconHighDetail.svg" alt="ICV Logo" width="200" />
