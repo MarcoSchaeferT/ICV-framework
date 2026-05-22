@@ -1,5 +1,3 @@
-# Dashboard
-
 <div align="center">
 
 <img src="public/iconHighDetail.svg" alt="ICV Logo" width="200" />
@@ -151,7 +149,7 @@ Copyright (c) 2026 ICV Contributors
 
 This project is funded by the Federal Ministry of Health (BMG) under grant No. 2523DAT400 (project: AI-DAVis PANDEMICS)
 
-<img src="public/bmas_offic_farbe_de_wbz.png" alt="Federal Ministry of Health Logo" width="150">
+<img src="public/BMG_Logo.svg" alt="Federal Ministry of Health Logo" width="150" style="background:white;padding:0px;border-radius:4px">
 
 For more information about the project and funding, see: [AI-DAVis PANDEMICS](https://www.bundesgesundheitsministerium.de/ministerium/ressortforschung/handlungsfelder/digitalisierung/ai-davis-pandemics.html)
 

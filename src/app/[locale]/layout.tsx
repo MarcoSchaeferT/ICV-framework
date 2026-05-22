@@ -8,6 +8,7 @@ import DynamicUI from "../components/layout/DynamicUI";
 import NavbarLeft from "../components/layout/navbarLeft";
 import { layoutSizes } from "../const_store";
 import CopyrightFooter from "../components/layout/small_UI_elements/copyrightFooter";
+import Script from "next/script";
 
 
 
@@ -51,6 +52,17 @@ export default async function LocaleLayout({ children }: LocaleLayoutProps) {
   return (
     <html lang={locale} >
       <body className={`${inter.className} overflow-y-scroll overflow-x-clip bg-surface-default`} suppressHydrationWarning={true}>
+      <Script
+          async
+          src="http://89.168.106.64:8081/js/pa-BarnYORUkFdXEbz1Bijao.js"
+          strategy="afterInteractive"
+        />
+        <Script id="plausible-init" strategy="afterInteractive">
+          {`
+            window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
+            plausible.init();
+          `}
+        </Script>
         <NextIntlClientProvider messages={messages}>
 
           {/* Wrap all pages in the layout with the dynamicUI (navbars etc.)

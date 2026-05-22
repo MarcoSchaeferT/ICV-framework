@@ -58,12 +58,12 @@ return (
                <SettingButton />
               </div>
                 <Image
-                  src="/bmas_offic_farbe_de_wbz.png"
-                  alt="BMAS Logo"
+                  src="/BMG_Logo.svg"
+                  alt="BMG Logo"
                   width={140}
                   height={106}
                   className="rounded"
-                  style={{ minHeight: 96 }}
+                  style={{ minHeight: 96, backgroundColor: "white", padding: "0px", borderRadius: "4px" }}
                 />
                 <p className="text-sm text-neutral-200 max-w-[240px] pt-1">
                   {t.rich('funding', { ...t_richConfig })}: <a className="underline hover:font-semibold" href="https://www.bundesgesundheitsministerium.de/ministerium/ressortforschung/handlungsfelder/digitalisierung/ai-davis-pandemics.html">{t.rich('projectName', { ...t_richConfig })}</a>)
