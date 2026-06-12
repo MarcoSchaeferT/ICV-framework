@@ -22,6 +22,7 @@ function buildUrl(basePath: string, params?: Record<string, string | number | un
 }
 
 // ─── Route Definitions ───────────────────────────────────────────────────────
+export type MapName = "germany_map_states" | "germany_map_districts" | "world_map" | "usa_map" | "capitals";
 
 class apiRoutes {
 
@@ -32,11 +33,6 @@ class apiRoutes {
     // ── Simple endpoints (no query parameters) ───────────────────────────
 
     public static readonly FETCH_COMPRESSED_JSON: string = `${apiRoutes.API_URL}/get_compressed_json`;
-    public static readonly FETCH_GERMANY_MAP: string = `${apiRoutes.API_URL}/get_germany_map`;
-    public static readonly FETCH_WORLD_MAP: string = `${apiRoutes.API_URL}/get_world_map`;
-    public static readonly FETCH_USA_MAP: string = `${apiRoutes.API_URL}/get_usa_map`;
-    public static readonly FETCH_CAPITALS: string = `${apiRoutes.API_URL}/get_capitals`;
-
     public static readonly GET_UPLOAD_ERROR: string = `${apiRoutes.API_URL}/getUploadError`;
     public static readonly GET_UPLOAD_PROGRESS: string = `${apiRoutes.API_URL}/getUploadProgress`;
     public static readonly CREATE_TABLE_FROM_FILE: string = `${apiRoutes.API_URL}/setFilesToDB`;
@@ -76,14 +72,14 @@ class apiRoutes {
      * @example
      *   apiRoutes.fetchDbData({
      *     relationName: "my_table",
-     *     feature: "mean",
+     *     feature: "mean" | "ALL",
      *     filterBy: "iso_a3",
      *     filterValue: "DEU",
      *   })
      */
     static fetchDbData(params: {
         relationName: string;
-        feature: string;
+        feature: string; // ALL
         filterBy?: string;
         filterValue?: string;
         task?: string;
@@ -93,6 +89,20 @@ class apiRoutes {
     }): string {
         return buildUrl(`${apiRoutes.API_URL}/getDataFromDB`, params);
     }
+
+    static fetchMapData(params: {
+        mapName: MapName;
+    }): string {
+        return buildUrl(`${apiRoutes.API_URL}/getMapData`, params);
+    }
+
+    public static readonly FETCH_MAP_DATA = {
+        GERMANY_MAP_STATES: apiRoutes.fetchMapData({ mapName: "germany_map_states" }),
+        GERMANY_MAP_DISTRICTS: apiRoutes.fetchMapData({ mapName: "germany_map_districts" }),
+        WORLD_MAP: apiRoutes.fetchMapData({ mapName: "world_map" }),
+        USA_MAP: apiRoutes.fetchMapData({ mapName: "usa_map" }),
+        CAPITALS: apiRoutes.fetchMapData({ mapName: "capitals" }),
+    } as const;
 
     /** Fetch dataset metadata for a given language (en | de). */
     static getDatasetsMetadata(params: {

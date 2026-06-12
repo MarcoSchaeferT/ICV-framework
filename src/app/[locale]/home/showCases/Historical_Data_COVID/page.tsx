@@ -1,23 +1,23 @@
 "use client";
 
 import { useRef, useEffect, useState } from 'react'
-import CovidDataStates from '@/app/components/dataTableClasses/CovidDataStates';
+import CovidDataStates from '@/components/dataTableClasses/CovidDataStates';
 import {apiRoutes } from "@/app/api_routes";
-import { InterfaceContextProvider, useInterfaceContext } from '@/app/components/contexts/InterfaceContext';
-import LeafD3MapGermanyComponent, {LeafD3MapGermanyProps}  from '@/app/components/plots/maps/leafD3MapGermanyCovid';
-import DataTableComponent from '@/app/components/dataTable';
-import SGridPlotCard from '@/app/components/layout/swapy_gridPlotCard';
-import { CardPropsClass } from '@/app/components/layout/cardWrapper';
+import { InterfaceContextProvider, useInterfaceContext } from '@/components/contexts/InterfaceContext';
+import LeafD3MapGermanyComponent, {LeafD3MapGermanyProps}  from '@/components/plots/maps/LeafD3MapGermanyCovid';
+import DataTableComponent from '@/components/DataTable';
+import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
+import { CardPropsClass } from '@/components/layout/CardWrapper';
 import {t_richConfig} from '@/app/const_store';
 import { createSwapy, Swapy } from 'swapy';
-import BarchartComponent,{ BarchartPorps } from '@/app/components/plots/barchart/barchart';
-import {LoadingSpinner} from '@/app/components/plots/maps/helpers';
+import BarchartComponent,{ BarchartProps } from '@/components/plots/barchart/barchart';
+import {LoadingSpinner} from '@/components/plots/maps/helpers';
 import { useLocale, useTranslations } from 'next-intl';
-import { useGetJSONData } from '@/app/hooks/customFetchAndCache';
-import { metaDataT } from '@/app/components/plots/metaDataHandler';
-import {ViewMainInfoComponent} from '@/app/components/viewPageMainInfo';
-import { useUIContext } from '@/app/components/contexts/UIContext';
-import { MDXContentProvider } from '../../../../../../messages/markdown/MDXContentProvider';
+import { useGetJSONData } from '@/app/hooks/useFetchAndCache';
+import { metaDataT } from '@/components/plots/MetaDataHandler';
+import {ViewMainInfoComponent} from '@/components/ViewPageMainInfo';
+import { useUIContext } from '@/components/contexts/UIContext';
+import { MDXContentProvider } from '@messages/markdown/MDXContentProvider';
 import { Locale } from '@/i18n/routing';
 
 
@@ -39,25 +39,27 @@ export default function Home() {
   let dataURL = apiRoutes.fetchDbData({ relationName: dataSet, feature: "" });
 
   // set up the map props
-  let mapPropsGermany = new LeafD3MapGermanyProps();
+  let mapPropsGermany = LeafD3MapGermanyProps();
   mapPropsGermany.chartName = 'map_germany';
-  mapPropsGermany.mapDataURL = apiRoutes.FETCH_GERMANY_MAP;
+  mapPropsGermany.mapDataURL = apiRoutes.FETCH_MAP_DATA.GERMANY_MAP_STATES;
   mapPropsGermany.dataURL = dataURL;
   mapPropsGermany.center = [51.5, 10.5];
   mapPropsGermany.zoom =6.4;
   mapPropsGermany.isApplySelectionsTransition = false;
-  mapPropsGermany.mapUIsettings.isLongnitude_slider = false;
-  mapPropsGermany.mapUIsettings.isLatitude_slider = false;
-  mapPropsGermany.mapUIsettings.isZoom_slider = false;
-  mapPropsGermany.mapUIsettings.isColorMapSelection_dropdown = true;
-  mapPropsGermany.mapUIsettings.isFeatureSelection_dropdown = true;
-  mapPropsGermany.mapUIsettings.isDatasetSelection_dropdown = false;
-  mapPropsGermany.mapUIsettings.isDistance_legend = true;
-  mapPropsGermany.mapUIsettings.isColorMap_legend = true;
+  mapPropsGermany.mapUIsettings.isLongitudeSlider = false;
+  mapPropsGermany.mapUIsettings.isLatitudeSlider = false;
+  mapPropsGermany.mapUIsettings.isZoomSlider = false;
+  mapPropsGermany.mapUIsettings.isColorMapSelectionDropdown = true;
+  mapPropsGermany.mapUIsettings.isFeatureSelectionDropdown = true;
+  mapPropsGermany.mapUIsettings.isDatasetSelectionDropdown = false;
+  mapPropsGermany.mapUIsettings.defaultFeatureName = "accudeaths";
+  mapPropsGermany.mapUIsettings.isDistanceLegend = true;
+  mapPropsGermany.mapUIsettings.isColorMapLegend = true;
   mapPropsGermany.isProjection_equirectangular = false;
   mapPropsGermany.isStaticAutoFitFullSize = true;
+  mapPropsGermany.isSetIntialContextDataFromComponent = true;
 
-  let covidDataStatesPpros =  new CardPropsClass("Table1","","","");
+  let covidDataStatesPpros =  CardPropsClass("Table1","","","");
 
   // intitialize data table context
   useInterfaceContext();
@@ -104,7 +106,7 @@ export default function Home() {
       }}>
 
         {/*** Grid Cells ***/}
-        <SGridPlotCard rowColSpan={[9,4]}  cardProps={new CardPropsClass("Map1","","","")}>
+        <SGridPlotCard rowColSpan={[9,4]}  cardProps={CardPropsClass("Map1","","","")}>
           <LeafD3MapGermanyComponent props={mapPropsGermany}/>
         </SGridPlotCard>
 
@@ -121,7 +123,7 @@ export default function Home() {
         </SGridPlotCard>
        <DynamicBarChart featureRaw="accucasesperweek" name="accuCasesPerWeek "/>
 
-       {/* <SGridPlotCard rowColSpan={[3,2]}  cardProps={new CardPropsClass("Map2","Map2","","")}> <D3MapComponent D3MapPorps={mapPropsGermany}/> </SGridPlotCard>*/}
+       {/* <SGridPlotCard rowColSpan={[3,2]}  cardProps={CardPropsClass("Map2","Map2","","")}> <D3MapComponent D3MapPorps={mapPropsGermany}/> </SGridPlotCard>*/}
         {/*<div className={`${leftDataTableStyle}`}><CardWrapper headline={"Covid Data Districts"} component={<DataTableCovid constructor={CovidDataDistricts}  />} /></div>*/}
       </div>
     </InterfaceContextProvider>
@@ -146,11 +148,11 @@ function DynamicBarChart({ featureRaw, name }: { featureRaw: string, name: strin
   
 
   if(dataSet === null || feature === null)   return (
-  <SGridPlotCard rowColSpan={[4,8]} cardProps={new CardPropsClass(featureRaw+"Barchart",name,"asas","")}> <LoadingSpinner/></SGridPlotCard>);
+  <SGridPlotCard rowColSpan={[4,8]} cardProps={CardPropsClass(featureRaw+"Barchart",name,"asas","")}> <LoadingSpinner/></SGridPlotCard>);
   
   let dataURL = apiRoutes.fetchDbData({ relationName: dataSet, feature: c.curFeature });
 
-  let bchartProps = new BarchartPorps("Barchart", dataURL , "exampleVar");
+  let bchartProps = BarchartProps("Barchart", dataURL , "exampleVar");
 
   bchartProps.chartName = feature+"Barchart";
   bchartProps.dataURL = dataURL;
@@ -162,7 +164,7 @@ function DynamicBarChart({ featureRaw, name }: { featureRaw: string, name: strin
 
   return (
     <>
-      <SGridPlotCard rowColSpan={[4,8]} cardProps={new CardPropsClass((featureRaw+"Barchart") || "NA", c.curFeature|| "NA", featureDescription|| "NA","","")}> <BarchartComponent ChartPorps={bchartProps}/></SGridPlotCard>
+      <SGridPlotCard rowColSpan={[4,8]} cardProps={CardPropsClass((featureRaw+"Barchart") || "NA", c.curFeature|| "NA", featureDescription|| "NA","","")}> <BarchartComponent chartProps={bchartProps}/></SGridPlotCard>
     </>
   );
 }

@@ -156,7 +156,7 @@ class stateMappersGermany {
   }
 }
 
-function handleLoadDataERROR(isLoading: boolean, data: dbDATA): any | undefined {
+function handleLoadDataError(isLoading: boolean, data: dbDATA): any | undefined {
   if (!isLoading) {
     if (data.error != undefined) {
       return String(data.error);
@@ -165,23 +165,23 @@ function handleLoadDataERROR(isLoading: boolean, data: dbDATA): any | undefined 
   return undefined;
 }
 
-const PrintDataLoadingERRORs = ({
-  listOfERRORs,
+const PrintDataLoadingErrors = ({
+  listOfErrors,
   position = "absolute",
 }: {
-  listOfERRORs: any[];
+  listOfErrors: any[];
   position?: "absolute" | "relative";
 }) => {
 
   // remove duplicate errors and undefined values
-  const uniqueERRORs = [...new Set(listOfERRORs.filter(e => e !== undefined))];
+  const uniqueErrors = [...new Set(listOfErrors.filter(e => e !== undefined))];
   return (
     <div
       className={`${position} bottom-0 left-[-8px] m-2 p-1 border w-full bg-white bg-opacity-75 z-10000 ${
-      uniqueERRORs.length > 0 ? "" : "hidden"
+      uniqueErrors.length > 0 ? "" : "hidden"
       }`}
     >
-      {uniqueERRORs.map((error, index) => (
+      {uniqueErrors.map((error, index) => (
       <div key={index} className=" text-red-500 wrap-break-word">
         {error}
       </div>
@@ -191,5 +191,5 @@ const PrintDataLoadingERRORs = ({
 };
 
 export default stateMappersGermany;
-export { handleLoadDataERROR, PrintDataLoadingERRORs };
+export { handleLoadDataError, PrintDataLoadingErrors };
 export type { stateMappersGermany as stateMappersGermanyT };

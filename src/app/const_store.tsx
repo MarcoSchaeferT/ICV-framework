@@ -1,5 +1,5 @@
 import { Link } from "@/i18n/routing";
-import { LINK } from '../../messages/navbarContent'; // Ensure LINK is exported as a value from this module
+import { LINK } from '@messages/navbarContent'; // Ensure LINK is exported as a value from this module
 import * as d3 from 'd3';
 
 export const consts: { [key: string]: string } = 
@@ -286,7 +286,7 @@ export const categoryCoordsMap: Record<string, [number, number]> = {
 // Categorical palette optimised for contrast against the Inferno colourmap
 // (Inferno: black → dark purple → red-orange → bright yellow)
 // → cool blues, teals, greens, and vivid pinks stand out best
-export const categoricalColors = [
+export const categoricalColors2 = [
         // ── best 4 against Inferno ──
         "#4ecdc4", // teal-cyan     (hue 175°, sat 55%, lum 55%) – clearly blue-green, away from lime
         "#a8b8e8", // boosted lilac  (Pastel2[2] → sat 55%, lum 75%) – richer blue-violet
@@ -307,7 +307,7 @@ export const categoricalColors = [
         "#00e676", // emerald
     ];
 
-    export const categoricalColors2 = d3.schemeCategory10.concat(d3.schemeSet3).concat(d3.schemeTableau10).concat(d3.schemePaired).concat(d3.schemePastel1).concat(d3.schemePastel2);
+    export const categoricalColors = d3.schemeCategory10.concat(d3.schemeSet3).concat(d3.schemeTableau10).concat(d3.schemePaired).concat(d3.schemePastel1).concat(d3.schemePastel2);
 
     export const dataSourceURLs: { [key: string]: string } = {
         "mosquito": "https://zenodo.org/records/19615975",

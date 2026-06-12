@@ -1,9 +1,9 @@
 name: Cleanup Old Package Versions
 
 on:
-  workflow_dispatch: # Allows you to run this manually from the Actions tab
-  #schedule:
-  #  - cron: '0 0 * * 0' # Optional: Runs every Sunday at midnight
+  workflow_dispatch: # Allows manual execution from the Actions tab
+  schedule:
+    - cron: '0 0 * * 0' # Executed automatically every Sunday at midnight
 
 jobs:
   delete-versions:
@@ -12,21 +12,26 @@ jobs:
       packages: write
       contents: read
     steps:
+      # 1. Cleanup Frontend Versions Safely
       - uses: actions/delete-package-versions@v5
         with:
           package-name: 'icv-frontend'
-          package-type: 'container' # Options: npm, maven, rubygems, nuget, docker, container
-          min-versions-to-keep: 1
-          delete-only-untagged-versions: 'true'
+          package-type: 'container'
+          min-versions-to-keep: 3 # Retains the 3 newest full multi-arch releases
+          delete-only-untagged-versions: 'false' # Prevents destruction of active child layers
+
+      # 2. Cleanup Database Versions Safely
       - uses: actions/delete-package-versions@v5
         with:
           package-name: 'icv-database'
-          package-type: 'container' 
-          min-versions-to-keep: 1
-          delete-only-untagged-versions: 'true' 
+          package-type: 'container'
+          min-versions-to-keep: 3
+          delete-only-untagged-versions: 'false'
+
+      # 3. Cleanup Backend Versions Safely
       - uses: actions/delete-package-versions@v5
         with:
           package-name: 'icv-backend'
           package-type: 'container'
-          min-versions-to-keep: 1
-          delete-only-untagged-versions: 'true'
+          min-versions-to-keep: 3
+          delete-only-untagged-versions: 'false'

@@ -41,7 +41,135 @@
   margin: 0 auto !important;
 }
 
-@config '../../tailwind.config.ts';
+@plugin "tailwindcss-animate";
+@plugin "@tailwindcss/typography";
+
+/* ============================================================
+   Tailwind v4 — CSS-first theme configuration
+   (replaces tailwind.config.ts theme.extend)
+   ============================================================ */
+
+/* Dark mode: class-based (.dark) */
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* --- Breakpoints (rem: 1rem = 16px) ---
+     Adds 3xs/2xs/xs/3xl and overrides lg to 1100px */
+  --breakpoint-3xs: 20rem;
+  /* 320px */
+  --breakpoint-2xs: 22.5rem;
+  /* 360px */
+  --breakpoint-xs: 30rem;
+  /* 480px */
+  --breakpoint-lg: 68.75rem;
+  /* 1100px — overrides default 1024px */
+  --breakpoint-3xl: 120rem;
+  /* 1920px */
+
+  /* --- Font Families --- */
+  --font-sans: 'Lato', sans-serif;
+  --font-serif: 'DM Serif Display', serif;
+
+  /* --- Border Radius (reference --radius CSS var defined in @layer base) --- */
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  /* --- Custom Colors --- */
+  --color-accent: #426DD0;
+  --color-sidebar: #262626;
+  --color-sidebar-foreground: #FFFFFF;
+  --color-sidebar-primary: #171717;
+  --color-sidebar-primary-foreground: #FFFFFF;
+  --color-sidebar-accent: #426DD0;
+  --color-sidebar-accent-foreground: #FFFFFF;
+  --color-sidebar-border: #171717;
+  --color-sidebar-ring: #426DD0;
+  --color-background: #DCDDD9;
+  --color-foreground: #747474;
+
+  --color-text: #272829;
+  --color-text-default: #272829;
+  --color-text-dark: #000000;
+  --color-text-light: #D8D9DA;
+  --color-text-foreground: #61677A;
+
+  --color-surface: #f5f6f3;
+  --color-surface-default: #f5f6f3;
+  --color-surface-dark: #b8b9b6;
+  --color-surface-light: #fefefe;
+  --color-surface-foreground: #dddddb;
+
+  --color-primary: #9b9b9b;
+  --color-primary-default: #9b9b9b;
+  --color-primary-dark: #747474;
+  --color-primary-light: #f5f5f5;
+  --color-primary-foreground: #e0e0e0;
+
+  --color-secondary: #E5E7EB;
+  --color-secondary-default: #E5E7EB;
+  --color-secondary-dark: #2D2B34;
+  --color-secondary-light: #F9FAFB;
+  --color-secondary-foreground: #030712;
+
+  --color-info: #2563EB;
+  --color-info-default: #2563EB;
+  --color-info-dark: #1D4ED8;
+  --color-info-light: #3B82F6;
+  --color-info-foreground: #F9FAFB;
+
+  --color-success: #16A34A;
+  --color-success-default: #16A34A;
+  --color-success-dark: #15803D;
+  --color-success-light: #22C55E;
+  --color-success-foreground: #F9FAFB;
+
+  --color-warning: #EAB308;
+  --color-warning-default: #EAB308;
+  --color-warning-dark: #CA8A04;
+  --color-warning-light: #FACC15;
+  --color-warning-foreground: #030712;
+
+  --color-error: #DC2626;
+  --color-error-default: #DC2626;
+  --color-error-dark: #B91C1C;
+  --color-error-light: #EF4444;
+  --color-error-foreground: #F9FAFB;
+
+  /* --- Background Gradients --- */
+  --background-image-gradient-radial: radial-gradient(var(--tw-gradient-stops));
+  --background-image-gradient-conic: conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops));
+
+  /* --- Grid Template Columns (extends beyond default 12) --- */
+  --grid-template-columns-18: repeat(18, minmax(0, 1fr));
+  --grid-template-columns-24: repeat(24, minmax(0, 1fr));
+
+  /* --- Animations --- */
+  --animate-accordion-down: accordion-down 300ms ease-out;
+  --animate-accordion-up: accordion-up 300ms ease-out;
+}
+
+/* Keyframes for accordion animations */
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+
+  to {
+    height: 0;
+  }
+}
+
 
 /*
   The default border color has changed to `currentColor` in Tailwind CSS v4,

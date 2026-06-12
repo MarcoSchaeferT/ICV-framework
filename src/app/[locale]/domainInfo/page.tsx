@@ -1,10 +1,10 @@
-import { BlogPost } from '../../components/blogPosts'
-import { TabularAccordion } from '../../components/blogTabularAccordion';
-import { blogVectors, blogDiseases } from '../../../../messages/vectorInfo';
+import { BlogPost } from '@/components/BlogPosts'
+import { TabularAccordion } from '@/components/BlogTabularAccordion';
+import { blogVectors, blogDiseases } from '@messages/vectorInfo';
 import {useLocale, useTranslations} from 'next-intl';
-import { t_richConfig } from '../../const_store';
+import { t_richConfig } from '@/app/const_store';
 import { routing, useRouter, Locale } from '@/i18n/routing';
-import { ScrollToButtonUp } from '../../components/layout/small_UI_elements/ScrollToButton';
+import { ScrollToButtonUp } from '@/components/layout/small_UI_elements/ScrollToButton';
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({locale}));

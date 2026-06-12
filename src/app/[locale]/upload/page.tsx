@@ -1,10 +1,10 @@
 "use client";
-import FileUploadForm from "@/app/components/upload";
-import { ViewMainInfoComponent } from "@/app/components/viewPageMainInfo";
+import FileUploadForm from "@/components/Upload";
+import { ViewMainInfoComponent } from "@/components/ViewPageMainInfo";
 import { t_richConfig } from "@/app/const_store";
 import MdxLayout from "@/mdx-layout";
 import { useLocale, useTranslations } from "next-intl";
-import { MDXContentProvider } from "../../../../messages/markdown/MDXContentProvider";
+import { MDXContentProvider } from "@messages/markdown/MDXContentProvider";
 import { Link } from "@/i18n/routing";
 import { TableRows } from "iconoir-react";
 
@@ -19,15 +19,15 @@ return(
 <>
   {/* Section for the File Upload Form */}
   <div className="min-h-[75vh] flex flex-col bg-gray-100">
-    <div className="flex mt-50 items-center justify-center bg-gray-100 p-4 mb-20">
+    <div className="flex mt-50 items-center justify-center bg-gray-100 p-4 mb-1">
         <FileUploadForm />
     </div>
 
     {/* Link to the Metadata Editor */}
-    <div className="flex items-center justify-center bg-gray-100 p-4">
+    <div className="flex items-center justify-center bg-gray-100 p-19">
       <Link
         href="/metadataEditor"
-        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow hover:bg-blue-700 transition-colors"
+        className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-10 py-4.5 text-lg font-medium text-white shadow hover:bg-blue-700 transition-colors"
       >
         <TableRows className="h-5 w-5" />
         {locale === "de" ? "Metadaten Editor" : "Metadata Editor"}

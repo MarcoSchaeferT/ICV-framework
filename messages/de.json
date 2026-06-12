@@ -144,6 +144,7 @@
                 "card_temperature": "Temperatur",
                 "card_dewpoint": "Taupunkt",
                 "card_precipitation": "Niederschlag",
+                "card_suitability": "Habitat Eignung",
                 "card_windSpeed": "Windgeschwindigkeit",
                 "card_map_temperature": "Temperatur",
                 "card_map_dewpoint": "Taupunkt",
@@ -223,7 +224,7 @@
         "buttontext": "Zurück nach Oben"
     },
     "component_D3MapLayerComponent": {
-        "longnitude": "Längengrad",
+        "longitude": "Längengrad",
         "latitude": "Breitengrad",
         "data_set": "Datensatz",
         "opacity": "Deckkraft",
@@ -285,7 +286,8 @@
     },
     "page_predictionView": {
         "mainInfo": {
-            "heading": "Vorhersage Ansicht"
+            "heading": "Vorhersage Ansicht",
+            "content": ""
         },
         "headingOverview": "Übersichtskarte",
         "headingDetailView": "Detailkarte"
@@ -303,7 +305,8 @@
             "tab_linecharts": "Liniendiagramme",
             "tab_detailView": "Karte Detailansicht",
             "mainInfo": {
-                "heading": "Trainings Daten Ansicht"
+                "heading": "Trainings Daten Ansicht",
+                "content": ""
             }
         },
         "linechart": {

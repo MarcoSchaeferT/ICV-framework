@@ -3,7 +3,7 @@ import React from 'react';
 import customMDXlink from './cutomMDXlink';
 import { useLocale } from 'next-intl';
 import { Locale } from './i18n/routing';
-import alertTypeTranslations from '../messages/markdown/markdownAlertTypes';
+import alertTypeTranslations from '@messages/markdown/markdownAlertTypes';
  
 const getAlertType = (children: React.ReactNode): string => {
   // Extract alert type from first paragraph child if present, e.g. "Note:", "Warning:", etc.

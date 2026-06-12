@@ -3,8 +3,8 @@ import type React from "react"
 import Image from "next/image"
 import { Link } from "@/i18n/routing";
 import { Locale, useLocale } from "next-intl";
-import { showCasesList } from "../../../../messages/showCasesContent";
-import { useUIContext } from "@/app/components/contexts/UIContext";
+import { showCasesList } from "@messages/showCasesContent";
+import { useUIContext } from "@/components/contexts/UIContext";
 
 export default function ShowcaseGrid() {
 

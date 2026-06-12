@@ -4,6 +4,7 @@ import {
   PageSearch,
   ColorWheel,
   TestTube,
+  Database,
   TableRows,
   ConstrainedSurface,
   Drone,
@@ -201,6 +202,12 @@ const nav_LINKS_top: LINKS = {
 
 const nav_LINKS_left: LINKS = { 
     "en": [
+         {
+           icon: Globe,
+            title: "WIP Dashboard Germany",
+            href: "/covidDashboardMapLibre",
+            group: Group.all 
+        },
         {
             icon: Archive,
             title: "ICV-Docs",
@@ -265,6 +272,18 @@ const nav_LINKS_left: LINKS = {
             title: "General Vis View",
             href: "/generalVisView",
             group: Group.all
+        },
+        {
+            icon: Arc3d,
+            title: "Assign Countries to Dataset",
+            href: "/assignCountriesToDataset",
+            group: Group.all
+        },
+        {
+            icon: Database,
+            title: "Manage Database Tables",
+            href: "/manageDB",
+            group: Group.all
         }
 
     ],
@@ -326,6 +345,18 @@ const nav_LINKS_left: LINKS = {
             icon: StatsReport,
             title: "General Vis View",
             href: "/generalVisView",
+            group: Group.all
+        },
+        {
+            icon: Arc3d,
+            title: "Assign Countries to Dataset",
+            href: "/assignCountriesToDataset",
+            group: Group.all
+        },
+        {
+            icon: Database,
+            title: "Manage Database Tables",
+            href: "/manageDB",
             group: Group.all
         }
 

@@ -102,38 +102,49 @@ population,int,,Population count,1
 date,date,NA,Date of the observation,1
 longitude_1,float,longitude,coordinate,0
 iso_3166_1_alpha_3,string,NA,the 3 letter country name,1
-cumulative_confirmed,float,cumulative_confirmed,cumulative confirmed cases,0
-cumulative_recovered,float,cumulative_recovered,cumulative recovered cases,0
-cumulative_deceased,float,cumulative_deceased,cumulative deceased cases,0
-cumulative_tested,float,cumulative_tested,cumulative tested cases,0
-new_confirmed,float,confirmed,Confirmed Cases,1
-new_recovered,float,recovered,Total Recoveries,1
-new_deceased,float,deceased,Total Deaths,1
-new_tested,float,tested,Total Tests,1
+cumulative_confirmed,float,,cumulative confirmed cases,0
+cumulative_recovered,float,,cumulative recovered cases,0
+cumulative_deceased,float,,cumulative deceased cases,0
+cumulative_tested,float,,cumulative tested cases,0
+new_confirmed,float,,Confirmed Cases,1
+new_recovered,float,,Total Recoveries,1
+new_deceased,float,,Total Deaths,1
+new_tested,float,,Total Tests,1
 id,int,id,id,0
-location_key,string,location_key,location key,0
-openstreetmap_id,string,openstreetmap_id,OpenStreetMap ID,0
+location_key,string,,location key,0
+openstreetmap_id,string,,OpenStreetMap ID,0
 latitude,float,latitude,latitude,0
 longitude,float,longitude,longitude,0
-elevation_m,string,elevation_m,elevation in meters,0
-area_sq_km,string,area_sq_km,area in square kilometers,0
-area_rural_sq_km,string,area_rural_sq_km,area of rural land in square kilometers,0
-area_urban_sq_km,string,area_urban_sq_km,area of urban land in square kilometers,0
+elevation_m,string,m,elevation in meters,0
+area_sq_km,string,km^2,area in square kilometers,0
+area_rural_sq_km,string,km^2,area of rural land in square kilometers,0
+area_urban_sq_km,string,km^2,area of urban land in square kilometers,0
 date,date,date,Date of the observation,0
-place_id,string,place_id,Place ID,0
-wikidata_id,string,wikidata_id,Wikidata ID,0
-datacommons_id,string,datacommons_id,Data Commons ID,0
-country_code,string,country_code,country code,0
-country_name,string,country_name,country name,0
-subregion1_code,string,subregion1_code,subregion 1 code,0
-subregion1_name,string,subregion1_name,subregion 1 name,0
-subregion2_code,string,subregion2_code,subregion 2 code,0
-subregion2_name,string,subregion2_name,subregion 2 name,0
-locality_code,string,locality_code,locality code,0
-locality_name,string,locality_name,locality name,0
-iso_3166_1_alpha_2,string,iso_3166_1_alpha_2,2 letter country code,0
-iso_3166_1_alpha_3,string,iso_3166_1_alpha_3,3 letter country code,0
-aggregation_level,string,aggregation_level,aggregation level,0
+place_id,string,,Place ID,0
+wikidata_id,string,,Wikidata ID,0
+datacommons_id,string,,Data Commons ID,0
+country_code,string,,country code,0
+country_name,string,,country name,0
+subregion1_code,string,,subregion 1 code,0
+subregion1_name,string,,subregion 1 name,0
+subregion2_code,string,,subregion 2 code,0
+subregion2_name,string,,subregion 2 name,0
+locality_code,string,,locality code,0
+locality_name,string,,locality name,0
+iso_3166_1_alpha_2,string,,2 letter country code,0
+iso_3166_1_alpha_3,string,,3 letter country code,0
+aggregation_level,string,,aggregation level,0
 created_at,date,NA,Creation date,1
-cv,float, ,Coefficient of variation,1
-
+cv,float,,Coefficient of variation,1
+IdLandkreis,int,NA,ID of the district,0
+Altersgruppe,string,NA,Age group,1
+Geschlecht,string,NA,Gender,1
+Meldedatum,date,NA,Reporting date,0
+Refdatum,date,NA,Reference date,0
+IstErkrankungsbeginn,int,NA,Is onset of illness,0
+NeuerFall,int,NA,New cases,1
+NeuerTodesfall,int,NA,New deaths,1
+NeuGenesen,int,NA,Newly recovered,1
+AnzahlFall,int,NA,Number of cases,1
+AnzahlTodesfall,int,NA,Number of deaths,1
+AnzahlGenesen,int,NA,Number of recovered,1

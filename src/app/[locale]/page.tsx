@@ -1,9 +1,9 @@
 
-import { layoutSizes } from "../const_store";
+import { layoutSizes } from "@/app/const_store";
 import { Link } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
-import { t_richConfig } from "../const_store";
-import { LINK } from '../../../messages/navbarContent';
+import { t_richConfig } from "@/app/const_store";
+import { LINK } from '@messages/navbarContent';
 import {
   TestTube,
   Axes,
@@ -24,9 +24,13 @@ export function generateStaticParams() {
 }
 
 
-export default function Home() {
-const t = useTranslations("page_home.pageContent");
-const subpage_features = useTranslations("page_home.subpage_features");
+import { setRequestLocale, getTranslations } from 'next-intl/server';
+
+export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
+  const resolvedParams = await params;
+  setRequestLocale(resolvedParams.locale);
+  const t = await getTranslations("page_home.pageContent");
+  const subpage_features = await getTranslations("page_home.subpage_features");
 
 
 return (
@@ -43,7 +47,7 @@ return (
       <section className="space-y-6 pb-8 pt-6 md:pb-12 md:pt-10 lg:pt-28" style={{ paddingBottom: `calc(7rem - ${layoutSizes.topNavbarHeight}px)` }}>
         <div className="container flex max-w-6xl flex-col items-center gap-4 text-center pt-20 pb-6">
           <div className="flex flex-row items-center gap-8">
-            <div className="bg-white min-h-[300] min-w-[300px] rounded-xl flex items-center justify-center pr-0 pl-5 shadow-lg transition-transform duration-300 hover:scale-105 hover:shadow-2xl">
+            <div className="bg-white min-h-[300px] min-w-[300px] rounded-xl flex items-center justify-center pr-0 pl-5 shadow-lg transition-transform duration-300 hover:scale-105 hover:shadow-2xl">
               <Image src="/iconHighDetail.svg" alt="Icon" width={300} height={300} className="" />
             </div>
             <h1 className="font-heading text-neutral-50 text-3xl sm:text-5xl md:text-7xl lg:text-6xl pt-4 text-left leading-tight font-bold ">
@@ -57,13 +61,13 @@ return (
               {t.rich('subHeading', { ...t_richConfig })} 
                <SettingButton />
               </div>
-                <Image
-                  src="/bmas_offic_farbe_de_wbz.png"
-                  alt="BMAS Logo"
+               <Image
+                  src="/BMG_Logo.svg"
+                  alt="BMG Logo"
                   width={140}
                   height={106}
                   className="rounded"
-                  style={{ minHeight: 96 }}
+                  style={{ minHeight: 96, backgroundColor: "white", padding: "0px", borderRadius: "4px" }}
                 />
                 <p className="text-sm text-neutral-200 max-w-[240px] pt-1">
                   {t.rich('funding', { ...t_richConfig })}: <a className="underline hover:font-semibold" href="https://www.bundesgesundheitsministerium.de/ministerium/ressortforschung/handlungsfelder/digitalisierung/ai-davis-pandemics.html">{t.rich('projectName', { ...t_richConfig })}</a>)
@@ -77,7 +81,7 @@ return (
       <div className="flex justify-center w-full">
         <section
           id="features"
-          className="container w-full space-y-6 rounded-xl bg-slate-50 dark:bg-transparent flex flex-col items-center"
+          className="container w-[80%] space-y-6 rounded-xl bg-slate-50 dark:bg-transparent flex flex-col items-center"
         >
           <div className=""></div>
             <h2 className="font-heading text-4xl leading-[1.1] sm:text-3xl md:text-4xl rounded-lg px-4 pt-2 ">

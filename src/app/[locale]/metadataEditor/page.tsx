@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { apiRoutes } from "../../api_routes";
-import { useUIContext } from "@/app/components/contexts/UIContext";
+import { apiRoutes } from "@/app/api_routes";
+import { useUIContext } from "@/components/contexts/UIContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {

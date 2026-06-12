@@ -64,7 +64,8 @@ progressVal = [1]
 metadata = {}
 fileUploadErrors: dict[str,str] = {"ERROR": "false"}
 class DataPaths:
-    germany_map: Path
+    germany_map_states: Path
+    germany_map_districts: Path
     world_map: Path
     capitals: Path
     mos_data: Path
@@ -76,7 +77,8 @@ class DataPaths:
     usa_map: Path
 
     def __init__(self):
-        self.germany_map = Path(__file__).parent / "assets" / "germany_midRes.geo.json.tgz"
+        self.germany_map_states = Path(__file__).parent / "assets" / "germany_states_midRes.geo.json.tgz"
+        self.germany_map_districts = Path(__file__).parent / "assets" / "germany_districts.geo.json.tgz"
         self.world_map = Path(__file__).parent / "assets" / "worldmap_lowRes.geo.json.tgz"
         self.capitals = Path(__file__).parent / "assets" / "capitals.geo.json.tgz"
         self.mos_data = Path(__file__).parent / "assets" / "aedes_aegypti_svm_output_2015.csv"
@@ -120,8 +122,6 @@ dummyDBdata = [
 
 database_url = os.getenv("DATABASE_URL")
 db_pw = os.getenv("DB_PASSWORD_SECRET")
-print("DATABASE_URL", database_url)
-print("POSTGRES_PASSWORD", db_pw)
 
 # register the blueprint
 app.register_blueprint(route_setFilesToDB, url_prefix='/api/setFilesToDB')
@@ -198,15 +198,15 @@ async def db():
         print("db" + str(users_query))
         for element in dummyDBdata:
             # Check if user exists
-            found = await query_raw(f"SELECT * FROM \"User\" WHERE email = '{element['email']}'")
+            found = await query_raw("SELECT * FROM \"User\" WHERE email = %s", (element['email'],))
             if found and len(found) > 0:
                 print("Email already exists: {}".format(element["email"]))
                 continue
             else:
-                await execute_raw(f"""
+                await execute_raw("""
                     INSERT INTO "User" (email, name, password) 
-                    VALUES ('{element["email"]}', '{element["name"]}', '{element["password"]}')
-                """)
+                    VALUES (%s, %s, %s)
+                """, (element["email"], element["name"], element["password"]))
         
         # Get updated users list
         users_query = await query_raw("SELECT * FROM \"User\"")
@@ -244,52 +244,31 @@ async def get_compressed_json():
     return data
 
 
-@swag_from('API_docs/get_germany_map.yml')
-@app.route("/api/get_germany_map", methods=["GET"])
-def getGermanyMap():
+@swag_from('API_docs/get_map_data.yml')
+@app.route("/api/getMapData", methods=["GET"])
+def getMap():
+    mapName = request.args.get("mapName")
+    if not mapName:
+        return "ERROR: No mapName provided!"
+
+    # Mapping of map names to their respective paths
+    map_paths = {
+        "germany_map_states": dataPaths.germany_map_states,
+        "germany_map_districts": dataPaths.germany_map_districts,
+        "world_map": dataPaths.world_map,
+        "usa_map": dataPaths.usa_map,
+        "capitals": dataPaths.capitals
+    }
+
+    if mapName not in map_paths:
+        return f"ERROR: Map '{mapName}' not found!"
+
     try:
-        data = load_TAR_GZ_JSON(dataPaths.germany_map)
+        data = load_TAR_GZ_JSON(map_paths[mapName])
+        return jsonify(data)
     except Exception as e:
-        print("ERROR reading data: get_germany_map", e)
-        data = {"ERROR": "ERROR reading data: get_germany_map" + str(e)}
-
-    return jsonify(data)
-
-@swag_from('API_docs/get_usa_map.yml')
-@app.route("/api/get_usa_map", methods=["GET"])
-def getUSAdMap():
-    data = []
-    try:
-        data = load_TAR_GZ_JSON(dataPaths.usa_map)
-    except Exception as e:
-        print("ERROR reading data: get_usa_map", e)
-        data = {"ERROR": "ERROR reading CSV file: get_usa_map" + str(e)}
-
-    return jsonify(data)
-
-@swag_from('API_docs/get_world_map.yml')
-@app.route("/api/get_world_map", methods=["GET"])
-def getWorldMap():
-    data = []
-    try:
-        data = load_TAR_GZ_JSON(dataPaths.world_map)
-    except Exception as e:
-        print("ERROR reading data: get_world_map", e)
-        data = {"ERROR": "ERROR reading CSV file: get_world_map" + str(e)}
-
-    return jsonify(data)
-
-@swag_from('API_docs/get_capitals.yml')
-@app.route("/api/get_capitals", methods=["GET"])
-def getCapitals():
-    data = []
-    try:
-        data = load_TAR_GZ_JSON(dataPaths.capitals)
-    except Exception as e:
-        print("ERROR reading data: get_capitals", e)
-        data = {"ERROR": "ERROR reading CSV file: get_capitals" + str(e)}
-
-    return jsonify(data)
+        print(f"ERROR reading map data for {mapName}:", e)
+        return f"ERROR reading map data for {mapName}: " + str(e)
 
 
 def load_TAR_GZ_JSON(path):
@@ -464,6 +443,20 @@ def health():
     """Simple health check endpoint."""
     return {"status": "healthy"}, 200
 
+
+# --- Cache management endpoints ---
+from backend.cache import response_cache
+
+@app.route("/api/cache/stats", methods=["GET"])
+def cache_stats():
+    """Return current cache statistics (hits, misses, size, etc.)."""
+    return jsonify(response_cache.stats())
+
+@app.route("/api/cache/clear", methods=["POST"])
+def cache_clear():
+    """Manually flush the entire response cache."""
+    response_cache.clear()
+    return jsonify({"success": True, "message": "Cache cleared"})
    
 
 

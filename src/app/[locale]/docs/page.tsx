@@ -2,8 +2,8 @@
 import MdxLayout from '@/mdx-layout'
 import { Locale } from '@/i18n/routing';
 import { useLocale, useTranslations } from 'next-intl';
-import { useUIContext } from '@/app/components/contexts/UIContext';
- 
+import { useUIContext } from '@/components/contexts/UIContext';
+
 export default function Page() {
   const locale = useLocale() as Locale;
   const UI_contextT = useUIContext();
@@ -18,7 +18,7 @@ export default function Page() {
             <div className="flex flex-row gap-4 ml-6 mr-6">
               <MdxLayout>
                 <h1 className="text-2xl font-bold mb-4">{t.rich("heading")}</h1>
-                  {UI_contextT.curDocsMDXContent}
+                {UI_contextT.curDocsMDXContent}
               </MdxLayout>
             </div>
           </div>

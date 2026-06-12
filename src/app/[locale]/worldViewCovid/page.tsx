@@ -2,20 +2,20 @@
 "use client";
 
 import { useRef, createRef, useEffect, useState } from 'react'
-import {apiRoutes } from "../../api_routes";
+import {apiRoutes } from "@/app/api_routes";
 import React from 'react';
-import { InterfaceContextProvider, useInterfaceContext, interfaceContextI } from '../../components/contexts/InterfaceContext';
-import SGridPlotCard from '../../components/layout/swapy_gridPlotCard';
-import { CardPropsClass } from '../../components/layout/cardWrapper';
-import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '../../components/plots/maps/leafD3Map';
-import { availableColorMapsNames } from '@/app/components/plots/maps/constants';
+import { InterfaceContextProvider, useInterfaceContext, interfaceContextI } from '@/components/contexts/InterfaceContext';
+import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
+import { CardPropsClass } from '@/components/layout/CardWrapper';
+import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '@/components/plots/maps/LeafD3Map';
+import { availableColorMapsNames } from '@/components/plots/maps/constants';
 import { createSwapy, Swapy } from 'swapy';
 import { useTranslations } from "next-intl";
-import { t_richConfig } from "../../const_store";
+import { t_richConfig } from "@/app/const_store";
 import * as d3 from 'd3';
-import { useUIContext } from '@/app/components/contexts/UIContext';
-import { ViewMainInfoComponent } from '@/app/components/viewPageMainInfo';
-import { MDXContentProvider } from '../../../../messages/markdown/MDXContentProvider';
+import { useUIContext } from '@/components/contexts/UIContext';
+import { ViewMainInfoComponent } from '@/components/ViewPageMainInfo';
+import { MDXContentProvider } from '@messages/markdown/MDXContentProvider';
 import { Locale } from '@/i18n/routing';
 import { useLocale } from 'next-intl';
 
@@ -32,28 +32,28 @@ let md = MDXContentProvider[locale];
  const layoutSizes = UI_contextT.layoutDims;
 
   // set up the map props
-  let worldMapProsp = new LeafD3MapLayerProps();
+  let worldMapProsp = LeafD3MapLayerProps();
   let p1 = worldMapProsp;
   p1.chartName = 'map_World';
-  p1.dataURL = apiRoutes.FETCH_WORLD_MAP;
+  p1.dataURL = apiRoutes.FETCH_MAP_DATA.WORLD_MAP;
   //p1.center = [15.3,-17 ];
   //p1.zoom = 7.6;
   p1.center = [20, 14];
   p1.zoom = 2;
-  p1.mapUIsettings.isLongnitude_slider = false;
-  p1.mapUIsettings.isLatitude_slider = false;
-  p1.mapUIsettings.isZoom_slider = false;
-  p1.mapUIsettings.isColorMapSelection_dropdown = true;
-  p1.mapUIsettings.isFeatureSelection_dropdown = true;
-  p1.mapUIsettings.isDatasetSelection_dropdown = true;
-  p1.mapUIsettings.isDistance_legend = true;
-  p1.mapUIsettings.isColorMap_legend = true;
-  p1.mapUIsettings.isCountrySelection_dropdown = true;
+  p1.mapUIsettings.isLongitudeSlider = false;
+  p1.mapUIsettings.isLatitudeSlider = false;
+  p1.mapUIsettings.isZoomSlider = false;
+  p1.mapUIsettings.isColorMapSelectionDropdown = true;
+  p1.mapUIsettings.isFeatureSelectionDropdown = true;
+  p1.mapUIsettings.isDatasetSelectionDropdown = true;
+  p1.mapUIsettings.isDistanceLegend = true;
+  p1.mapUIsettings.isColorMapLegend = true;
+  p1.mapUIsettings.isCountrySelectionDropdown = true;
   p1.mapUIsettings.isDatePicker = true;
   p1.isStaticAutoFitFullSize = false;
   p1.isApplyContextData = false;
   p1.isProjection_equirectangular = true;
-  p1.mapUIsettings.filterString_for_availableDataset_include = "epi";
+  p1.mapUIsettings.filterStringForAvailableDatasetInclude = "epi";
   p1.mapUIsettings.defaultDatasetName = "epidemiology_geography_df_1_2_w_geometry";
   p1.mapUIsettings.inCovidDataView = true;
   p1.isApplyTransitions = false;
@@ -62,6 +62,7 @@ let md = MDXContentProvider[locale];
   p1.mapDataSets.isGridData = false;
   p1.mapDataSets.isSequenceMetaData = false;
   p1.mapUIsettings.defaultFeatureName = "new_deceased";
+  p1.isSetIntialContextDataFromComponent = true;
   p1.mapUIsettings.dataFilteringCheckboxes = false;
   p1.mapDataSets.isCityNames = false;
   // Overview map (zoom=2 < 4) => country-level data
@@ -69,23 +70,23 @@ let md = MDXContentProvider[locale];
   p1.mapUIsettings.isSubregionLevelData = false;
 
 
-  let mapPropsWorld2 = new LeafD3MapLayerProps();
+  let mapPropsWorld2 = LeafD3MapLayerProps();
   let p2 = mapPropsWorld2;
   p2.chartName = 'map_World2';
-  p2.dataURL = apiRoutes.FETCH_WORLD_MAP;
+  p2.dataURL = apiRoutes.FETCH_MAP_DATA.WORLD_MAP;
   p2.center = [-20, -60];
   p2.zoom = 3.0;
-  p2.mapUIsettings.isLongnitude_slider = true;
-  p2.mapUIsettings.isLatitude_slider = true;
-  p2.mapUIsettings.isZoom_slider = true;
-  p2.mapUIsettings.isColorMapSelection_dropdown = false;
-  p2.mapUIsettings.isFeatureSelection_dropdown = false;
-  p2.mapUIsettings.isDatasetSelection_dropdown = false;
-  p2.mapUIsettings.isDistance_legend = true;
-  p2.mapUIsettings.isColorMap_legend = true;
-  p2.mapUIsettings.isCountrySelection_dropdown = false;
+  p2.mapUIsettings.isLongitudeSlider = true;
+  p2.mapUIsettings.isLatitudeSlider = true;
+  p2.mapUIsettings.isZoomSlider = true;
+  p2.mapUIsettings.isColorMapSelectionDropdown = false;
+  p2.mapUIsettings.isFeatureSelectionDropdown = false;
+  p2.mapUIsettings.isDatasetSelectionDropdown = false;
+  p2.mapUIsettings.isDistanceLegend = true;
+  p2.mapUIsettings.isColorMapLegend = true;
+  p2.mapUIsettings.isCountrySelectionDropdown = false;
   p2.mapUIsettings.isDatePicker = false;
-  p2.mapUIsettings.filterString_for_availableDataset_include = p1.mapUIsettings.filterString_for_availableDataset_include;
+  p2.mapUIsettings.filterStringForAvailableDatasetInclude = p1.mapUIsettings.filterStringForAvailableDatasetInclude;
   p2.isStaticAutoFitFullSize = false;
   p2.isProjection_equirectangular = true;
   p2.isApplyContextData = true;
@@ -134,10 +135,10 @@ let md = MDXContentProvider[locale];
 
   // build the page
  
-    let d3MapCardProps_overview = new CardPropsClass(
+    let d3MapCardProps_overview = CardPropsClass(
       t.rich('headingOverview', {...t_richConfig})?.toString() || '',
       t.rich('headingOverview', {...t_richConfig})?.toString() || '',"","");
-    let d3MapCardProps2_overveiwDetail = new CardPropsClass(
+    let d3MapCardProps2_overveiwDetail = CardPropsClass(
       t.rich('headingDetailView', {...t_richConfig})?.toString() || '',
       t.rich('headingDetailView', {...t_richConfig})?.toString() || '',"","");
 

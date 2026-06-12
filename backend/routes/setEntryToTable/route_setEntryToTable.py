@@ -28,6 +28,9 @@ async def setEntryToTable():
     if relation_name == "feedback_csv":
       print("Creating feedback_csv table if it doesn't exist")
       await ensure_feedback_csv_exists()
+    elif relation_name == "page_visits":
+      print("Creating page_visits table if it doesn't exist")
+      await ensure_page_visits_exists()
 
     columns = []
     values = []
@@ -97,4 +100,28 @@ async def ensure_feedback_csv_exists():
     if not table_exists:
         await create_Feedback_Relation()
 
- 
+async def create_page_visits_relation():
+  create_query = """
+    CREATE TABLE page_visits (
+      id SERIAL PRIMARY KEY,
+      page_path VARCHAR,
+      session_id VARCHAR,
+      visited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  """
+  try:
+    await execute_raw(create_query)
+  except Exception as e:
+    print("Error creating page_visits table:", e)
+
+async def ensure_page_visits_exists():
+    from backend.routes.getDataFromDB.route_getListOfRelationsDB  import getListOfRelationsDB 
+
+    result = await getListOfRelationsDB()
+    result = result.get_json() if hasattr(result, 'get_json') else {}
+    table_exists = "page_visits" in [row for row in result]
+
+    print("Table page_visits exists check result:", table_exists)
+
+    if not table_exists:
+        await create_page_visits_relation()

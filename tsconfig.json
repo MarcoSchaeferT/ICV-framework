@@ -25,11 +25,8 @@
       "@/*": [
         "./src/*"
       ],
-      "@/contexts/*": [
-        "./src/app/components/contexts/*"
-      ],
-      "@/AppComponents/*": [
-        "./src/app/components/*"
+      "@messages/*": [
+        "./messages/*"
       ]
     },
     "target": "ES2017"

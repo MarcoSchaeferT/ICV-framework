@@ -1,0 +1,34 @@
+tags:
+  - Map Data Endpoints
+summary: Get map GeoJSON data by name
+description: |
+  Returns GeoJSON data for various geographical boundaries based on the provided `mapName` parameter.
+  Supported maps include Germany (states/districts), USA, World, and Capitals.
+parameters:
+  - name: mapName
+    in: query
+    type: string
+    required: true
+    description: The identifier for the map data to be retrieved.
+    enum:
+      - germany_map_states
+      - germany_map_districts
+      - world_map
+      - usa_map
+      - capitals
+responses:
+  200:
+    description: Successful response with GeoJSON data
+    schema:
+      type: object
+      description: GeoJSON FeatureCollection
+  400:
+    description: Map name missing or invalid
+    schema:
+      type: string
+      example: "ERROR: No mapName provided!"
+  500:
+    description: Internal server error reading map data
+    schema:
+      type: string
+      example: "ERROR reading map data for germany_map_states: ..."

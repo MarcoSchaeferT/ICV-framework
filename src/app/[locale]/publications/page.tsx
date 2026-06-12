@@ -1,5 +1,5 @@
 import { useTranslations } from 'next-intl';
-import { PublicationsList } from '../../components/publicationsList'
+import { PublicationsList } from '@/components/PublicationsList'
 import { Link } from "@/i18n/routing";
 
 

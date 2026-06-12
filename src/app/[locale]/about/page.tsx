@@ -9,17 +9,17 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Bug, Lightbulb, ExternalLink, InfoIcon } from 'lucide-react'
-import {GitHubIcon} from "../../../../messages/reactIcons"
+import {GitHubIcon} from "@messages/reactIcons"
 import {useRef, useEffect, useState } from "react"
 
 import {useLocale, useTranslations} from 'next-intl';
-import { t_richConfig, layoutSizes } from '../../const_store';
+import { t_richConfig, layoutSizes } from '@/app/const_store';
 import {Locale } from '@/i18n/routing';
 import { apiRoutes } from "@/app/api_routes";
 import validator from "validator";
 import { Progress } from "@/components/ui/progress"
 import {MdxLayoutAbout} from '@/mdx-layout'
-import {MDXContentProvider} from '../../../../messages/markdown/MDXContentProvider'
+import {MDXContentProvider} from '@messages/markdown/MDXContentProvider'
 
 
 export default function Component() {

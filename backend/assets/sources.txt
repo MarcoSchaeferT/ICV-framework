@@ -5,6 +5,10 @@ germany map:
 https://github.com/isellsoap/deutschlandGeoJSON/blob/main/2_bundeslaender/3_mittel.geo.json
 https://github.com/isellsoap/deutschlandGeoJSON
 
+germany map kreise:
+https://github.com/isellsoap/deutschlandGeoJSON/blob/main/4_kreise/3_mittel.geo.json (currently not used)
+https://github.com/m-ad/geofeatures-ags-germany/blob/master/geojson/counties.json (with AGS in use)
+
 highRes worl map:
 https://datahub.io/core/geo-countries 
 

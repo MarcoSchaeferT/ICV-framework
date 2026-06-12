@@ -144,6 +144,7 @@
                 "card_temperature": "Temperature",
                 "card_dewpoint": "Dew point",
                 "card_precipitation": "Precipitation",
+                "card_suitability": "Habitat Suitability",
                 "card_windSpeed": "Wind speed",
                 "card_map_temperature": "Temperature",
                 "card_map_dewpoint": "Dew point",
@@ -223,7 +224,7 @@
         "buttontext": "Back to Top"
     },
     "component_D3MapLayerComponent": {
-        "longnitude": "Longitude",
+        "longitude": "Longitude",
         "latitude": "Latitude",
         "data_set": "Data Set",
         "color_map": "Color Map",
@@ -285,7 +286,8 @@
     },
     "page_predictionView": {
         "mainInfo": {
-            "heading": "Prediction View"
+            "heading": "Prediction View",
+            "content": ""
         },
         "headingOverview": "Overview Map",
         "headingDetailView": "Detail Map"
@@ -303,7 +305,8 @@
             "tab_linecharts": "Line Charts",
             "tab_detailView": "Map Detail View",
             "mainInfo": {
-                "heading": "Training Data View"
+                "heading": "Training Data View",
+                "content": ""
             }
         },
         "linechart": {

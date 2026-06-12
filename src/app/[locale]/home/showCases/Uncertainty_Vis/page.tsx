@@ -2,20 +2,20 @@
 "use client";
 
 import { useRef, useEffect, useState } from 'react'
-import {apiRoutes } from "../../../../api_routes";
+import {apiRoutes } from "@/app/api_routes";
 import React from 'react';
-import { InterfaceContextProvider, useInterfaceContext } from '../../../../components/contexts/InterfaceContext';
-import SGridPlotCard from '../../../../components/layout/swapy_gridPlotCard';
-import { CardPropsClass } from '../../../../components/layout/cardWrapper';
-import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '../../../../components/plots/maps/leafD3Map';
+import { InterfaceContextProvider, useInterfaceContext } from '@/components/contexts/InterfaceContext';
+import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
+import { CardPropsClass } from '@/components/layout/CardWrapper';
+import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '@/components/plots/maps/LeafD3Map';
 import { createSwapy, Swapy } from 'swapy';
-import { MDXContentProvider } from '../../../../../../messages/markdown/MDXContentProvider';
-import {ViewMainInfoComponent} from '../../../../components/viewPageMainInfo';
+import { MDXContentProvider } from '@messages/markdown/MDXContentProvider';
+import {ViewMainInfoComponent} from '@/components/ViewPageMainInfo';
 import { Locale, useLocale, useTranslations } from "next-intl";
-import { t_richConfig } from "../../../../const_store";
-import { useUIContext } from '@/app/components/contexts/UIContext';
-import { availableColorMapsNames } from '@/app/components/plots/maps/constants';
-import { LoadingSpinner } from '@/app/components/plots/maps/helpers';
+import { t_richConfig } from "@/app/const_store";
+import { useUIContext } from '@/components/contexts/UIContext';
+import { availableColorMapsNames } from '@/components/plots/maps/constants';
+import { LoadingSpinner } from '@/components/plots/maps/helpers';
 
 
 const isSWAPY = true;
@@ -30,33 +30,33 @@ let MDX = MDXContentProvider[locale];
  const layoutSizes = UI_contextT.layoutDims;
 
   // set up the map props
-  let worldMapProsp = new LeafD3MapLayerProps();
+  let worldMapProsp = LeafD3MapLayerProps();
   let p1 = worldMapProsp;
   p1.chartName = 'map_World';
-  p1.mapDataURL = apiRoutes.FETCH_WORLD_MAP;
+  p1.mapDataURL = apiRoutes.FETCH_MAP_DATA.WORLD_MAP;
   p1.center = [14, 15.6];
   p1.zoom = 2.2;
   p1.isSetIntialContextDataFromComponent = true;
-  p1.mapUIsettings.isLongnitude_slider = false;
-  p1.mapUIsettings.isLatitude_slider = false;
-  p1.mapUIsettings.isZoom_slider = false;
+  p1.mapUIsettings.isLongitudeSlider = false;
+  p1.mapUIsettings.isLatitudeSlider = false;
+  p1.mapUIsettings.isZoomSlider = false;
   p1.mapUIsettings.isLatLngZoomOverlay = true;
-  p1.mapUIsettings.isColorMapSelection_dropdown = true;
-  p1.mapUIsettings.isFeatureSelection_dropdown = true;
-  p1.mapUIsettings.isDatasetSelection_dropdown = true;
-  p1.mapUIsettings.isDistance_legend = true;
-  p1.mapUIsettings.isColorMap_legend = true;
-  p1.mapUIsettings.isCountrySelection_dropdown = false;
+  p1.mapUIsettings.isColorMapSelectionDropdown = true;
+  p1.mapUIsettings.isFeatureSelectionDropdown = true;
+  p1.mapUIsettings.isDatasetSelectionDropdown = true;
+  p1.mapUIsettings.isDistanceLegend = true;
+  p1.mapUIsettings.isColorMapLegend = true;
+  p1.mapUIsettings.isCountrySelectionDropdown = false;
   p1.mapUIsettings.isDatePicker = false;
   p1.mapUIsettings.isAutoHideSettingsToggle = true;
-  p1.mapUIsettings.isSettingsBelndAnimation = true;
+  p1.mapUIsettings.isSettingsBlendAnimation = true;
   p1.mapUIsettings.isAutoHideSettingsToggle = false;
   p1.mapUIsettings.defaultDonutSize = 25;
   p1.isStaticAutoFitFullSize = false;
   p1.isApplyContextData = false;
   p1.isApplyTransitions = false;
   p1.isProjection_equirectangular = true;
-  p1.mapUIsettings.filterString_for_availableDataset_include = "_sim";
+  p1.mapUIsettings.filterStringForAvailableDatasetInclude = "_sim";
   p1.mapUIsettings.defaultDatasetName = "t_2024_monthly_mean_4_ocsvm_aegypti_predictions_2023_mod_sim";
     p1.mapUIsettings.defaultFeatureName = "cv";
     p1.mapUIsettings.isSequenceMetaDataChecked = false;
@@ -73,8 +73,8 @@ let MDX = MDXContentProvider[locale];
     disableScroll: false
   };
 
-  let generalCardPorps = new CardPropsClass("xai_1", t("temporalUncertaintyPlot"), "","")
-  let generalCardPorps2 = new CardPropsClass("xai_2", t("calibrationPlot"), "","")
+  let generalCardPorps = CardPropsClass("xai_1", t("temporalUncertaintyPlot"), "","")
+  let generalCardPorps2 = CardPropsClass("xai_2", t("calibrationPlot"), "","")
 
  
 
@@ -112,7 +112,7 @@ let MDX = MDXContentProvider[locale];
   );
 
 
-    let d3MapCardProps_overview = new CardPropsClass(t("coefficientMap"),
+    let d3MapCardProps_overview = CardPropsClass(t("coefficientMap"),
       t("coefficientMap"),"","");
       d3MapCardProps_overview.infoCard = {content: MDX.DummyContent, footer: undefined};
       d3MapCardProps_overview.infoCardInteraction = {content: MDX.DummyContent, footer: undefined};

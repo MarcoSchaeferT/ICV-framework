@@ -2,24 +2,24 @@
 "use client";
 
 import { useRef, useEffect, useMemo } from 'react'
-import {apiRoutes } from "../../api_routes";
+import {apiRoutes } from "@/app/api_routes";
 import React from 'react';
-import { InterfaceContextProvider, useInterfaceContext } from '../../components/contexts/InterfaceContext';
-import SGridPlotCard from '../../components/layout/swapy_gridPlotCard';
-import { CardPropsClass } from '../../components/layout/cardWrapper';
-import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '../../components/plots/maps/leafD3Map';
+import { InterfaceContextProvider, useInterfaceContext } from '@/components/contexts/InterfaceContext';
+import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
+import { CardPropsClass } from '@/components/layout/CardWrapper';
+import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '@/components/plots/maps/LeafD3Map';
 import { createSwapy, Swapy } from 'swapy';
-import LinechartComponent, { LinechartPorps } from '@/app/components/plots/linechart/linechart';
+import LinechartComponent, { LinechartProps } from '@/components/plots/linechart/linechart';
 
 import { useLocale ,useTranslations } from "next-intl";
-import { t_richConfig } from "../../const_store";
-import { useGetJSONData } from "../../hooks/customFetchAndCache";
-import { metaDataT } from '@/app/components/plots/metaDataHandler';
-import { MDXContentProvider } from '../../../../messages/markdown/MDXContentProvider';
+import { t_richConfig } from "@/app/const_store";
+import { useGetJSONData } from "@/app/hooks/useFetchAndCache";
+import { metaDataT } from '@/components/plots/MetaDataHandler';
+import { MDXContentProvider } from '@messages/markdown/MDXContentProvider';
 import { Locale } from "@/i18n/routing";
-import {ViewMainInfoComponent} from '../../components/viewPageMainInfo';
+import {ViewMainInfoComponent} from '@/components/ViewPageMainInfo';
 import * as d3 from 'd3';
-import { useUIContext } from '@/app/components/contexts/UIContext';
+import { useUIContext } from '@/components/contexts/UIContext';
 
 import {
   Tabs,
@@ -43,43 +43,43 @@ export default function Home() {
 
   let mainInfoHeading = t('mainInfo.heading');
 
-  let mapPropsWorld1 = new LeafD3MapLayerProps();
+  let mapPropsWorld1 = LeafD3MapLayerProps();
   mapPropsWorld1.chartName = 'map_World';
-  mapPropsWorld1.dataURL = apiRoutes.FETCH_WORLD_MAP;
+  mapPropsWorld1.dataURL = apiRoutes.FETCH_MAP_DATA.WORLD_MAP;
   mapPropsWorld1.center = [20, 14];
   mapPropsWorld1.zoom = 2;
   mapPropsWorld1.center = [-0.8, -76.6];
   mapPropsWorld1.zoom = 8.2;
-  mapPropsWorld1.mapUIsettings.isColorMap_legend = true;
-  mapPropsWorld1.mapUIsettings.isCountrySelection_dropdown = false;
+  mapPropsWorld1.mapUIsettings.isColorMapLegend = true;
+  mapPropsWorld1.mapUIsettings.isCountrySelectionDropdown = false;
   mapPropsWorld1.mapUIsettings.isDatePicker = false;
-  mapPropsWorld1.mapUIsettings.filterString_for_availableDataset_include = "climate_data";
-  mapPropsWorld1.mapUIsettings.filterString_for_availableDataset_exclude = "proba";
+  mapPropsWorld1.mapUIsettings.filterStringForAvailableDatasetInclude = "climate_data";
+  mapPropsWorld1.mapUIsettings.filterStringForAvailableDatasetExclude = "proba";
   mapPropsWorld1.mapUIsettings.isPresenceData = true;
   mapPropsWorld1.mapUIsettings.isSequenceMetaData = true;
-  mapPropsWorld1.mapUIsettings.isLongnitude_slider = false;
-  mapPropsWorld1.mapUIsettings.isLatitude_slider = false;
-  mapPropsWorld1.mapUIsettings.isZoom_slider = false;
+  mapPropsWorld1.mapUIsettings.isLongitudeSlider = false;
+  mapPropsWorld1.mapUIsettings.isLatitudeSlider = false;
+  mapPropsWorld1.mapUIsettings.isZoomSlider = false;
   mapPropsWorld1.isApplyContextData = false;
   mapPropsWorld1.isProjection_equirectangular = true;
   mapPropsWorld1.isSetIntialContextDataFromComponent = true;
 
-  let mapPropsWorld2 = new LeafD3MapLayerProps();
+  let mapPropsWorld2 = LeafD3MapLayerProps();
     let p2 = mapPropsWorld2
     p2.chartName = 'map_World2';
-    p2.dataURL = apiRoutes.FETCH_WORLD_MAP;
+    p2.dataURL = apiRoutes.FETCH_MAP_DATA.WORLD_MAP;
     p2.center = [11.53, 44.45];
     p2.zoom = 4.4;
     p2.mapUIsettings.areSettingsOpen = false;
-    p2.mapUIsettings.isLongnitude_slider = true;
-    p2.mapUIsettings.isLatitude_slider = true;
-    p2.mapUIsettings.isZoom_slider = true;
-    p2.mapUIsettings.isColorMapSelection_dropdown = false;
-    p2.mapUIsettings.isFeatureSelection_dropdown = false;
-    p2.mapUIsettings.isDatasetSelection_dropdown = false;
-    p2.mapUIsettings.isDistance_legend = true;
-    p2.mapUIsettings.isColorMap_legend = true;
-    p2.mapUIsettings.isCountrySelection_dropdown = false;
+    p2.mapUIsettings.isLongitudeSlider = true;
+    p2.mapUIsettings.isLatitudeSlider = true;
+    p2.mapUIsettings.isZoomSlider = true;
+    p2.mapUIsettings.isColorMapSelectionDropdown = false;
+    p2.mapUIsettings.isFeatureSelectionDropdown = false;
+    p2.mapUIsettings.isDatasetSelectionDropdown = false;
+    p2.mapUIsettings.isDistanceLegend = true;
+    p2.mapUIsettings.isColorMapLegend = true;
+    p2.mapUIsettings.isCountrySelectionDropdown = false;
     p2.mapUIsettings.isDatePicker = false;
     p2.isStaticAutoFitFullSize = false;
     p2.isProjection_equirectangular = true;
@@ -91,7 +91,7 @@ export default function Home() {
       disableScroll: true,
     };
 
-     let d3MapCardProps2_overveiwDetail = new CardPropsClass(
+     let d3MapCardProps2_overveiwDetail = CardPropsClass(
           t.rich('tab_detailView', {...t_richConfig})?.toString() || '',
           "","","");
   
@@ -144,13 +144,13 @@ export default function Home() {
         }}>
         {/*** Grid Cells ***/}
 
-          <SGridPlotCard rowColSpan={[1,3]} cardProps={new CardPropsClass("Stat1","","","", )}> <ShowDataSet query='country' locale={locale} t={t} /> </SGridPlotCard>
-          <SGridPlotCard rowColSpan={[1,3]} cardProps={new CardPropsClass("Stat2","","","",)}> <ShowDataSet query = 'feature' locale={locale} t={t}/> </SGridPlotCard>
-          <SGridPlotCard rowColSpan={[1,3]} cardProps={new CardPropsClass("Stat3","","","", )}> <ShowDataSet query = 'colorMap' locale={locale} t={t}/> </SGridPlotCard>
-          <SGridPlotCard rowColSpan={[1,3]} cardProps={new CardPropsClass("Stat4","","","", )}> <ShowDataSet query = 'dataSet' locale={locale} t={t}/> </SGridPlotCard>
+          <SGridPlotCard rowColSpan={[1,3]} cardProps={CardPropsClass("Stat1","","","", )}> <ShowDataSet query='country' locale={locale} t={t} /> </SGridPlotCard>
+          <SGridPlotCard rowColSpan={[1,3]} cardProps={CardPropsClass("Stat2","","","",)}> <ShowDataSet query = 'feature' locale={locale} t={t}/> </SGridPlotCard>
+          <SGridPlotCard rowColSpan={[1,3]} cardProps={CardPropsClass("Stat3","","","", )}> <ShowDataSet query = 'colorMap' locale={locale} t={t}/> </SGridPlotCard>
+          <SGridPlotCard rowColSpan={[1,3]} cardProps={CardPropsClass("Stat4","","","", )}> <ShowDataSet query = 'dataSet' locale={locale} t={t}/> </SGridPlotCard>
 
-          <SGridPlotCard rowColSpan={[8,6]} cardProps={new CardPropsClass("Map1","Map View","","")}><LeafD3MapLayerComponent props={mapPropsWorld1}/></SGridPlotCard>
-           <SGridPlotCard rowColSpan={[8,6]} cardProps={new CardPropsClass("Map14","","","")}>
+          <SGridPlotCard rowColSpan={[8,6]} cardProps={CardPropsClass("Map1","Map View","","")}><LeafD3MapLayerComponent props={mapPropsWorld1}/></SGridPlotCard>
+           <SGridPlotCard rowColSpan={[8,6]} cardProps={CardPropsClass("Map14","","","")}>
           <Tabs className="size-full flex flex-col h-full" defaultValue="account">
             <TabsList className='justify-start flex bg-gray-400 text-white rounded-t-md rounded-b-none border-b border-gray-200 h-10'>
               <TabsTrigger className='bg-gray-300 text-gray-500' value="account"> {t.rich('tab_linecharts', {...t_richConfig})?.toString()} </TabsTrigger>
@@ -297,7 +297,7 @@ function DynamicLineChart({ featureRaw, name }: { featureRaw: string, name: stri
     feature = feature.replace(/_(\d+)/g, "_*");
 
   if(dataSet === null || feature === null) return (
-  <SGridPlotCard rowColSpan={[4,3]} cardProps={new CardPropsClass(featureRaw+"Linechart",name,"","")}> <LoadingSpinner/></SGridPlotCard>);
+  <SGridPlotCard rowColSpan={[4,3]} cardProps={CardPropsClass(featureRaw+"Linechart",name,"","")}> <LoadingSpinner/></SGridPlotCard>);
 
   let dataURL = apiRoutes.fetchDbData({ relationName: dataSet, feature: feature, filterBy: "iso_a3", filterValue: a3 });
   const urlParams = new URLSearchParams(dataURL.split('?')[1]);
@@ -305,16 +305,16 @@ function DynamicLineChart({ featureRaw, name }: { featureRaw: string, name: stri
   urlParams.forEach((value, key) => {
     paramsDict[key] = value;
   });
-  let lineChartPorps = new LinechartPorps("Linechart", dataURL , "exampleVar");
+  let linechartProps = LinechartProps("Linechart", dataURL , "exampleVar");
 
-  lineChartPorps.chartName = feature+"Linechart";
-  lineChartPorps.dataURL = dataURL;
-  lineChartPorps.locale =  locale;
-  lineChartPorps.translations = t;
+  linechartProps.chartName = feature+"Linechart";
+  linechartProps.dataURL = dataURL;
+  linechartProps.locale =  locale;
+  linechartProps.translations = t;
 
   return (
     <>
-    <SGridPlotCard rowColSpan={[4,3]} cardProps={new CardPropsClass(featureRaw+"Linechart", name,"","")}> <LinechartComponent ChartPorps={lineChartPorps}/></SGridPlotCard>
+    <SGridPlotCard rowColSpan={[4,3]} cardProps={CardPropsClass(featureRaw+"Linechart", name,"","")}> <LinechartComponent chartProps={linechartProps}/></SGridPlotCard>
     </>
   );
 }

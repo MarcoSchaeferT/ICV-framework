@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button"
 import {Settings } from 'lucide-react'
-import { useUIContext } from "../../components/contexts/UIContext";
+import { useUIContext } from '@/components/contexts/UIContext';
 import { t_richConfig } from "@/app/const_store";
 import { useTranslations } from "next-intl";
 

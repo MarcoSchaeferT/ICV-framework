@@ -1,0 +1,291 @@
+
+"use client";
+
+import { useRef, useEffect, useMemo } from 'react'
+import {apiRoutes } from "@/app/api_routes";
+import React from 'react';
+import { InterfaceContextProvider, useInterfaceContext } from '@/components/contexts/InterfaceContext';
+import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
+import { CardPropsClass } from '@/components/layout/CardWrapper';
+import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '@/components/plots/maps/LeafD3Map';
+import { createSwapy, Swapy } from 'swapy';
+import LinechartComponent, { LinechartProps } from '@/components/plots/linechart/linechart';
+
+import { useLocale ,useTranslations } from "next-intl";
+import { t_richConfig } from "@/app/const_store";
+import { useGetJSONData } from "@/app/hooks/useFetchAndCache";
+import { metaDataT } from '@/components/plots/MetaDataHandler';
+import {ViewMainInfoComponent} from '@/components/ViewPageMainInfo';
+import * as d3 from 'd3';
+import { useUIContext } from '@/components/contexts/UIContext';
+
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
+
+
+
+const isSWAPY = true;
+
+export default function Home() {
+
+  const locale = useLocale();
+  const t = useTranslations("page_rawDataView.pageContent");
+
+  const UI_contextT = useUIContext();
+  const layoutSizes = UI_contextT.layoutDims;
+
+  let mainInfoHeading = t.rich('mainInfo.heading', {...t_richConfig}) || '';
+  let mainInfoContent = t.rich('mainInfo.content', {...t_richConfig}) || '';
+
+  let mapPropsWorld1 = LeafD3MapLayerProps();
+  mapPropsWorld1.chartName = 'map_World';
+  mapPropsWorld1.dataURL = apiRoutes.FETCH_MAP_DATA.WORLD_MAP;
+  mapPropsWorld1.center = [20, 14];
+  mapPropsWorld1.zoom = 2;
+  mapPropsWorld1.center = [-0.8, -76.6];
+  mapPropsWorld1.zoom = 8.2;
+  mapPropsWorld1.mapUIsettings.isColorMapLegend = true;
+  mapPropsWorld1.mapUIsettings.isCountrySelectionDropdown = false;
+  mapPropsWorld1.mapUIsettings.isDatePicker = false;
+  mapPropsWorld1.mapUIsettings.filterStringForAvailableDatasetInclude = "named";
+  mapPropsWorld1.mapUIsettings.filterStringForAvailableDatasetExclude = "proba";
+  mapPropsWorld1.mapUIsettings.isPresenceData = true;
+  mapPropsWorld1.mapUIsettings.isSequenceMetaData = true;
+  mapPropsWorld1.mapUIsettings.isLongitudeSlider = false;
+  mapPropsWorld1.mapUIsettings.isLatitudeSlider = false;
+  mapPropsWorld1.mapUIsettings.isZoomSlider = false;
+  mapPropsWorld1.isApplyContextData = false;
+  mapPropsWorld1.isProjection_equirectangular = true;
+  mapPropsWorld1.isSetIntialContextDataFromComponent = true;
+
+  let mapPropsWorld2 = LeafD3MapLayerProps();
+    let p2 = mapPropsWorld2
+    p2.chartName = 'map_World2';
+    p2.dataURL = apiRoutes.FETCH_MAP_DATA.WORLD_MAP;
+    p2.center = [11.53, 44.45];
+    p2.zoom = 4.4;
+    p2.mapUIsettings.areSettingsOpen = false;
+    p2.mapUIsettings.isLongitudeSlider = true;
+    p2.mapUIsettings.isLatitudeSlider = true;
+    p2.mapUIsettings.isZoomSlider = true;
+    p2.mapUIsettings.isColorMapSelectionDropdown = false;
+    p2.mapUIsettings.isFeatureSelectionDropdown = false;
+    p2.mapUIsettings.isDatasetSelectionDropdown = false;
+    p2.mapUIsettings.isDistanceLegend = true;
+    p2.mapUIsettings.isColorMapLegend = true;
+    p2.mapUIsettings.isCountrySelectionDropdown = false;
+    p2.mapUIsettings.isDatePicker = false;
+    p2.isStaticAutoFitFullSize = false;
+    p2.isProjection_equirectangular = true;
+    p2.isApplyContextData = true;
+    p2.isApplyTransitions = true;
+   // p2.mapUIsettings.defaultDatasetName =   p1.mapUIsettings.defaultDatasetName ;
+    p2.mapInteractions = {
+      disableMouse: true,
+      disableScroll: true,
+    };
+
+     let d3MapCardProps2_overveiwDetail = CardPropsClass(
+          t.rich('tab_detailView', {...t_richConfig})?.toString() || '',
+          "","","");
+  
+
+  // intitialize data table context
+  useInterfaceContext();
+
+   // set up swapy (client side only)
+  const swapyRef = useRef<Swapy | null>(null)
+  const swapContainerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const container =swapContainerRef.current;
+    console.log("container", container)
+    if(isSWAPY && container) {
+      swapyRef.current = createSwapy(container,{
+        animation: 'dynamic', // dynamic or spring or none
+        manualSwap: false,
+        swapMode: 'hover', //'hover' | 'drop';
+        autoScrollOnDrag: true,
+        // dragAxis: 'x',
+        // dragOnHold: true
+      })
+      swapyRef.current?.enable(isSWAPY)
+
+      return () => {
+        // Destroy the swapy instance on component destroy
+        swapyRef.current?.destroy()
+      }
+    };
+  }, []);
+
+  // build the page
+
+  return (
+     <>
+     <InterfaceContextProvider>
+      <main className="flex max-h-fit flex-col items-center justify-between " style={{paddingTop: layoutSizes.gapSize}}>
+       
+
+        {/*** START: grid layout ***/}
+        <div ref={swapContainerRef} className={`w-full grid grid-cols-12 md:grid-cols-12`} style={{
+                gridTemplateRows: `repeat(auto-fill, minmax(${layoutSizes.rowSpanSize}vh, ${layoutSizes.rowSpanSize}vh))`,
+                gap: `${layoutSizes.gapSize}px`,
+                height: `calc(120vh - ${layoutSizes.topNavbarHeight}px - ${layoutSizes.gapSize*1}px)`,
+         
+            paddingRight: `${layoutSizes.gapSize}px`,
+             paddingLeft: `${layoutSizes.gapSize}px`,
+
+
+        }}>
+        {/*** Grid Cells ***/}
+
+          <SGridPlotCard rowColSpan={[1,3]} cardProps={CardPropsClass("Stat1","","","", )}>  </SGridPlotCard>
+          <SGridPlotCard rowColSpan={[1,3]} cardProps={CardPropsClass("Stat2","","","",)}> </SGridPlotCard>
+          <SGridPlotCard rowColSpan={[1,3]} cardProps={CardPropsClass("Stat3","","","", )}> </SGridPlotCard>
+          <SGridPlotCard rowColSpan={[1,3]} cardProps={CardPropsClass("Stat4","","","", )}>  </SGridPlotCard>
+
+          <SGridPlotCard rowColSpan={[8,6]} cardProps={CardPropsClass("Map1","Grid Card 1","","")}> </SGridPlotCard>
+    
+          
+                <SGridPlotCard rowColSpan={[4,3]} cardProps={CardPropsClass("Linechart1","Grid Card 2","","")}> </SGridPlotCard>
+                <SGridPlotCard rowColSpan={[4,3]} cardProps={CardPropsClass("Linechart2","Grid Card 3","","")}> </SGridPlotCard>
+                <SGridPlotCard rowColSpan={[4,3]} cardProps={CardPropsClass("Linechart3","Grid Card 4","","")}> </SGridPlotCard>
+                <SGridPlotCard rowColSpan={[4,3]} cardProps={CardPropsClass("Linechart4","Grid Card 5","","")}> </SGridPlotCard>
+              </div>
+           
+  
+
+        </main>
+      </InterfaceContextProvider>
+      </>
+    );
+}
+
+function ShowDataSet({ query, locale, t }: { query: string ; locale: string; t: any }) {
+  let c = useInterfaceContext();
+  let queryV = query; 
+
+  const [isLoading_Metadata, rawMetaData] = useGetJSONData(apiRoutes.getDatasetsMetadata({ LANGID: locale }));
+
+  let metaData = useMemo(() => {
+    if (rawMetaData) {
+      return rawMetaData as unknown as metaDataT;
+    }
+    return null;
+  }, [rawMetaData]);
+
+  let dataSet = new URL("http://blub"+c.curDatasetURL).searchParams.get('relationName');
+  let feature = c.curFeature 
+  let country = c.mapSelectionObj ? c.mapSelectionObj.properties["name_"+locale]  : null;
+  let colorMap = c.curColorMap;
+  let outVal = null;
+  let cardName = "";
+
+  if (queryV === 'dataSet') {
+    outVal = dataSet;
+    cardName = t.rich('card_dataSet', {...t_richConfig});
+  }
+  else if (queryV === 'feature') {
+    if(metaData === null) return <LoadingSpinner/>;
+    if(metaData[feature] != undefined) {
+      let unit = metaData[feature].dimension;
+      let description = metaData[feature].description;
+      outVal = (
+      <>
+        <table className="text-center">
+          <tbody>
+            <tr>
+              <td>{feature} [{unit}]</td>
+              <td className="text-xs pl-1 text-gray-400 wrap-break-word whitespace-pre-line">{description}</td>
+            </tr>
+          </tbody>
+        </table>
+      </>
+      );
+    }
+    cardName = t.rich('card_feature', {...t_richConfig});
+  }
+  else if (queryV === 'country'){
+    outVal = country;
+    cardName = t.rich('card_country', {...t_richConfig});
+  }
+  else if (queryV === 'colorMap'){
+    outVal = colorMap.replace(/interpolate/g, ' ');
+    cardName = t.rich('card_colorMap', {...t_richConfig});
+    if (colorMap && (d3 as any)[colorMap]) {
+      const scale = (d3 as any)[colorMap];
+      const colors = Array.from({ length: 0 }, (_, i) => scale(i / 50));
+      outVal = (
+        <div className="flex items-center gap-1">
+          <span>{colorMap.replace(/interpolate/g, ' ')}</span>
+          <div className="flex ml-2 pt-1">
+            {colors.map((c, idx) => (
+              <div key={idx} style={{ background: c, width: 2, height: 10, borderRadius: 0,  }} />
+            ))}
+          </div>
+        </div>
+      );
+    }
+  }
+  return (
+    <>
+    <div className='text-xs text-gray-800 pt-3 pl-3' >{cardName}</div>
+    <div className='flex p-3 pt-0 justify-left items-center h-[78%] overflow-clip'>
+      <div className="text-2xl size-fit overflow-hidden text-ellipsis whitespace-nowrap" style={{ maxWidth: '100%' }}>
+        {outVal ? outVal : 'N/A'}
+      </div>
+    </div>
+    </>
+  ); 
+}
+
+
+function DynamicLineChart({ featureRaw, name }: { featureRaw: string, name: string }) {
+  let c = useInterfaceContext();
+  const locale = useLocale();
+  let t = useTranslations("page_rawDataView.linechart");
+
+
+  let dataSet = new URL("http://blub"+c.curDatasetURL).searchParams.get('relationName');
+  let a3 = c.mapSelectionObj ? c.mapSelectionObj.properties.gu_a3 : 'COL'; 
+  let feature = featureRaw;
+
+  if (!featureRaw.includes("land_use") && !featureRaw.includes("prob_"))
+    feature = feature.replace(/_(\d+)/g, "_*");
+
+  if(dataSet === null || feature === null) return (
+  <SGridPlotCard rowColSpan={[4,3]} cardProps={CardPropsClass(featureRaw+"Linechart",name,"","")}> <LoadingSpinner/></SGridPlotCard>);
+
+  let dataURL = apiRoutes.fetchDbData({ relationName: dataSet, feature: feature, filterBy: "iso_a3", filterValue: a3 });
+  const urlParams = new URLSearchParams(dataURL.split('?')[1]);
+  const paramsDict: { [key: string]: string } = {};
+  urlParams.forEach((value, key) => {
+    paramsDict[key] = value;
+  });
+  let linechartProps = LinechartProps("Linechart", dataURL , "exampleVar");
+
+  linechartProps.chartName = feature+"Linechart";
+  linechartProps.dataURL = dataURL;
+  linechartProps.locale =  locale;
+  linechartProps.translations = t;
+
+  return (
+    <>
+    <SGridPlotCard rowColSpan={[4,3]} cardProps={CardPropsClass(featureRaw+"Linechart", name,"","")}> <LinechartComponent chartProps={linechartProps}/></SGridPlotCard>
+    </>
+  );
+}
+
+
+function LoadingSpinner() {
+  return (
+    <>
+      <div className="flex items-center justify-center h-full w-full">
+        <div className="w-16 h-16 border-4 border-t-4  border-gray-200 rounded-full border-t-blue-500 animate-spin"></div>
+      </div>
+    </>
+  );
+}

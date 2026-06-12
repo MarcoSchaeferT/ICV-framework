@@ -4,16 +4,16 @@
 import { useRef, useEffect, useState } from 'react'
 import {apiRoutes } from "@/app/api_routes";
 import React from 'react';
-import { InterfaceContextProvider, useInterfaceContext, interfaceContextI } from '@/app/components/contexts/InterfaceContext';
-import SGridPlotCard from '@/app/components/layout/swapy_gridPlotCard';
-import { CardPropsClass } from '@/app/components/layout/cardWrapper';
-import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '@/app/components/plots/maps/leafD3Map';
+import { InterfaceContextProvider, useInterfaceContext, interfaceContextI } from '@/components/contexts/InterfaceContext';
+import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
+import { CardPropsClass } from '@/components/layout/CardWrapper';
+import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '@/components/plots/maps/LeafD3Map';
 import { createSwapy, Swapy } from 'swapy';
-import { MDXContentProvider } from '../../../../../../messages/markdown/MDXContentProvider';
-import {ViewMainInfoComponent} from '@/app/components/viewPageMainInfo';
+import { MDXContentProvider } from '@messages/markdown/MDXContentProvider';
+import {ViewMainInfoComponent} from '@/components/ViewPageMainInfo';
 import { Locale, useLocale, useTranslations } from "next-intl";
 import { t_richConfig } from "@/app/const_store";
-import { useUIContext } from '@/app/components/contexts/UIContext';
+import { useUIContext } from '@/components/contexts/UIContext';
 
 
 const isSWAPY = true;
@@ -28,34 +28,34 @@ let md = MDXContentProvider[locale];
  const layoutSizes = UI_contextT.layoutDims;
 
   // set up the map props
-  let worldMapProsp = new LeafD3MapLayerProps();
+  let worldMapProsp = LeafD3MapLayerProps();
   let p1 = worldMapProsp;
   p1.chartName = 'map_World';
-  p1.dataURL = apiRoutes.FETCH_WORLD_MAP;
+  p1.dataURL = apiRoutes.FETCH_MAP_DATA.WORLD_MAP;
   //p1.center = [15.3,-17 ];
   //p1.zoom = 7.6;
   p1.center = [5.5, -72.5];
   p1.zoom = 6.0;
   p1.isSetIntialContextDataFromComponent = true;
-  p1.mapUIsettings.isLongnitude_slider = false;
-  p1.mapUIsettings.isLatitude_slider = false;
-  p1.mapUIsettings.isZoom_slider = false;
+  p1.mapUIsettings.isLongitudeSlider = false;
+  p1.mapUIsettings.isLatitudeSlider = false;
+  p1.mapUIsettings.isZoomSlider = false;
   p1.mapUIsettings.isLatLngZoomOverlay = true;
-  p1.mapUIsettings.isColorMapSelection_dropdown = false;
-  p1.mapUIsettings.isFeatureSelection_dropdown = false;
-  p1.mapUIsettings.isDatasetSelection_dropdown = true;
-  p1.mapUIsettings.isCountrySelection_dropdownMapBased = true;
-  p1.mapUIsettings.isCountrySelection_dropdown = false;
-  p1.mapUIsettings.isDistance_legend = true;
-  p1.mapUIsettings.isColorMap_legend = true;
+  p1.mapUIsettings.isColorMapSelectionDropdown = false;
+  p1.mapUIsettings.isFeatureSelectionDropdown = false;
+  p1.mapUIsettings.isDatasetSelectionDropdown = true;
+  p1.mapUIsettings.isCountrySelectionDropdownMapBased = true;
+  p1.mapUIsettings.isCountrySelectionDropdown = false;
+  p1.mapUIsettings.isDistanceLegend = true;
+  p1.mapUIsettings.isColorMapLegend = true;
   p1.mapUIsettings.isDatePicker = false;
   p1.mapUIsettings.isAutoHideSettingsToggle = false;
-  p1.mapUIsettings.isSettingsBelndAnimation = false;
+  p1.mapUIsettings.isSettingsBlendAnimation = false;
   p1.isStaticAutoFitFullSize = false;
   p1.isApplyContextData = false;
   p1.isApplyTransitions = false;
   p1.isProjection_equirectangular = false;
-  p1.mapUIsettings.filterString_for_availableDataset_include = "probability";
+  p1.mapUIsettings.filterStringForAvailableDatasetInclude = "probability";
   p1.mapUIsettings.defaultDatasetName = "t_2019_ocsvm_albopictus_probability_predictions_named";
   p1.mapUIsettings.defaultFeatureName = "prob_1";
   p1.mapUIsettings.isPresenceData = true;
@@ -74,30 +74,30 @@ let md = MDXContentProvider[locale];
   p1.mapStyles.strokeWidth = 3; 
   
 
-  let mapPropsWorld2 = new LeafD3MapLayerProps();
+  let mapPropsWorld2 = LeafD3MapLayerProps();
   let p2 = mapPropsWorld2
   p2.chartName = 'map_World2';
-  p2.dataURL = apiRoutes.FETCH_WORLD_MAP;
+  p2.dataURL = apiRoutes.FETCH_MAP_DATA.WORLD_MAP;
   p2.center = [52.0, 10.1];
   p2.zoom = 6.0;
   p2.mapUIsettings.areSettingsOpen = true;
-  p2.mapUIsettings.isLongnitude_slider = false;
-  p2.mapUIsettings.isLatitude_slider = false;
-  p2.mapUIsettings.isZoom_slider = false;
-  p2.mapUIsettings.isColorMapSelection_dropdown = false;
-  p2.mapUIsettings.isFeatureSelection_dropdown = false;
-  p2.mapUIsettings.isDatasetSelection_dropdown = false;
-  p2.mapUIsettings.isDistance_legend = true;
-  p2.mapUIsettings.isColorMap_legend = true;
-  p2.mapUIsettings.isCountrySelection_dropdownMapBased = true;
-  p2.mapUIsettings.isCountrySelection_dropdown = false;
+  p2.mapUIsettings.isLongitudeSlider = false;
+  p2.mapUIsettings.isLatitudeSlider = false;
+  p2.mapUIsettings.isZoomSlider = false;
+  p2.mapUIsettings.isColorMapSelectionDropdown = false;
+  p2.mapUIsettings.isFeatureSelectionDropdown = false;
+  p2.mapUIsettings.isDatasetSelectionDropdown = false;
+  p2.mapUIsettings.isDistanceLegend = true;
+  p2.mapUIsettings.isColorMapLegend = true;
+  p2.mapUIsettings.isCountrySelectionDropdownMapBased = true;
+  p2.mapUIsettings.isCountrySelectionDropdown = false;
   p2.mapUIsettings.isDatePicker = false;
   p2.mapUIsettings.isDoNotApplyCountryFromContext = true;
   p2.isStaticAutoFitFullSize = false;
   p2.isProjection_equirectangular = false;
   p2.mapUIsettings.isPresenceDataChecked = true;
   p2.mapUIsettings.presenceDataColor = "rgb(2, 246, 250)";
-  p2.mapUIsettings.filterString_for_availableDataset_include = "probability";
+  p2.mapUIsettings.filterStringForAvailableDatasetInclude = "probability";
   p2.mapUIsettings.defaultDatasetName = "";
   p2.mapUIsettings.defaultFeatureName = "prob_1";
   p2.isApplyContextData = true;
@@ -144,11 +144,11 @@ let md = MDXContentProvider[locale];
     }, []);
   
 
-    let d3MapCardProps_overview = new CardPropsClass(
+    let d3MapCardProps_overview = CardPropsClass(
       t.rich('headingOverview', {...t_richConfig})?.toString() || '',
       t.rich('headingOverview', {...t_richConfig})?.toString() || '',"","");
       d3MapCardProps_overview.infoCard = {content: md.pages.PredictionView.overview.Info, footer: undefined};
-    let d3MapCardProps2_overveiwDetail = new CardPropsClass(
+    let d3MapCardProps2_overveiwDetail = CardPropsClass(
       t.rich('headingDetailView', {...t_richConfig})?.toString() || '',
       t.rich('headingDetailView', {...t_richConfig})?.toString() || '',"","");
     
