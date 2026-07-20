@@ -99,6 +99,10 @@ RUN mkdir .next && chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Disables Node's 5-minute requestTimeout so multi-GB CSV uploads over slow
+# connections are not aborted mid-transfer (see server-timeouts.cjs)
+COPY --chown=nextjs:nodejs server-timeouts.cjs ./
+
 # Switch to non-root user
 USER nextjs
 
@@ -106,4 +110,4 @@ USER nextjs
 EXPOSE 3000
 
 # Start the server
-CMD ["node", "server.js"]
+CMD ["node", "--require", "./server-timeouts.cjs", "server.js"]

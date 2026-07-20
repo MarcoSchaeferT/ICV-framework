@@ -206,10 +206,12 @@
     },
     "component_copyrightFooter": {
         "copyright": "© 2026 ICV Contributors. Lizenziert unter GNU GPL-3.0 - siehe ",
-        "copyrightRest": " Datei für Details",
+        "copyrightRest": "Datei für Details",
         "funding": "Gefördert durch das Bundesministerium für Gesundheit (BMG) unter der Fördernummer 2523DAT400 (Projekt",
         "projectName": " AI-DAVis PANDEMICS)",
-        "furtherInfo": "Über"
+        "furtherInfo": "Über",
+        "dataProtection": "Datenschutz",
+        "impressum": "Impressum"
     },
     "swapyHandle_component": {
         "enable": "Komponententausch aktivieren",
@@ -256,8 +258,8 @@
             "relative": "Anteil"
         },
         "covid19_world_data": {
-            "complete_data": "Kompletten Datensatz anzeigen",
-            "complete_data_short": "Kompletten Datensatz",
+            "complete_data": "gesamten Datensatz anzeigen",
+            "complete_data_short": "gesamten Datensatz",
             "reset_to_2020": "Auf Jahr 2020 zurücksetzen",
             "clear_map": "Karte leeren",
             "reset_to_all_countries_short": "Alle Länder",
@@ -267,9 +269,9 @@
             "subregion": "Unterregion",
             "country": "Land",
             "time_range": "Zeitraum",
-            "time_range_data_short": "Daten für den Zeitraum anzeigen",
-            "time_range_data": "Daten für den ausgewählten Zeitraum anzeigen",
-            "select_country_name": "Land auswählen oder Ländername eingeben"
+            "time_range_data_short": "Zeitraum anzeigen",
+            "time_range_data": "Zeitraum anzeigen",
+            "select_country_name": "Land auswählen / Ländername eingeben"
         }
     },
     "page_covidDashboard": {

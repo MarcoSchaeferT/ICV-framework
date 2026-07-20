@@ -38,7 +38,7 @@ export default function DemoModeDialog() {
             <span className="block mt-4 text-sm">
               However, the full functionality is available via the public 
               <a 
-                href="https://github.com/MarcoSchaeferT/ICV-framework" 
+                href="https://github.com/MarcoSchaeferT/dashboardDAVis" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="mx-1 text-amber-600 hover:underline font-medium"

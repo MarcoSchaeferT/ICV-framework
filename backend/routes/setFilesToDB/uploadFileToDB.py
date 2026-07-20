@@ -1,7 +1,5 @@
 import asyncio
-from flask import jsonify
 from pathlib import Path
-from threading import Lock
 
 # custom modules
 from .parseCSVdata import parseCSVdata, ParsedData
@@ -9,22 +7,19 @@ from .createTable import createTable
 from .insertData import insertData
 from .resetTable import resetTable
 from backend.routes.columnMetadata.route_columnMetadata import populate_column_metadata
+from backend.upload_state import upload_state
+from backend.cache import response_cache
 
 
-# Lock to prevent concurrent uploads of the same file
-_upload_lock = Lock()
-_currently_processing = set()
-
-async def uploadFileToDB(file_path: Path):
+async def uploadFileToDB(file_path: Path, upload_id: str):
     file_name = Path(file_path).name
-    
-    # Prevent duplicate processing of the same file
-    with _upload_lock:
-        if file_name in _currently_processing:
-            print(f"File {file_name} is already being processed, skipping duplicate request")
-            return jsonify({"ERROR": f"File {file_name} is already being processed"})
-        _currently_processing.add(file_name)
-    
+
+    # Prevent duplicate processing of the same file (Redis-backed lock,
+    # shared across all Gunicorn workers)
+    if not upload_state.try_acquire_file_lock(file_name):
+        print(f"File {file_name} is already being processed, skipping duplicate request")
+        return {"ERROR": f"File {file_name} is already being processed"}
+
     try:
         # *** PARSE *** #
         data: ParsedData = await parseCSVdata(file_path)
@@ -46,9 +41,9 @@ async def uploadFileToDB(file_path: Path):
         # Run insert synchronously since we're already in an async function
         # This allows proper sequential processing of multiple files
         try:
-            await insertData(data)
+            await insertData(data, upload_id)
         except Exception as e:
-            return jsonify({"ERROR": f"Insert failed: {str(e)}"})
+            return {"ERROR": f"Insert failed: {str(e)}"}
 
         # *** POPULATE COLUMN METADATA *** #
         # Auto-fill column_metadata_en and column_metadata_de from CSV suggestions
@@ -60,23 +55,24 @@ async def uploadFileToDB(file_path: Path):
             print(f"WARNING: Column metadata population failed: {e}")
             traceback.print_exc()
 
-        return None  # Return None on success, jsonify only on error
-    
+        # *** INVALIDATE CACHE *** #
+        # The table's content (and possibly schema) just changed — drop
+        # cached query results in ALL workers via the Redis epoch bump.
+        evicted = response_cache.invalidate(data.db_name)
+        print(f"[CACHE] Invalidated '{data.db_name}' after upload ({evicted} local entries)")
+
+        return None  # Return None on success, error dict only on error
+
     finally:
-        # Always remove from processing set when done
-        with _upload_lock:
-            _currently_processing.discard(file_name)
+        # Always release the processing lock when done
+        upload_state.release_file_lock(file_name)
 
-
-def setProgress(progress):
-  from backend.index import progressVal
-  progressVal[0] = progress
 
 def checkErrors(result):
   if result != None:
       if type(result) is dict:
           if "ERROR" in result and "already exists" not in result["ERROR"]:
-              return jsonify(result)
+              return result
           if "restart" in result:
             return result
   return False

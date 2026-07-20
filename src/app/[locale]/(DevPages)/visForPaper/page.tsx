@@ -18,6 +18,7 @@ import { metaDataT } from '@/components/plots/MetaDataHandler';
 import {ViewMainInfoComponent} from '@/components/ViewPageMainInfo';
 import * as d3 from 'd3';
 import { useUIContext } from '@/components/contexts/UIContext';
+import { useLoadingTask, LoadingSpinnerAnimation } from '@/components/plots/maps/utils/loadingSpinner';
 
 import {
   Tabs,
@@ -170,6 +171,15 @@ function ShowDataSet({ query, locale, t }: { query: string ; locale: string; t: 
 
   const [isLoading_Metadata, rawMetaData] = useGetJSONData(apiRoutes.getDatasetsMetadata({ LANGID: locale }));
 
+  const L_metadataLoader = useLoadingTask('Metadata');
+  useEffect(() => {
+    if (isLoading_Metadata) {
+      L_metadataLoader.start();
+    } else {
+      L_metadataLoader.stop();
+    }
+  }, [isLoading_Metadata, L_metadataLoader]);
+
   let metaData = useMemo(() => {
     if (rawMetaData) {
       return rawMetaData as unknown as metaDataT;
@@ -189,7 +199,7 @@ function ShowDataSet({ query, locale, t }: { query: string ; locale: string; t: 
     cardName = t.rich('card_dataSet', {...t_richConfig});
   }
   else if (queryV === 'feature') {
-    if(metaData === null) return <LoadingSpinner/>;
+    if(metaData === null) return <LoadingSpinnerAnimation/>;
     if(metaData[feature] != undefined) {
       let unit = metaData[feature].dimension;
       let description = metaData[feature].description;
@@ -257,7 +267,7 @@ function DynamicLineChart({ featureRaw, name }: { featureRaw: string, name: stri
     feature = feature.replace(/_(\d+)/g, "_*");
 
   if(dataSet === null || feature === null) return (
-  <SGridPlotCard rowColSpan={[4,3]} cardProps={CardPropsClass(featureRaw+"Linechart",name,"","")}> <LoadingSpinner/></SGridPlotCard>);
+  <SGridPlotCard rowColSpan={[4,3]} cardProps={CardPropsClass(featureRaw+"Linechart",name,"","")}> ERROR </SGridPlotCard>);
 
   let dataURL = apiRoutes.fetchDbData({ relationName: dataSet, feature: feature, filterBy: "iso_a3", filterValue: a3 });
   const urlParams = new URLSearchParams(dataURL.split('?')[1]);
@@ -279,13 +289,3 @@ function DynamicLineChart({ featureRaw, name }: { featureRaw: string, name: stri
   );
 }
 
-
-function LoadingSpinner() {
-  return (
-    <>
-      <div className="flex items-center justify-center h-full w-full">
-        <div className="w-16 h-16 border-4 border-t-4  border-gray-200 rounded-full border-t-blue-500 animate-spin"></div>
-      </div>
-    </>
-  );
-}

@@ -1,13 +1,4 @@
-import { dictStates_mapGermany, dictStates_TableGermany, dbDATA, IS_DEMO_MODE } from "./const_store";
-
-/**
- * Checks if the application is in demo mode.
- * 
- * @returns {boolean} True if in demo mode, false otherwise.
- */
-export function checkDemoMode(): boolean {
-  return IS_DEMO_MODE;
-}
+import { dictStates_mapGermany, dictStates_TableGermany, dbDATA } from "./const_store";
 
 
 /**

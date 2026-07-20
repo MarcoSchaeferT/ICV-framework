@@ -55,14 +55,12 @@ Swagger(app, template=template)
 testData = ["test", "test2", "test3"]
 
 # global variables
-global progressVal
 global metadata
-global fileUploadErrors
-# used by uploadFileToDB.py to set the progress value
-progressVal = [1]
 # used by uploadFileToDB.py -> createTable() -> loadMetadata() stores part of the metadata (valuename, datatype)
 metadata = {}
-fileUploadErrors: dict[str,str] = {"ERROR": "false"}
+# Upload progress/error state lives in Redis (shared across Gunicorn workers),
+# see backend/upload_state.py
+from backend.upload_state import upload_state
 class DataPaths:
     germany_map_states: Path
     germany_map_districts: Path
@@ -150,27 +148,16 @@ def test():
         print(str(json.dumps(testData)))
         return json.dumps(testData)
     
-@swag_from('API_docs/get_upload_progress.yml')
-@app.route("/api/getUploadProgress", methods=["GET", "POST"])
-async def getUploadProgress():
-    return jsonify({"progress": progressVal[0]})
-
-@swag_from('API_docs/set_upload_progress.yml')
-@app.route("/api/setUploadProgress", methods=["GET"])
-async def setUploadProgress():
-    if request.method == "GET":
-        progressVal[0] = request.args.get("progressVal", type=int, default=progressVal)
-        return jsonify({"progress": progressVal[0]})
-
-@swag_from('API_docs/get_upload_error.yml')
-@app.route("/api/getUploadError", methods=["GET", "POST"])
-async def getUploadError() -> Response:
-    global fileUploadErrors
-    if request.method == "GET":
-        fileUploadErrors["ERROR"] = "false"
-    if "ERROR" in fileUploadErrors:
-        return jsonify(fileUploadErrors)
-    return jsonify({"ERROR": "false"})
+@swag_from('API_docs/get_upload_status.yml')
+@app.route("/api/uploadStatus", methods=["GET"])
+def getUploadStatus():
+    # Combined progress + error state for one upload, polled by the frontend.
+    # Read-only: state is initialized by the setFilesToDB route and written
+    # only by the backend during processing.
+    upload_id = request.args.get("id", "")
+    if not upload_id:
+        return jsonify({"ERROR": "Missing 'id' query parameter"}), 400
+    return jsonify(upload_state.get_status(upload_id))
 
 
 # test route to database 

@@ -18,12 +18,23 @@ services:
     networks:
       - internal-network
 
+  icv-redis:
+    image: redis:7-alpine
+    restart: always
+    container_name: icv-redis
+    # Holds transient upload progress/error state shared across the Gunicorn
+    # workers of icv-backend — no persistence needed.
+    command: [ "redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru" ]
+    networks:
+      - internal-network
+
   icv-frontend:
     image: ghcr.io/marcoschaefert/icv-frontend:latest
     environment:
       IS_DOCKER: "true"
       NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE}
       NEXT_PUBLIC_SHOW_DISCLAIMER: ${NEXT_PUBLIC_SHOW_DISCLAIMER}
+      NEXT_PUBLIC_SHOW_COV: ${NEXT_PUBLIC_SHOW_COV}
     build:
       context: .
       dockerfile: ./Dockerfile.frontend
@@ -51,9 +62,15 @@ services:
       - "5222:5222"
     networks:
       - internal-network
+    depends_on:
+      - icv-database
+      - icv-redis
     environment:
-      DATABASE_URL: ${DATABASE_URL_SECRET}
+      DATABASE_URL: "postgresql://${DATABASE_USER}:${DB_PASSWORD_SECRET}@icv-database:5333/icv-database"
+      # Shared state for upload progress/errors across Gunicorn workers
+      REDIS_URL: "redis://icv-redis:6379/0"
       IS_DOCKER: "true"
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-}
 
 volumes:
   db-data:

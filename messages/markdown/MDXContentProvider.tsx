@@ -30,6 +30,18 @@ import  About_projectInfo_de from './pages/About/projectInfo_de.mdx';
 import  About_projectInfo_en from './pages/About/projectInfo_en.mdx';
 
 /************************
+ **** Data Protection ***
+ ************************/
+import DataProtection_content_de from './pages/DataProtection/de.mdx';
+import DataProtection_content_en from './pages/DataProtection/en.mdx';
+
+/************************
+ ***** Impressum ********
+ ************************/
+import Impressum_content_de from './pages/Impressum/de.mdx';
+import Impressum_content_en from './pages/Impressum/en.mdx';
+
+/************************
  ******** Upload ********
  ************************/
 import  Upload_requirements_en from './pages/Upload/requirements_en.mdx';
@@ -93,18 +105,24 @@ import SC_DengueSerotypeCounts_de from './pages/ShowCases/DengueSerotypeCounts/m
 import SC_Uncertainty_Vis_en from './pages/ShowCases/Uncertainty_Vis/mainInfo_en.mdx';
 import SC_Uncertainty_Vis_de from './pages/ShowCases/Uncertainty_Vis/mainInfo_de.mdx';
 
-interface HoverCardsContent {
+export interface HoverCardsContent {
     Info: React.FC; // general info + how to (+ data set details)
     Interaction: React.FC; // interaction + UI elements
 }
 
-interface MDXContentProvider {
+export interface MDXContentProviderType {
     
     DummyContent: React.FC;
     FooterContent: React.FC;
     pages: {
         About: {
             projectInfo: React.FC;
+        };
+        DataProtection: {
+            content: React.FC;
+        };
+        Impressum: {
+            content: React.FC;
         };
         Upload: {
             requirements: React.FC;
@@ -143,8 +161,9 @@ interface MDXContentProvider {
    
     
 }
+export type MDXContentProvider = MDXContentProviderType
 
-export const MDXContentProvider: Record<string, MDXContentProvider> = {
+export const MDXContentProvider: Record<string, MDXContentProviderType> = {
     "en": {
        
         DummyContent: DummyContent_en,
@@ -152,6 +171,12 @@ export const MDXContentProvider: Record<string, MDXContentProvider> = {
         pages: {
             About: {
                 projectInfo: About_projectInfo_en,
+            },
+            DataProtection: {
+                content: DataProtection_content_en,
+            },
+            Impressum: {
+                content: Impressum_content_en,
             },
             Upload: {
                 requirements: Upload_requirements_en,
@@ -201,6 +226,12 @@ export const MDXContentProvider: Record<string, MDXContentProvider> = {
         pages: {
             About: {
                 projectInfo: About_projectInfo_de,
+            },
+            DataProtection: {
+                content: DataProtection_content_de,
+            },
+            Impressum: {
+                content: Impressum_content_de,
             },
             Upload: {
                 requirements: Upload_requirements_de,

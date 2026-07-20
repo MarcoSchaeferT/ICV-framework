@@ -176,7 +176,7 @@ export default function Component() {
            <div className="flex flex-wrap gap-3 items-end justify-between">
               <div className="flex flex-wrap gap-3 ">
                 <Button asChild >
-                  <Link href="https://github.com/MarcoSchaeferT/ICV-framework" className="flex items-center gap-2">
+                  <Link href="https://github.com/MarcoSchaeferT/dashboardDAVis" className="flex items-center gap-2">
                     <GitHubIcon  />
                    {t_main.rich('ButtonGitHub',{...t_richConfig,})}
                   </Link>
@@ -204,7 +204,7 @@ export default function Component() {
                  </div>
                 </Button>
                 <Button variant="outline" asChild>
-                  <Link href="https://github.com/MarcoSchaeferT/ICV-framework/packages" className="flex items-center gap-2">
+                  <Link href="https://github.com/MarcoSchaeferT/dashboardDAVis/packages" className="flex items-center gap-2">
                     <ExternalLink className="w-4 h-4" />
                     {t_main.rich('ButtonReleases',{...t_richConfig,})}
                   </Link>

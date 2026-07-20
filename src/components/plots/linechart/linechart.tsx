@@ -24,7 +24,7 @@ import { apiRoutes } from '@/app/api_routes';
 import { useLocale ,useTranslations } from "next-intl";
 import { Locale } from '@/i18n/routing';
 import { t_richConfig, monthNames, dbDATA } from '@/app/const_store';
-import { LoadingSpinner } from '../maps/helpers';
+import { useLoadingTask, LoadingSpinnerAnimation } from '../maps/utils/loadingSpinner';
 
 /**
  * Props class for the LinechartComponent.
@@ -101,6 +101,19 @@ const LinechartComponent = ({chartProps}: {chartProps: LinechartProps}) => {
   let c = useInterfaceContext();
   
   let  isDataNotAvailable = false;
+
+  const [isDataLoading, rawData] = useGetJSONData(props.dataURL);
+  const [isLoading_Metadata, rawMetaData] = useGetJSONData(apiRoutes.getDatasetsMetadata({ LANGID: locale || "en" }));
+
+  const L_linechartData = useLoadingTask('Linechart Data');
+
+  useEffect(() => {
+    if (isDataLoading || isLoading_Metadata) {
+      L_linechartData.start();
+    } else {
+      L_linechartData.stop();
+    }
+  }, [isDataLoading, isLoading_Metadata, L_linechartData]);
   console.log("LinechartComponent render", props.dataURL, c.curFeature, c.selectedFilter, c.selectedGridcellID);
 
 
@@ -110,10 +123,7 @@ const LinechartComponent = ({chartProps}: {chartProps: LinechartProps}) => {
   let collectDataLoadingErrors: string[] = [];
   const params = useMemo(() => getParamsOfURL(props.dataURL), [props.dataURL]);
   const feature = useMemo(() => params['feature']?.replace(/[_*]/g, ''), [params]);
- 
 
-  const [isDataLoading, rawData] = useGetJSONData(props.dataURL);
-  const [isLoading_Metadata, rawMetaData] = useGetJSONData(apiRoutes.getDatasetsMetadata({ LANGID: locale || "en" }));
   collectDataLoadingErrors.push(handleLoadDataError(isDataLoading, rawData as unknown as dbDATA));
   collectDataLoadingErrors.push(handleLoadDataError(isLoading_Metadata, rawMetaData as unknown as dbDATA));
 
@@ -208,7 +218,7 @@ const [xLabel, yLabel] = useMemo(() => {
     isDataNotAvailable = false;
     return (
       <div className="flex items-center justify-center h-full">
-        <LoadingSpinner />
+        <LoadingSpinnerAnimation />
       </div>
     );
   }else if (c.curFeatureValue == "NA" || c.curFeatureValue == "undefined" || data.error != undefined ) {
@@ -244,7 +254,8 @@ const [xLabel, yLabel] = useMemo(() => {
   }
 
   return (
-    <div className="flex flex-col h-full w-full min-h-0"> 
+    <div className="flex flex-col h-full w-full min-h-0 relative"> 
+      <LoadingSpinnerAnimation />
       {/* Header Section */}
 
       <ChartHeader ErrorData={collectDataLoadingErrors} props={chartProps} />

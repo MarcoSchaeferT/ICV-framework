@@ -2,13 +2,13 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    LoadingSpinner,
     getMinMaxFeature,
     getGridCellIndex,
     getGridOffset,
     snapToGrid,
     roundLatLng,
 } from './helpers';
+import {LoadingSpinnerProvider, useLoadingTask, LoadingSpinnerAnimation} from './utils/loadingSpinner';
 import {
     metaDataT,
 } from '../MetaDataHandler';
@@ -222,6 +222,7 @@ const LeafD3MapGermanyComponent = ({props}: {props: LeafD3MapGermanyProps}) => {
     const toolTipRef = useRef<any>(null);
     const UIcntRef = useRef<number>(0);
     const isHoverCountry = useRef<boolean>(false);
+    const activeLayerRef = useRef<L.Path | null>(null);
     const gridcellSizeLatLng = useRef<{ lng: number; lat: number }>({ lng: 0, lat: 0 });
      const [isSettingsOpen, setIsSettingsOpen] = useState(true);
     
@@ -262,7 +263,7 @@ const LeafD3MapGermanyComponent = ({props}: {props: LeafD3MapGermanyProps}) => {
 
     useEffect(() => {
         if(props.isApplySelectionsTransition) {
-            isLoadingSpinner.current = true;
+            L_contextSync.start();
 
             if(curColorMapType != contextT.curColorMap){
                 
@@ -354,7 +355,23 @@ const LeafD3MapGermanyComponent = ({props}: {props: LeafD3MapGermanyProps}) => {
     const ischanged = useRef(false);
     let time = useRef<ReturnType<typeof setTimeout> | null>(null);
     let mapTime = useRef<ReturnType<typeof setTimeout> | null>(null);
-    let isLoadingSpinner = useRef(false);
+    // ── Loading task hooks (replace old isLoadingSpinner ref) ──
+    const L_dataLoading = useLoadingTask('Data');
+    const L_contextSync = useLoadingTask('Context Sync');
+    const L_debounceLoading = useLoadingTask('Debounce Render');
+
+    // Clear loading spinner when all main datasets finish loading
+    useEffect(() => {
+        if (!isLoading_mapData &&
+            !isLoading_MosquitoData &&
+            !isLoadingDatalist &&
+            !isLoading_Metadata) {
+            L_dataLoading.stop();
+            L_contextSync.stop();
+        } else {
+            L_dataLoading.start();
+        }
+    }, [isLoading_mapData, isLoading_MosquitoData, isLoadingDatalist, isLoading_Metadata, L_dataLoading, L_contextSync]);
 
     // ─── Shared hook: parse raw polygon data → Map<gridCellIndex, VisDataT> ───
     const { gridData: parsedGridData, parseErrors } = useGridDataParser({
@@ -403,7 +420,8 @@ const LeafD3MapGermanyComponent = ({props}: {props: LeafD3MapGermanyProps}) => {
 useLayerUpdateDebounce({
     curMouseEventRef: curMouseEvent,
     timerRef: time,
-    isLoadingSpinnerRef: isLoadingSpinner,
+    startLoading: L_debounceLoading.start,
+    stopLoading: L_debounceLoading.stop,
     setIsUpdate: setisUpdate,
     onDebounceComplete: () => {
         if (map && L && props.isStaticAutoFitFullSize && mapData && !mapData.error && mapData.type) {
@@ -469,6 +487,10 @@ function DrawMapPolygons() {
                         curPropertyNames.current = country;
                         let id = stateMappersGermany.Map__State_to_ID(country);
                         c.setSelectedStateID(id);
+
+                        // Track and bring active layer to front
+                        activeLayerRef.current = layer as L.Path;
+                        (layer as L.Path).bringToFront();
                      
                     });
 
@@ -512,7 +534,6 @@ function DrawMapPolygons() {
                            
                         }
 
-                        (layer as L.Path).bringToFront(); // Ensures the hovered polygon is on top
                         if (feature.properties) {
                                 const country = feature.properties ? feature.properties.name : "";
                                 const id = stateMappersGermany.Map__State_to_ID(country);
@@ -573,12 +594,19 @@ function DrawMapPolygons() {
                                 map.openTooltip(toolTipRef.current);
                             }
                             if (curPropertyNames.current !== feature.properties.name) {
+                                
                                 (layer as L.Path).setStyle({
-                                    fillColor: "rgba(29, 73, 217, 0.5)",
-                                    // weight: 1,
-                                    // fillOpacity: layerOpacity,
+                                    //fillColor: "rgb(29, 73, 217)",
+                                    color: "rgb(47, 214, 109)",
+                                    //fillOpacity: 0.5,
+                                    weight: 4,
+                                    lineJoin: "round",
+                                    lineCap: "round",
                                 });
-                                (layer as L.Path).bringToBack();
+                                 (layer as L.Path).bringToFront();
+                                // Add glow class for the CSS drop-shadow filter
+                                const el = (layer as any).getElement?.();
+                                if (el) el.classList.add("leaflet-path-hover");
                                 isHoverCountry.current = true;
                             }
                             hoverCountry.current = feature.properties.name;
@@ -601,12 +629,19 @@ function DrawMapPolygons() {
                                     weight: 1,
                                     //fillOpacity: c.curLayerOpacity,
                                 });
+                                // Remove glow class (transitions handle the slow fade-out)
+                                const el = (layer as any).getElement?.();
+                                if (el) el.classList.remove("leaflet-path-hover");
                                 hoverCountry.current = "";
                                 isHoverCountry.current = false;
                                 removeAllTooltips();
                                 const svg = d3.select(map.getContainer()).select("svg");
                                 svg.selectAll("rect").remove();
                                 svg.selectAll("circle").remove();
+                            }
+                            // Always bring the active (clicked) layer back to front
+                            if (activeLayerRef.current && typeof activeLayerRef.current.bringToFront === "function") {
+                                activeLayerRef.current.bringToFront();
                             }
                         }
                     });
@@ -1068,6 +1103,7 @@ useCanvasGridLayer({
    // the page
     return (
 
+<LoadingSpinnerProvider>
 <div className="relative size-full" >
     <div className="absolute top-1 right-1 z-20">
         <button
@@ -1133,7 +1169,6 @@ useCanvasGridLayer({
             const dataset = listOfDataSets[value];
             curDatasetname.current = dataset;
             let url = apiRoutes.fetchDbData({ relationName: dataset, feature: props.mapUIsettings.defaultFeatureName || "" })
-            isLoadingSpinner.current = true;
 
             setSelectedDataset(url);
             contextT.setCurDatasetURL(url);
@@ -1168,8 +1203,6 @@ useCanvasGridLayer({
             let url = apiRoutes.fetchDbData({ relationName: curDatasetname.current, feature: value });
             //console.log("setCurFeatureName:", value);
             //console.log("setCurDatasetName:",url);
-            props.mapUIsettings.defaultFeatureName = "";
-            isLoadingSpinner.current = true;
             setSelectedDataset(url);
             contextT.setCurDatasetURL(url);
 
@@ -1209,7 +1242,6 @@ useCanvasGridLayer({
             <Select onValueChange={(value) => {
                 setColorMapType(value);
                 contextT.setCurColorMap(value);
-                isLoadingSpinner.current = true;
             }} defaultValue={defaultColorMap}>
                 <SelectTrigger className="w-full mt-1">
                     <SelectValue placeholder="" />
@@ -1256,7 +1288,7 @@ useCanvasGridLayer({
     )}
    
     
-    {isLoadingSpinner.current && (<LoadingSpinner  />)}
+    <LoadingSpinnerAnimation />
     <div ref={divRef} className='flex justify-center items-center size-full'>
     <svg id={chart} className=' w-full h-full'></svg>
    
@@ -1297,6 +1329,7 @@ useCanvasGridLayer({
     )}
     </div>
 </div>
+</LoadingSpinnerProvider>
     );
 };
 

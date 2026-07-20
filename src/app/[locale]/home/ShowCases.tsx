@@ -9,8 +9,13 @@ import { useUIContext } from "@/components/contexts/UIContext";
 export default function ShowcaseGrid() {
 
   const locale = useLocale() as Locale;
-  let showcases = showCasesList[locale];
   const UI_contextT = useUIContext();
+  const { showCov } = UI_contextT;
+  let showcases = showCasesList[locale];
+  if (!showCov) {
+    showcases = showcases.filter(item => !item.link.toLowerCase().includes("covid"));
+  }
+
   return (
    <div className="p-2  size-full">
       <div className="max-w-7xl mx-auto">

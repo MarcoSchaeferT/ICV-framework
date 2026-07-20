@@ -1,16 +1,7 @@
+import React from 'react';
 import * as d3 from 'd3';
 import * as GEOjson from 'geojson';
 
-// loading animation for map updates
-export function LoadingSpinner() {
-    return (
-        <>
-        <div className="absolute right-[50%] top-[50%] float-top bg-white z-50">
-            <div className="w-6 h-6 border-4 border-t-4 border-gray-200 rounded-full border-t-blue-500 animate-spin"></div>
-        </div>
-        </>
-    );
-}
 
 /**
  * Computes the minimum and maximum values of a specified feature from the given data array.
@@ -372,5 +363,4 @@ export function getGoodReadableRange(dataMin: number, dataMax: number): [number,
         }
     }
     return [dataMin, dataMax];
-  }
-
+}

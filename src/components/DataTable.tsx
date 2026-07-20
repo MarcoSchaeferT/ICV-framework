@@ -62,7 +62,7 @@ import { useLocale ,useTranslations } from "next-intl";
 import { t_richConfig, dbDATA } from '@/app/const_store';
 import { Locale } from '@/i18n/routing';
 import { useGetJSONData } from '@/app/hooks/useFetchAndCache';
-import { LoadingSpinner } from "./plots/maps/helpers";
+import { useLoadingTask, LoadingSpinnerAnimation } from "./plots/maps/utils/loadingSpinner";
 
 // Stable references to prevent re-render loops
 const EMPTY_ARRAY: any[] = [];
@@ -182,6 +182,15 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
 
   // data loading
   const [isLoading_TableData, rawTableData] = useGetJSONData(DataTableObject.getURL());
+
+  const L_tableLoader = useLoadingTask('Table Data');
+  useEffect(() => {
+    if (isLoading_TableData) {
+      L_tableLoader.start();
+    } else {
+      L_tableLoader.stop();
+    }
+  }, [isLoading_TableData, L_tableLoader]);
   const [isLoading_Metadata, rawMetaData] = useGetJSONData(apiRoutes.getDatasetsMetadata({ LANGID: locale }));
   
   const tableName: string = DataTableObject.getTableName();
@@ -330,9 +339,7 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
 
   // *** create the table **** //
   if (isLoading_TableData) {
-    
-    return <><div className="size-full p-2 relative flex flex-col">Loading...</div><LoadingSpinner /></>;
-   
+    return <><div className="size-full p-2 relative flex flex-col">Loading...</div><LoadingSpinnerAnimation /></>;
   }
     return (
       <>     

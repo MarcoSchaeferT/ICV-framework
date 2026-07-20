@@ -1,6 +1,7 @@
 "use client";
 import React, { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot, Root } from "react-dom/client";
+import {useLoadingTask, LoadingSpinnerAnimation} from './utils/loadingSpinner';
 
 // ─── Shared hooks & utils (extracted from nested component definitions) ───
 import {
@@ -20,7 +21,6 @@ import MapContentChild from './MapContentChild';
 import { RANGE_LAT, RANGE_LONG, MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, CALCER } from './constants';
 
 import {
-    LoadingSpinner,
     getMinMaxFeature,
     getGridCellIndex,
     pointParser,
@@ -277,7 +277,7 @@ export function LeafD3MapLayerProps(
 }
 const LeafD3MapLayerComponent = ({props}: {props: LeafD3MapLayerProps}) => {
 
-    const isLoadingSpinnerDEBUG = 1
+
 
     leafProps.zoom = props.zoom;
     leafProps.center = props.center;
@@ -338,12 +338,18 @@ const baseStyle: Leaflet.PathOptions = {
             fillOpacity: props.mapStyles?.fillOpacity,
             weight: strokeWidth,
             fill: true,
+            lineJoin: "round",
+            lineCap: "round",
         };
 
         const hoverStyle: Leaflet.PathOptions = {
             ...baseStyle,
-            fillColor: "rgb(29, 73, 217)",
-            fillOpacity: 0.5,
+            //fillColor: "rgb(29, 73, 217)",
+            color: "rgb(24, 245, 216)",
+            //fillOpacity: 0.5,
+            weight: strokeWidth + 3,
+            lineJoin: "round",
+            lineCap: "round",
         };
 
         const activeStyle: Leaflet.PathOptions = {
@@ -495,6 +501,7 @@ const baseStyle: Leaflet.PathOptions = {
     const toolTipRef = useRef<any>(null);
     const cursorMarkerRef = useRef<L.Marker | null>(null);
     const isHoverCountry = useRef<boolean>(false);
+    const activeLayerRef = useRef<L.Path | null>(null);
     const [showSuccessCountryDropdown, setShowSuccessCountryDropdown] = useState(false);
     const [showSuccessTimerangeDropdown, setShowSuccesTimerangeDropdown] = useState(false);
     const highlightedCountryRef = useRef<L.GeoJSON | null>(null);
@@ -544,7 +551,12 @@ const baseStyle: Leaflet.PathOptions = {
         fetchMinMax();
     }, [selectedDatasetURL]);
 
-    let isLoadingSpinner = useRef(false);
+    // ── Loading task hooks (replace old isLoadingSpinner ref) ──
+    const L_dataLoading = useLoadingTask('Data');
+    const L_contextSync = useLoadingTask('Context Sync');
+    const L_presenceLayer = useLoadingTask('Presence Layer');
+    const L_presenceLayerCovid = useLoadingTask('Presence Layer Covid');
+    const L_debounceLoading = useLoadingTask('Debounce Render');
 
     const renderCount = useRef(0);
     const curMapMouseEvents = useRef<mapMouseEvents>({ type: "null", position: [0, 0], event: null, lastSetTime: 0 });
@@ -561,8 +573,6 @@ const baseStyle: Leaflet.PathOptions = {
     const [isLoadingDatalist, dataList] = useGetJSONData(apiRoutes.GET_LIST_OF_DATASETS)
     const [isLoading_Metadata, rawMetaData] = useGetJSONData(apiRoutes.getDatasetsMetadata({ LANGID: locale }));
     const [isLoadingCapitals, rawCapitalsData] = useGetJSONData(apiRoutes.FETCH_MAP_DATA.CAPITALS);
-
-
 
 
      // column names from database
@@ -662,8 +672,40 @@ const baseStyle: Leaflet.PathOptions = {
     const [isCountryLevelData, setIsCountryLevelData] = useState(props.mapUIsettings.isCountryLevelData);
     const [isSubregionLevelData, setIsSubregionLevelData] = useState(props.mapUIsettings.isSubregionLevelData);
 
+    const handleResetToAllCountries = useCallback(() => {
+        setSelectedCountry("");
+        contextT.setSelectedCountry("");
 
-   
+        let url = apiRoutes.fetchDbData({
+            relationName: curDatasetname.current,
+            feature: contextT.curFeature || selectedFeature || mapUIsettings.defaultFeatureName,
+            startDate: contextT.dateRange?.from ? format(contextT.dateRange.from, "yyyy-MM-dd") : undefined,
+            endDate: contextT.dateRange?.to ? format(contextT.dateRange.to, "yyyy-MM-dd") : undefined,
+            aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
+        });
+        console.log("handleResetToAllCountries", url);
+
+        contextT.setCurDatasetURL(url);
+        contextT.setCurPresenceDatasetURL(url);
+        contextT.setIsPresenceData(true);
+        setIsPresData(true);
+        setPresenceDataURL(url);
+        setShowSuccessCountryDropdown(true);
+
+        if (map && highlightedCountryRef.current) {
+            map.removeLayer(highlightedCountryRef.current);
+            highlightedCountryRef.current = null;
+        }
+
+        setTimeout(() => {
+            setShowSuccessCountryDropdown(false);
+        }, 5000);
+    }, [contextT.dateRange, contextT.curFeature, selectedFeature, mapUIsettings.defaultFeatureName, isCountryLevelData, isSubregionLevelData, map])
+
+    const handleResetToAllCountriesRef = useRef(handleResetToAllCountries);
+    useEffect(() => {
+        handleResetToAllCountriesRef.current = handleResetToAllCountries;
+    }, [handleResetToAllCountries]); 
     // collect data loading errors
     collectDataLoadingErrors.current = [];
     collectDataLoadingErrors.current.push(handleLoadDataError(isLoading_mapData, rawMapData as unknown as dbDATA));
@@ -677,15 +719,39 @@ const baseStyle: Leaflet.PathOptions = {
     collectDataLoadingErrors.current.push(handleLoadDataError(isLoadingS_organism, rawS_organsim as unknown as dbDATA));
     collectDataLoadingErrors.current.push(handleLoadDataError(isLoadingS_years, rawS_years as unknown as dbDATA));
     collectDataLoadingErrors.current.push(handleLoadDataError(isLoadingCapitals, rawCapitalsData as unknown as dbDATA));
+    collectDataLoadingErrors.current.push(handleLoadDataError(isLoading_ColumnNames, rawColumnNames as unknown as dbDATA));
+
 
     // Clear loading spinner when all main datasets finish loading
     useEffect(() => {
-        if (!isLoading_MosquitoData && !isLoadingPresenceData && !isLoading_sequenceMetadata) {
-            isLoadingSpinner.current = false;
-            if(isLoadingSpinnerDEBUG) console.log("off Spinner: !isLoading_MosquitoData && !isLoadingPresenceData && !isLoading_sequenceMetadata");
-             //setisUpdate(prev => !prev);
+        if (!isLoading_mapData &&
+            !isLoading_MosquitoData && 
+            !isLoadingPresenceData && 
+            !isLoading_sequenceMetadata &&
+            !isLoadingDatalist && 
+            !isLoading_Metadata && 
+            !isLoadingP_species && 
+            !isLoadingP_years && 
+            !isLoadingS_organism && 
+            !isLoadingS_years && 
+            !isLoadingCapitals && 
+            !isLoading_ColumnNames) {
+            L_dataLoading.stop();
+        }else{
+          L_dataLoading.start();
         }
-    }, [isLoading_MosquitoData, isLoadingPresenceData, isLoading_sequenceMetadata, presData]);
+    }, [isLoading_mapData,
+        isLoading_MosquitoData, 
+        isLoadingPresenceData, 
+        isLoading_sequenceMetadata, 
+        isLoadingDatalist, 
+        isLoading_Metadata, 
+        isLoadingP_species, 
+        isLoadingP_years, 
+        isLoadingS_organism, 
+        isLoadingS_years, 
+        isLoadingCapitals, 
+        isLoading_ColumnNames]);
 
     // assign data types
     let presenceDat= rawPresenceData as unknown as presDBdataI;
@@ -753,6 +819,10 @@ const baseStyle: Leaflet.PathOptions = {
 
 
 
+ useEffect(() => {
+    console.log("setDateRange ", contextT.dateRange?.to);
+ }, [contextT.dateRange]);
+
  
     const applyGlobalContext = useCallback(() => {
         if(curColorMapType != contextT.curColorMap){
@@ -770,8 +840,6 @@ const baseStyle: Leaflet.PathOptions = {
             setIsSequenceMetaData(contextT.isSequenceMetaData);
         }
         if(pieSize != contextT.pieSize_sequenceMetaData && contextT.pieSize_sequenceMetaData !== undefined){
-             isLoadingSpinner.current = false;
-              if(isLoadingSpinnerDEBUG) console.log("off Spinner: pieSize != contextT.pieSize_sequenceMetaData && contextT.pieSize_sequenceMetaData !== undefined");
             setPieSize(contextT.pieSize_sequenceMetaData);
         }
         if(cur_SYear != contextT.curSyear && contextT.curSyear !== undefined){
@@ -816,7 +884,9 @@ const baseStyle: Leaflet.PathOptions = {
         setSelectedFilter(contextT.selectedFilter);
         if (props.mapUIsettings.isDoNotApplyCountryFromContext === false)
             setSelectedCountry(contextT.selectedCountry);
-        setDateRange(contextT.dateRange);
+            setDateRange(contextT.dateRange);
+
+         L_contextSync.stop();
     }, [
         contextT.curColorMap,
         contextT.curDatasetURL,
@@ -860,7 +930,6 @@ const baseStyle: Leaflet.PathOptions = {
         ) {
             const ff = `${filterStr}_${contextT.curMonth}`;
             if (selectedFeature !== ff) {
-                isLoadingSpinner.current = true;
                 setSelectedFeature(ff);
                 const url = apiRoutes.fetchDbData({ relationName: curDatasetname.current, feature: ff });
                 setSelectedDataset(url);
@@ -874,7 +943,6 @@ const baseStyle: Leaflet.PathOptions = {
                 if (newDatasetName !== curDatasetname.current) {
                     curDatasetname.current = newDatasetName;
                     setSelectedDatasetKey(newDatasetName);
-                    isLoadingSpinner.current = true;
                     const url = apiRoutes.fetchDbData({ relationName: newDatasetName, feature: selectedFeature });
                     setSelectedDataset(url);
                 }
@@ -895,7 +963,7 @@ const baseStyle: Leaflet.PathOptions = {
                 presenceDataURL !== contextT.curPresenceDatasetURL ||
                 sequenceMetaDataURL !== contextT.curDonutChartDataURL;
             if (needsLoading) {
-                isLoadingSpinner.current = true;
+                L_contextSync.start();
             }
             applyGlobalContext();
         }
@@ -1019,7 +1087,7 @@ const baseStyle: Leaflet.PathOptions = {
     }, [sequenceMetaData]);   
    
     useEffect(() => {
-        if(!isLoadingPresenceData) {
+        if(!isLoadingPresenceData && props.mapDataSets.isPresenceData) {
             let presDat: {geometry: [number, number], feature: string, country_name?: string, subregion_name?: string}[] = [];
             let groupedPresData: presDBdataT[] = [];
             try {
@@ -1096,8 +1164,6 @@ const baseStyle: Leaflet.PathOptions = {
         url = url.replace(/&aggregation_level=[01]/g, "");
         // Append the correct one
         url += newCountryLevel ? "&aggregation_level=0" : "&aggregation_level=1";
-
-        isLoadingSpinner.current = true;
         setPresenceDataURL(url);
 
         console.log(
@@ -1152,8 +1218,6 @@ useEffect(() => {
             return;
         }
         if(!props.mapDataSets.isSequenceMetaData){
-            isLoadingSpinner.current = false;
-            if(isLoadingSpinnerDEBUG) console.log("off Spinner: fetchCountryCounts");
             return;
         }
 
@@ -1416,7 +1480,8 @@ useEffect(() => {
 useLayerUpdateDebounce({
     curMouseEventRef: curMouseEvent,
     timerRef: layerUpdateHandlerTime,
-    isLoadingSpinnerRef: isLoadingSpinner,
+    startLoading: L_debounceLoading.start,
+    stopLoading: L_debounceLoading.stop,
     setIsUpdate: setisUpdate,
     onDebounceComplete: () => {
         presenceDrawHash.current += 1;
@@ -1424,7 +1489,7 @@ useLayerUpdateDebounce({
         setIsSettingsOpen(true);
     },
     delayOverrides: { wheel: 1500, null: 1000 },
-    deps: [dimensions, isPresData, isSequenceMetaData, map, latitude, longitude, zoom, layerOpacity, rawMosquitoData, curColorMapType],
+    deps: [dimensions, map, latitude, longitude, zoom, layerOpacity, rawMosquitoData, curColorMapType],
 });
 
 
@@ -1520,11 +1585,12 @@ function MapDrawLayer_CountryPolygons(mapData: GEOjson.FeatureCollection, map: L
 
         const clearPresenceOverlays = () => {
             d3.selectAll('[class^="svg-circles-container_"]').each(function () {
-                d3.select(this).selectAll("circle").remove();
+                d3.select(this).selectAll("g.pres-point").remove();
             });
             d3.selectAll(".leaflet-popup-pane").each(function () {
                 d3.select(this).selectAll(".custom-popup").remove();
             });
+            circlesSelectionRef.current = null;
         };
 
         const nextLayer = L.geoJSON(mapData, {
@@ -1556,8 +1622,7 @@ function MapDrawLayer_CountryPolygons(mapData: GEOjson.FeatureCollection, map: L
                             endDate: dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined,
                             aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
                         });
-                        isLoadingSpinner.current = true;
-
+                      
                         setDateRange({ from: dateRange?.from ?? min_date, to: dateRange?.to ?? max_date });
                         contextT.setDateRange({ from: dateRange?.from ?? min_date, to: dateRange?.to ?? max_date });
 
@@ -1577,18 +1642,19 @@ function MapDrawLayer_CountryPolygons(mapData: GEOjson.FeatureCollection, map: L
 
                     resetLayerStyles();
                     curPropertyNames.current = countryName;
+                    // Track and bring active layer to front with active style
+                    activeLayerRef.current = pathLayer;
+                    pathLayer.setStyle({ ...activeStyle });
                     pathLayer.bringToFront();
 
                     setTimeout(() => {
-                        isLoadingSpinner.current = false;
-                        if(isLoadingSpinnerDEBUG) console.log("off Spinner: setShowSuccessCountryDropdown");
                         setShowSuccessCountryDropdown(false);
                     }, 3000);
                 };
 
                 // Hover
                 const handleMouseMove = (event: L.LeafletMouseEvent) => {
-                    //pathLayer.bringToFront();
+                    pathLayer.bringToFront();
                     const translated =
                         feature.properties?.[`NAME_${locale}`] ??
                         feature.properties?.[`name_${locale}`] ??
@@ -1596,23 +1662,35 @@ function MapDrawLayer_CountryPolygons(mapData: GEOjson.FeatureCollection, map: L
                     hoverCountry.current = translated;
                     contextT.mouseEvent.current.country = translated;
 
+                    // Only apply hover style to non-active countries
                     if (curPropertyNames.current !== feature.properties?.name) {
                         pathLayer.setStyle({ ...hoverStyle });
+                        const el = (pathLayer as any).getElement?.();
+                        if (el) el.classList.add("leaflet-path-hover");
                     }
                 };
 
                 const handleMouseOut = () => {
-                    if (curPropertyNames.current !== feature.properties?.name) {
+                    // Restore appropriate style: activeStyle for the selected country, baseStyle for others
+                    if (curPropertyNames.current === feature.properties?.name) {
+                        pathLayer.setStyle({ ...activeStyle });
+                    } else {
                         pathLayer.setStyle({ ...baseStyle });
                     }
+                    // Remove glow class (transitions handle the slow fade-out)
+                    const el = (pathLayer as any).getElement?.();
+                    if (el) el.classList.remove("leaflet-path-hover");
                     hoverCountry.current = "";
                     isHoverCountry.current = false;
                     removeAllTooltips();
                     const svg = d3.select(map.getContainer()).select("svg");
                     svg.selectAll("rect.hover-grid-cell").remove();
                     svg.selectAll("rect.selected-grid-cell").remove();
-                    svg.selectAll("circle").remove();
                     contextT.mouseEvent.current.country = "NA";
+                    // Always bring the active (clicked) layer back to front
+                    if (activeLayerRef.current && typeof activeLayerRef.current.bringToFront === "function") {
+                        activeLayerRef.current.bringToFront();
+                    }
                 };
 
                 leafletLayer.on({
@@ -2214,6 +2292,10 @@ function MapMouseEvents(isUpdate: boolean) {
                     // important for e.g. line chart component
                     // to show the history for a feature of one grid cell
                     contextT.setMapSelectionObj(dummyFeature);
+
+                    if (mapUIsettings.inCovidDataView || mapUIsettings.isCountrySelectionDropdown) {
+                        handleResetToAllCountriesRef.current();
+                    }
                 }
 
                 // Draw the selected grid cell (non-filled yellow rectangle)
@@ -2501,9 +2583,6 @@ function LayerTransition(
             overlayElement.style.transition = `opacity ${timer}ms ease-in`;
             setTimeout(() => {
                 overlayElement.style.opacity = layerOpacity.toString(); // Fade-in after 0ms
-                isLoadingSpinner.current = false;
-               if(isLoadingSpinnerDEBUG) console.log("off Spinner: overlayElement setTimeout");
-                //setisUpdate(prev => !prev);
             }, timer);
         }
     }
@@ -2549,32 +2628,20 @@ useCanvasGridLayer({
 });
 
 MapDrawLayer_MosquitoPresenceData(presenceDrawHash.current);
+MapDrawLayer_CovidPresenceData(presenceDrawHash.current);
 
 function MapDrawLayer_MosquitoPresenceData(presenceDrawHash: number) {
     const layerTansitionTime = 500;
     const canvasRef = useRef<HTMLCanvasElement | null>(null); // Reuse canvas instead of recreating
     const overlayRef = useRef<L.ImageOverlay | null>(null);
-    const debug = false;
-
 
     useEffect(() => {
-        if(!props.mapDataSets.isPresenceData){
-            isLoadingSpinner.current = false;
-            if(isLoadingSpinnerDEBUG) console.log("off Spinner: useEffect - props.mapDataSets.isPresenceData");
-            return;
-            
-        }
-        
-    });
-
-    useEffect(() => {
-        // Don't render if data is loading
-        if (!map || isLoadingPresenceData) return;
+        // Don't render if data is loading, we are in Covid view, or presence data is disabled
+        if (!map || isLoadingPresenceData || mapUIsettings.inCovidDataView || !mapUIsettings.isPresenceData) return;
 
         function Render(){
             // Don't render if map is not initialized
             if (!map) return;
-            //isLoadingSpinner.current = true;
 
             // Reuse existing canvas if available
             let canvas = canvasRef.current;
@@ -2595,155 +2662,37 @@ function MapDrawLayer_MosquitoPresenceData(presenceDrawHash: number) {
 
             context.clearRect(0, 0, canvas.width, canvas.height);
             
-
-            const dotSizeConstant= 4; // Adjust dot size based on zoom level
+            const dotSizeConstant = 4;
 
             if(isPresData) {
                 if (!map) return;
-                //map.fitWorld();
+                L_presenceLayer.start();
 
-                // make sure svg container is aligned to MapContainer
-                let mapSize = map.getSize();
-                const container = d3.select(map.getPanes().overlayPane);
-                let svg = container.select('.svg-circles-container_' + props.chartName);
-                if (svg.empty()) {
-                    const svg = d3.select(map.getPanes().overlayPane).append('svg')
-                    .attr("class", "svg-circles-container_" + props.chartName)
-                    .attr("width", mapSize.x)
-                    .attr("height", mapSize.y)
-                    .style("width", `${mapSize.x}px`)
-                    .style("height", `${mapSize.y}px`)
-                    .style("position", "absolute")
-                    .style("top", 0)
-                    .style("left", 0)
-                    .style("z-index", 900)
-                    .style("pointer-events", "none")
-                    .style("overflow", "visible");
-                }
-
-                // Use memoized data structures to avoid repeated sorting
                 const sortedPresDataLocal = sortedPresDataMemo;
-                // Canvas branch: draw all presence points on canvas when not in Covid view
-                if (!mapUIsettings.inCovidDataView) {
-                    for (const d of sortedPresDataLocal) {
-                        if (!d.geometry) continue;
-                        let coords;
-                        if (L) {
-                            coords = d.latLng
-                                ? map.latLngToContainerPoint(L.latLng(d.latLng[0], d.latLng[1]))
-                                : map.latLngToContainerPoint(L.latLng(d.geometry[0], d.geometry[1]));
-                        } else {
-                            return;
-                        }
-                        const x1 = coords.x;
-                        const y1 = coords.y;
-                        context.fillStyle = curColorMapType !="interpolateInferno" ? 
-                        (props.mapUIsettings.presenceDataColor || "rgb(239, 23, 23)") : "rgb(239, 23, 23)";
-                        context.beginPath();
-                        context.arc(x1, y1, screenDistanceOneKM.current + dotSizeConstant, 0, Math.PI * 2);
-                        context.fill();
-                        context.fillStyle = "black";
-                        context.beginPath();
-                        context.arc(x1, y1, (screenDistanceOneKM.current + dotSizeConstant) * 0.2, 0, Math.PI * 2);
-                        context.fill();
+                for (const d of sortedPresDataLocal) {
+                    if (!d.geometry) continue;
+                    let coords;
+                    if (L) {
+                        coords = d.latLng
+                            ? map.latLngToContainerPoint(L.latLng(d.latLng[0], d.latLng[1]))
+                            : map.latLngToContainerPoint(L.latLng(d.geometry[0], d.geometry[1]));
+                    } else {
+                        return;
                     }
-                } else {
-                    
-                    // SVG branch: use enter/update/exit with memoized max-per-country
-                    const max_feature_value_per_country = maxFeaturePerCountryMemo;
-                    const filtered = sortedPresDataLocal.filter(d => d.geometry && (zoom > zoomBreakpoint || (d.country_name && Number(d.feature) === max_feature_value_per_country[d.country_name])));
-                    // create or update svg container
-                    const svgContainer = d3.select(map.getPanes().overlayPane);
-                    let svg = svgContainer.select<SVGSVGElement>('.svg-circles-container_' + props.chartName);
-                    if (svg.empty()) {
-                        svg = svgContainer.append<SVGSVGElement>('svg')
-                            .attr('class', 'svg-circles-container_' + props.chartName)
-                            .style('position', 'absolute')
-                            .style('top', 0)
-                            .style('left', 0)
-                            .style('z-index', '900')
-                            .style('pointer-events', 'none')
-                            .style('overflow', 'visible');
-                    }
-                    svg.attr('width', mapSize.x).attr('height', mapSize.y)
-                        .style('width', `${mapSize.x}px`).style('height', `${mapSize.y}px`);
-
-                    const keyFn = (d: any) => `${d.geometry[0]}_${d.geometry[1]}_${d.feature}`;
-                    const groups = svg.selectAll('g.pres-point').data(filtered as any, keyFn);
-
-                    // exit
-                    groups.exit().remove();
-
-                    // enter
-                    const groupsEnter = groups.enter().append('g').attr('class', 'pres-point').style('pointer-events', 'visible');
-                    groupsEnter.append('circle').attr('class', 'outer');
-                    groupsEnter.append('circle').attr('class', 'inner');
-
-                    // update + enter
-                    const merged = groupsEnter.merge(groups as any);
-                    merged.each(function(d: any) {
-                        const g = d3.select(this);
-                        const lat = d.geometry[0];
-                        const lng = d.geometry[1];
-                        const coords = L ? map.latLngToLayerPoint(new L.LatLng(lat, lng)) : { x: 0, y: 0 };
-                        const x1 = coords.x;
-                        const y1 = coords.y;
-                        const outerRadius = screenDistanceOneKM.current + 5;
-                        const innerRadius = outerRadius * 0.2;
-
-                        g.select('circle.outer')
-                            .attr('cx', x1)
-                            .attr('cy', y1)
-                            .attr('r', radiusScale(Number(d.feature)) * outerRadius)
-                            .attr('fill', d3.color(colorMap(Number(d.feature)))?.copy({ opacity: layerOpacity })?.toString() || 'rgba(0,0,0,0)')
-                            .attr('stroke', '#D3D3D3')
-                            .attr('data-lat', lat)
-                            .attr('data-lng', lng)
-                            .attr('feature-value', d.feature)
-                            .style('cursor', 'pointer');
-
-                        g.select('circle.inner')
-                            .attr('cx', x1)
-                            .attr('cy', y1)
-                            .attr('r', innerRadius)
-                            .attr('fill', 'black')
-                            .attr('data-lat', lat)
-                            .attr('data-lng', lng);
-                    });
-
-                    merged.select('circle.outer')
-                        .on('mouseover', function() { (this as HTMLElement).style.cursor = 'pointer'; })
-                        .on('mouseout', function() { (this as HTMLElement).style.cursor = 'default'; })
-                        .on('click', function(event: any, d: any) {
-                            event.stopPropagation();
-                            const latlng = L ? L.latLng(+d.geometry[0], +d.geometry[1]) : { lat: 0, lng: 0 };
-                            const content = `
-                                    <div class="p-2 rounded-lg bg-indigo-700 text-white shadow">
-                                        <h1 class="m-0 text-xl font-bold text-shadow">
-                                        ${new Intl.NumberFormat('de-DE').format(Number(d.feature))}
-                                        </h1>
-                                        <h2 style="margin: 0; font-size: 13px; font-weight: 600;">${contextT.curFeature}<h2>
-                                        <p style="margin-top:15px;margin-bottom:2px;" class="text-base"><b>${t.rich('covid19_world_data.country', {...t_richConfig})}:</b> ${d.country_name != null ? d.country_name : contextT.mouseEvent.current.country}</p>
-                                        <p style="margin:0px 0;margin-bottom:15px;" class="text-base"> ${d.subregion_name != 'NULL' ? '<b>'+ t.rich('covid19_world_data.subregion', {...t_richConfig})+': </b>' + d.subregion_name : ''}</p>
-                                        <p style="margin: 2px 0;"><b>${t.rich('covid19_world_data.time_range', {...t_richConfig})}:  </b> ${dateRange?.from ? format(dateRange.from, "dd.MM.yyyy") : "N/A"} - ${dateRange?.to ? format(dateRange.to, "dd.MM.yyyy") : "N/A"}</p>
-                                    </div>`;
-                            setTimeout(() => {
-                                const tooltip = L ? L.popup({ className: 'custom-popup' }) : null;
-                                if (!tooltip) return;
-                                tooltip
-                                    .setLatLng(latlng)
-                                    .setContent(content)
-                                    .openOn(map)
-                                    .addTo(map);
-                                setTimeout(() => { map.removeLayer(tooltip); }, 10000);
-                            }, 0);
-                        });
-                   
-                };
+                    const x1 = coords.x;
+                    const y1 = coords.y;
+                    context.fillStyle = curColorMapType !="interpolateInferno" ? 
+                    (props.mapUIsettings.presenceDataColor || "rgb(239, 23, 23)") : "rgb(239, 23, 23)";
+                    context.beginPath();
+                    context.arc(x1, y1, screenDistanceOneKM.current + dotSizeConstant, 0, Math.PI * 2);
+                    context.fill();
+                    context.fillStyle = "black";
+                    context.beginPath();
+                    context.arc(x1, y1, (screenDistanceOneKM.current + dotSizeConstant) * 0.2, 0, Math.PI * 2);
+                    context.fill();
+                }
             }
             const imageUrl = canvas.toDataURL();
-            isLoadingSpinner.current = false;
-          
 
             LayerTransition(
                 map,
@@ -2752,18 +2701,157 @@ function MapDrawLayer_MosquitoPresenceData(presenceDrawHash: number) {
                 0.9,
                 overlayRef
             );
-
-            //isLoadingSpinner.current = false;
-            //if(isLoadingSpinnerDEBUG) console.log("off Spinner: overlayRef setTimeout");
-            prev_presenceDrawHash.current = presenceDrawHash; // Update the previous hash to the current one
-            overlayRef.current?.setZIndex(300); // Set a high z-index to ensure it appears above other layers
+            setTimeout(() => { L_presenceLayer.stop(); }, layerTansitionTime*1.5);
+             
+            prev_presenceDrawHash.current = presenceDrawHash;
+            overlayRef.current?.setZIndex(300);
             circlesSelectionRef.current = null;
-        } // Render end
+        }
 
         Render();
-    }, [presenceDrawHash, dimensions, presData]);
 
-    return overlayRef.current; // Return the canvas reference for further use
+        return () => {
+            if (map && overlayRef.current) {
+                if (map.hasLayer(overlayRef.current)) {
+                    map.removeLayer(overlayRef.current);
+                }
+                overlayRef.current = null;
+            }
+        };
+    }, [presenceDrawHash, dimensions, presData, isPresData]);
+
+    return overlayRef.current;
+}
+
+function MapDrawLayer_CovidPresenceData(presenceDrawHash: number) {
+    const layerTansitionTime = 500;
+
+    useEffect(() => {
+        // Don't render if data is loading or we are not in Covid view
+        if (!map || isLoadingPresenceData || !mapUIsettings.inCovidDataView) return;
+
+        function Render(){
+            if (!map) return;
+
+            if(isPresData) {
+                if (!map) return;
+                L_presenceLayerCovid.start();
+
+                let mapSize = map.getSize();
+
+                const sortedPresDataLocal = sortedPresDataMemo;
+                const max_feature_value_per_country = maxFeaturePerCountryMemo;
+                const filtered = sortedPresDataLocal.filter(d => d.geometry && (zoom > zoomBreakpoint || (d.country_name && Number(d.feature) === max_feature_value_per_country[d.country_name])));
+                
+                const svgContainer = d3.select(map.getPanes().overlayPane);
+                let svgUpdate = svgContainer.select<SVGSVGElement>('.svg-circles-container_' + props.chartName);
+                if (svgUpdate.empty()) {
+                    svgUpdate = svgContainer.append<SVGSVGElement>('svg')
+                        .attr('class', 'svg-circles-container_' + props.chartName)
+                        .style('position', 'absolute')
+                        .style('top', 0)
+                        .style('left', 0)
+                        .style('z-index', '900')
+                        .style('pointer-events', 'none')
+                        .style('overflow', 'visible');
+                }
+                svgUpdate.attr('width', mapSize.x).attr('height', mapSize.y)
+                    .style('width', `${mapSize.x}px`).style('height', `${mapSize.y}px`);
+
+                const keyFn = (d: any) => `${d.geometry[0]}_${d.geometry[1]}_${d.feature}`;
+                const groups = svgUpdate.selectAll('g.pres-point').data(filtered as any, keyFn);
+
+                // exit
+                groups.exit().remove();
+
+                // enter
+                const groupsEnter = groups.enter().append('g').attr('class', 'pres-point').style('pointer-events', 'visible');
+                groupsEnter.append('circle').attr('class', 'outer');
+                groupsEnter.append('circle').attr('class', 'inner');
+
+                // update + enter
+                const merged = groupsEnter.merge(groups as any);
+                merged.each(function(d: any) {
+                    const g = d3.select(this);
+                    const lat = d.geometry[0];
+                    const lng = d.geometry[1];
+                    const coords = L ? map.latLngToLayerPoint(new L.LatLng(lat, lng)) : { x: 0, y: 0 };
+                    const x1 = coords.x;
+                    const y1 = coords.y;
+                    const outerRadius = screenDistanceOneKM.current + 5;
+                    const innerRadius = outerRadius * 0.2;
+
+                    g.select('circle.outer')
+                        .attr('cx', x1)
+                        .attr('cy', y1)
+                        .attr('r', radiusScale(Number(d.feature)) * outerRadius)
+                        .attr('fill', d3.color(colorMap(Number(d.feature)))?.copy({ opacity: layerOpacity })?.toString() || 'rgba(0,0,0,0)')
+                        .attr('stroke', '#D3D3D3')
+                        .attr('data-lat', lat)
+                        .attr('data-lng', lng)
+                        .attr('feature-value', d.feature)
+                        .style('cursor', 'pointer');
+
+                    g.select('circle.inner')
+                        .attr('cx', x1)
+                        .attr('cy', y1)
+                        .attr('r', innerRadius)
+                        .attr('fill', 'black')
+                        .attr('data-lat', lat)
+                        .attr('data-lng', lng);
+                });
+
+                merged.select('circle.outer')
+                    .on('mouseover', function() { (this as HTMLElement).style.cursor = 'pointer'; })
+                    .on('mouseout', function() { (this as HTMLElement).style.cursor = 'default'; })
+                    .on('click', function(event: any, d: any) {
+                        event.stopPropagation();
+                        const latlng = L ? L.latLng(+d.geometry[0], +d.geometry[1]) : { lat: 0, lng: 0 };
+                        const content = `
+                                <div class="p-2 rounded-lg bg-indigo-700 text-white shadow">
+                                    <h1 class="m-0 text-xl font-bold text-shadow">
+                                    ${new Intl.NumberFormat('de-DE').format(Number(d.feature))}
+                                    </h1>
+                                    <h2 style="margin: 0; font-size: 13px; font-weight: 600;">${contextT.curFeature}<h2>
+                                    <p style="margin-top:15px;margin-bottom:2px;" class="text-base"><b>${t.rich('covid19_world_data.country', {...t_richConfig})}:</b> ${d.country_name != null ? d.country_name : contextT.mouseEvent.current.country}</p>
+                                    <p style="margin:0px 0;margin-bottom:15px;" class="text-base"> ${d.subregion_name != 'NULL' ? '<b>'+ t.rich('covid19_world_data.subregion', {...t_richConfig})+': </b>' + d.subregion_name : ''}</p>
+                                    <p style="margin: 2px 0;"><b>${t.rich('covid19_world_data.time_range', {...t_richConfig})}:  </b> ${dateRange?.from ? format(dateRange.from, "dd.MM.yyyy") : "N/A"} - ${dateRange?.to ? format(dateRange.to, "dd.MM.yyyy") : "N/A"}</p>
+                                </div>`;
+                        setTimeout(() => {
+                            const tooltip = L ? L.popup({ className: 'custom-popup' }) : null;
+                            if (!tooltip) return;
+                            tooltip
+                                .setLatLng(latlng)
+                                .setContent(content)
+                                .openOn(map)
+                                .addTo(map);
+                            setTimeout(() => { map.removeLayer(tooltip); }, 10000);
+                        }, 0);
+                    });
+            } else {
+                if (map) {
+                    d3.select(map.getPanes().overlayPane)
+                        .selectAll('.svg-circles-container_' + props.chartName)
+                        .selectAll('g.pres-point')
+                        .remove();
+                }
+            }
+
+            prev_presenceDrawHash.current = presenceDrawHash;
+            L_presenceLayerCovid.stop()
+            circlesSelectionRef.current = null;
+        }
+
+        Render();
+
+        return () => {
+            if (map) {
+                d3.select(map.getPanes().overlayPane)
+                    .selectAll('.svg-circles-container_' + props.chartName)
+                    .remove();
+            }
+        };
+    }, [presenceDrawHash, dimensions, presData, isPresData]);
 }
 
 
@@ -2805,7 +2893,6 @@ function MapDrawLayer_SequenceMetadata(countryCounts: { [key: string]: any }) {
                 inner.attr("transform", `scale(${s})`);
             });
         }
-        isLoadingSpinner.current = false;
     }
 
 
@@ -3164,9 +3251,11 @@ useEffect(() => {
     
 
 
-   function UI_elementStyler(colSpan: number = 1){
-        return { className: `text-sm m-1 p-1 border row-span-2 bg-white/75 z-10 rounded-lg shadow-md`, style: { gridColumn: `span ${colSpan} / span ${colSpan}` } };
-   }
+    const colWidth = 285; // Set the desired column width here in pixels
+
+    function UI_elementStyler(colSpan: number = 1){
+        return { className: `text-sm p-2 border row-span-2 bg-white/75 z-10 rounded-lg shadow-md`, style: { gridColumn: `span ${colSpan} / span ${colSpan}` } };
+    }
 
 
   
@@ -3203,10 +3292,10 @@ useEffect(() => {
 // }, []);
 
 
-
    // the page
     return (
         <>
+  
        
 <div className="@container relative size-full" >
     <div className="absolute top-[-35px] right-14 z-600">
@@ -3224,13 +3313,16 @@ useEffect(() => {
     <SizeHook element={element} sizeRef={sizeRef} setSize={setSizes}/>
 
       <div
-        className={`absolute w-full mt-1 ml-1 pr-2 grid grid-cols-1 @xs:grid-cols-1 @sm:grid-cols-1 @lg:grid-cols-2 @2xl:grid-cols-2 @4xl:grid-cols-3 z-30 max-w-[1325px]   ${
+        className={`absolute w-full mt-1 ml-1 pr-2 grid gap-2 z-30 max-w-full   ${
             props.mapUIsettings.isSettingsBlendAnimation
                 ? (isSettingsOpen
                     ? "transition-all delay-1000 duration-1000 opacity-100 scale-100 z-30"
                     : "transition-all duration-500 opacity-0 scale-100")
                 : ""
         }`}
+        style={{
+            gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${colWidth}px), ${colWidth}px))`,
+        }}
     >
     {(props.mapUIsettings.isSettingsBlendAnimation ? (isSettingsOpen && isSettingsOpenFixed) : isSettingsOpenFixed) && (
         
@@ -3295,11 +3387,6 @@ useEffect(() => {
                     endDate: mapUIsettings.inCovidDataView && (dateRange && dateRange.from && dateRange.to) ? format(dateRange.to, "yyyy-MM-dd") : undefined,
                 });
 
-                setTimeout(() => {
-                    isLoadingSpinner.current = true;
-                    console.log("isLoadingSpinner.current = true");
-                    setisUpdate(prev => !prev);
-                }, 1000);
 
                 setSelectedDataset(url);
                 contextT.setCurDatasetURL(url);
@@ -3369,7 +3456,6 @@ useEffect(() => {
                     endDate: mapUIsettings.inCovidDataView && (dateRange && dateRange.from && dateRange.to) ? format(dateRange.to, "yyyy-MM-dd") : undefined,
                     aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
                 });
-                isLoadingSpinner.current = true;
 
                 // get month from selection when feature includes a number after an underscore
                 const curMonthNumber = value.split("_").length > 1 && !value.includes("prob") ? parseInt(value.split("_")[1]) : -1;
@@ -3377,12 +3463,8 @@ useEffect(() => {
                     contextT.setCurMonth(curMonthNumber);
                 }
                     
-             
-
                 setSelectedDataset(url);
                 contextT.setCurDatasetURL(url);
-
-                
 
                 setSelectedFeature(value);
                 contextT.setCurFeature(value);
@@ -3502,11 +3584,8 @@ useEffect(() => {
                 id="isPresData-checkbox"
                 checked={isPresData}
                 onCheckedChange={(checked: boolean) => {
-                    isLoadingSpinner.current = true;
-
                     contextT.setIsPresenceData(checked);
                     setIsPresData(checked)
-
                 }}
             />
         </div>
@@ -3600,7 +3679,6 @@ useEffect(() => {
                         id="isSequenceMetaData-checkbox"
                         checked={isSequenceMetaData}
                         onCheckedChange={(e) => {
-                            isLoadingSpinner.current = true;
                             const checked = e as boolean;
                             contextT.setIsSequenceMetaData(checked);
                             setIsSequenceMetaData(checked);
@@ -3649,7 +3727,6 @@ useEffect(() => {
                         </label>
                         <Select value={cur_Sorgansim} onValueChange={(value) => {
                             let url = apiRoutes.fetchDbData({ relationName: contextT.curDonutChartDatasetName, feature: geoAssignmentColumn, task: "getCount", filterBy: "'" + sequenceColumnForDonut + "','date'", filterValue: "'" + value + "','" + cur_SYear + "'" });
-                            isLoadingSpinner.current = true;
                             setCur_SOrgansim(value);
                             contextT.setCurSOrgansim(value);
                             setTimeout(() => {
@@ -3701,7 +3778,6 @@ useEffect(() => {
                         </label>
                         <Select value={cur_SYear} onValueChange={(value) => {
                             let url = apiRoutes.fetchDbData({ relationName: contextT.curDonutChartDatasetName, feature: geoAssignmentColumn, task: "getCount", filterBy: "'" + sequenceColumnForDonut + "','date'", filterValue: "'" + cur_Sorgansim + "','" + value + "'" });
-                            isLoadingSpinner.current = true;
                             setCur_SYear(value);
                             contextT.setCurSyear(value);
                             setTimeout(() => {
@@ -3850,9 +3926,9 @@ useEffect(() => {
                     endDate: mapUIsettings.inCovidDataView && (dateRange && dateRange.from && dateRange.to) ? format(dateRange.to, "yyyy-MM-dd") : undefined,
                     aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
                 });
-                isLoadingSpinner.current = true;
 
                 setDateRange(dateRange ? dateRange : {from: min_date, to: max_date});
+                contextT.setDateRange(dateRange ? dateRange : {from: min_date, to: max_date});
 
                 setSelectedCountry(value);
                 contextT.setSelectedCountry(value);
@@ -3860,7 +3936,6 @@ useEffect(() => {
                 contextT.setCurPresenceDatasetURL(url);
                 contextT.setIsPresenceData(true);
                 setIsPresData(true);
-                isLoadingSpinner.current = true;
                 setPresenceDataURL(url);
                 setShowSuccessCountryDropdown(true);
 
@@ -3943,8 +4018,6 @@ useEffect(() => {
                 }
 
                 setTimeout(() => {
-                    isLoadingSpinner.current = false;
-                    if(isLoadingSpinnerDEBUG) console.log("off Spinner: CountryDropdown setTimeout");
                     setShowSuccessCountryDropdown(false);
                 }, 3000);
 
@@ -3965,83 +4038,48 @@ useEffect(() => {
         </Select>
         )}
 
-    <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 mt-2">
+    {/*<div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 mt-2">
         <Button
                 className="truncate w-full  min-w-0 px-4 py-2 mb-2  bg-blue-500 text-white rounded text-sm whitespace-nowrap overflow-hidden text-ellipsis"
-                onClick={ () => {
-                    isLoadingSpinner.current = true;
-
-                    setSelectedCountry("");
-                    contextT.setSelectedCountry("");
-
-                    let url = apiRoutes.fetchDbData({
-                        relationName: curDatasetname.current,
-                        feature: contextT.curFeature,
-                        startDate: dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined,
-                        endDate: dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined,
-                        aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
-                    });
-        
-                    contextT.setCurDatasetURL(url);
-                    contextT.setCurPresenceDatasetURL(url);
-                    contextT.setIsPresenceData(true);
-                    setIsPresData(true);
-                    isLoadingSpinner.current = true;
-                    setPresenceDataURL(url);
-                    setShowSuccessCountryDropdown(true);
-    
-    
-                    setTimeout(() => {
-                        isLoadingSpinner.current = false;
-                        if(isLoadingSpinnerDEBUG) console.log("off Spinner: CountryDropdown 5000ms setTimeout");
-                        setShowSuccessCountryDropdown(false);
-                    }, 5000);
-
-                    isLoadingSpinner.current = false;
-                    if(isLoadingSpinnerDEBUG) console.log("off Spinner: CountryDropdown setTimeout");
-                }}
+                onClick={handleResetToAllCountries}
             >
             <span className="block lg:hidden">{t.rich('covid19_world_data.reset_to_all_countries_short', {...t_richConfig})}</span>
             <span className="hidden lg:block">{t.rich('covid19_world_data.reset_to_all_countries', {...t_richConfig})}</span>
         </Button>
         </div>
+    */}
 
-        {showSuccessCountryDropdown && <div>
-            <div className="pointer-events-auto">
-            <AlertSuccess/>
-            </div>
-        </div>}
-
-        </div>)
+         </div>)
         }
+        
 
 
     {mapUIsettings.isDatePicker && (
-        <div {...UI_elementStyler(8)}   > 
+        <div {...UI_elementStyler(2)}   > 
             <label htmlFor="dataset-select">
             {t.rich('time_range', {...t_richConfig})}:
             </label>
-            <div className="flex flex-col lg:flex-row items-start lg:items-center space-y-2 lg:space-y-0 lg:space-x-2 mt-2 min-w-0">
+            <div className="flex w-full flex-row items-start space-y-2 lg:space-y-0 lg:space-x-2 mt-2 min-w-0">
             <Popover>
-            <PopoverTrigger asChild>
-                <Button
-                variant="outline"
-                data-empty={!dateRange}
-                className="data-[empty=true]:text-muted-foreground w-full justify-start text-left font-normal border-3 border-purple-800 focus-visible:ring-3 focus-visible:ring-purple-800
-                truncate min-w-0 px-4 rounded text-sm whitespace-nowrap overflow-hidden text-ellipsis" 
-                >
-                <CalendarIcon className="mr-0.5 w-4 h-4  shrink-0"/>
-                {dateRange?.from
-                    ? (dateRange.to 
-                        ? `${format(dateRange.from, "PP")} - ${format(dateRange.to, "PP")}`
-                        : `${format(dateRange.from, "PP")} - ...`
-                      )
-                    : <span>{t.rich('select_time_span', {...t_richConfig})}</span>}
-                </Button>
-            </PopoverTrigger>
+                <PopoverTrigger asChild>
+                    <Button
+                    variant="outline"
+                    data-empty={!dateRange}
+                    className="data-[empty=true]:text-muted-foreground w-[60%] justify-start text-left font-normal border-3 border-purple-800 focus-visible:ring-3 focus-visible:ring-purple-800
+                    truncate min-w-0 px-4 rounded text-sm whitespace-nowrap overflow-hidden text-ellipsis" 
+                    >
+                    <CalendarIcon className="mr-0.5 w-4 h-4  shrink-0"/>
+                    {dateRange?.from
+                        ? (dateRange.to 
+                            ? `${format(dateRange.from, "PP")} - ${format(dateRange.to, "PP")}`
+                            : `${format(dateRange.from, "PP")} - ...`
+                        )
+                        : <span>{t.rich('select_time_span', {...t_richConfig})}</span>}
+                    </Button>
+                </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
                 <div className="flex flex-col md:flex-row bg-white dark:bg-slate-950 rounded-md overflow-hidden">
-                    <div className="flex flex-col p-3 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800">
+                    <div className="flex flex-col p-3 border-b w-full md:border-b-0 md:border-r border-slate-200 dark:border-slate-800">
                         <div className="px-3 pb-2 text-[10px] font-bold text-purple-800 dark:text-purple-400 uppercase tracking-widest flex items-center opacity-70">
                              {t.rich('covid19_world_data.time_range', {...t_richConfig})} (From)
                         </div>
@@ -4068,7 +4106,7 @@ useEffect(() => {
                             endMonth={max_date}
                         />
                     </div>
-                    <div className="flex flex-col p-3">
+                    <div className="flex flex-col p-3 w-full">
                         <div className="px-3 pb-2 text-[10px] font-bold text-purple-800 dark:text-purple-400 uppercase tracking-widest flex items-center opacity-70">
                              {t.rich('covid19_world_data.time_range', {...t_richConfig})} (To)
                         </div>
@@ -4099,10 +4137,9 @@ useEffect(() => {
             </PopoverContent>
             </Popover>
             <Button
-                className="mt-0 bg-purple-800 truncate w-full min-w-0 px-4 py-2 text-white p-1 rounded text-sm whitespace-nowrap overflow-hidden text-ellipsis"
+                className="mt-0 bg-purple-800 w-[40%] truncate  min-w-0 px-4 py-2 text-white p-1 rounded text-sm whitespace-nowrap overflow-hidden text-ellipsis"
                 onClick={ () => {
-                    isLoadingSpinner.current = true;
-                    
+                                   
                     let url = apiRoutes.fetchDbData({
                         relationName: curDatasetname.current,
                         feature: selectedFeature || contextT.curFeature,
@@ -4125,8 +4162,6 @@ useEffect(() => {
                     }, 4000);
 
                     setTimeout(() => {
-                        isLoadingSpinner.current = false;
-                        if(isLoadingSpinnerDEBUG) console.log("off Spinner: TimerangeDropdown 5000ms setTimeout");
                         setShowSuccesTimerangeDropdown(false);
                     }, 5000);
 
@@ -4138,12 +4173,11 @@ useEffect(() => {
 
             </div>
 
-            <div className="flex flex-col lg:flex-row items-start lg:items-center space-y-2 lg:space-y-0 lg:space-x-2 mt-2 min-w-0">
+            <div className="flex flex-row items-start items-center space-y-2 pr-2 mt-2 ">
             <Button
-                  className="truncate w-full min-w-0 lg:w-2/3 px-4 py-2 text-white rounded text-sm mb-2"
+                  className="truncate w-[60%] px-4 py-2 text-white rounded text-sm"
                 onClick={ () => {
-                    isLoadingSpinner.current = true;
-                    
+                             
                     let url = apiRoutes.fetchDbData({
                         relationName: curDatasetname.current,
                         feature: selectedFeature || contextT.curFeature,
@@ -4168,8 +4202,6 @@ useEffect(() => {
                     }, 2000);
 
                     setTimeout(() => {
-                        isLoadingSpinner.current = false;
-                        if(isLoadingSpinnerDEBUG) console.log("off Spinner: TimerangeDropdown 5000ms setTimeout");
                         setShowSuccesTimerangeDropdown(false);
                     }, 5000);
 
@@ -4178,7 +4210,7 @@ useEffect(() => {
             <span className="block lg:hidden">{t.rich('covid19_world_data.complete_data_short', {...t_richConfig})}</span>
             <span className="hidden lg:block">{t.rich('covid19_world_data.complete_data', {...t_richConfig})}</span>
             </Button>
-
+{/*
             <Button
                 className="truncate w-full min-w-0 px-4 py-2 text-white p-1 rounded text-sm whitespace-nowrap overflow-hidden text-ellipsis bg-blue-500 mb-2"
                 onClick={ () => {
@@ -4244,16 +4276,11 @@ useEffect(() => {
             }}>
             {t.rich('covid19_world_data.clear_map', {...t_richConfig})}
             </Button>
-
+    */}
             </div>
-            {showSuccessTimerangeDropdown && <div>
-            <div className="pointer-events-auto">
-            <AlertSuccess/>
-            </div>
-        </div>}
-         
-        </div>)
+         </div>)
         }
+        
 
 
          {mapUIsettings.isAutoHideSettingsToggle && (
@@ -4265,7 +4292,6 @@ useEffect(() => {
                     id="isAutoHideSettings-checkbox"
                     defaultChecked={props.mapUIsettings.isSettingsBlendAnimation}
                     onCheckedChange={(e) => {
-                        isLoadingSpinner.current = true;
                         const checked = e as boolean;
                         props.mapUIsettings.isSettingsBlendAnimation = checked;
                         return checked;
@@ -4292,8 +4318,6 @@ useEffect(() => {
                                 id="isPresData-checkbox-1"
                                 defaultChecked={isCountryLevelData}
                                 onCheckedChange={(checked: boolean) => {
-                                    isLoadingSpinner.current = true;
-
                                     contextT.setIsCountryLevelData(checked);
                                     setIsCountryLevelData(checked);
 
@@ -4322,9 +4346,10 @@ useEffect(() => {
                                                 d3.selectAll('[class^="svg-circles-container_"]')
                                                 .each(function () {
                                                     d3.select(this)
-                                                        .selectAll('circle')
+                                                        .selectAll('g.pres-point')
                                                         .remove();
                                                     });
+                                                circlesSelectionRef.current = null;
                                 
                                                     d3.selectAll('.leaflet-popup-pane')
                                                     .each(function () {
@@ -4344,10 +4369,6 @@ useEffect(() => {
                                             }
                                         }
                                     }
-
-                                    
-                                    isLoadingSpinner.current = false;
-                                    if(isLoadingSpinnerDEBUG) console.log("off Spinner: country_level setTimeout");
                                 }}
                             />
                             <span className="ml-2">{t.rich('covid19_world_data.country_level', {...t_richConfig})}</span>
@@ -4358,7 +4379,6 @@ useEffect(() => {
                                 id="isPresData-checkbox-2"
                                 defaultChecked={isSubregionLevelData}
                                 onCheckedChange={(checked: boolean) => {
-                                    isLoadingSpinner.current = true;
 
                                     contextT.setIsSubregionLevelData(checked);
                                     setIsSubregionLevelData(checked);
@@ -4387,9 +4407,10 @@ useEffect(() => {
                                                 d3.selectAll('[class^="svg-circles-container_"]')
                                                 .each(function () {
                                                     d3.select(this)
-                                                        .selectAll('circle')
+                                                        .selectAll('g.pres-point')
                                                         .remove();
                                                     });
+                                                circlesSelectionRef.current = null;
                                 
                                                     d3.selectAll('.leaflet-popup-pane')
                                                     .each(function () {
@@ -4410,11 +4431,6 @@ useEffect(() => {
 
                                         }
                                     }
-                                    
-                                    // setTimeout(() => {
-                                        isLoadingSpinner.current = false;
-                                        if(isLoadingSpinnerDEBUG) console.log("off Spinner: subregion_level setTimeout");
-                                    //}, 1000);
                                 }}
                             />
                             <span className="ml-2">{t.rich('covid19_world_data.subregion_level', {...t_richConfig})}</span>
@@ -4434,7 +4450,7 @@ useEffect(() => {
 
         
 
-    {isLoadingSpinner.current && (<LoadingSpinner  />)}
+    <LoadingSpinnerAnimation  />
     <div ref={divRef} className='flex justify-center items-center size-full'>
     <svg id={chart} className=' w-full h-full'></svg>
 
@@ -4483,6 +4499,22 @@ useEffect(() => {
                 barWidth={barWidth}
                 isVisible={mapUIsettings.isColorMapLegend}
             />
+        </div>
+    )}
+
+    {(showSuccessCountryDropdown || showSuccessTimerangeDropdown) && (
+        <div
+            style={{
+                position: "absolute",
+                left: legendDistanceToMapBorderX ,
+                bottom: legendDistanceToMapBorderY + scaleLegDims.height + 5,
+                zIndex: 1000,
+                pointerEvents: "auto",
+                maxWidth: "350px",
+            }}
+            className="animate-in fade-in slide-in-from-bottom-2 duration-300"
+        >
+            <AlertSuccess />
         </div>
     )}
    

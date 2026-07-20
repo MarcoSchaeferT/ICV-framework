@@ -1,7 +1,8 @@
 import { Locale } from "next-intl";
 import { BarChart3, Leaf, ArrowLeftRight, Cloud, ChartSpline } from "lucide-react"
 import { MosquitoIcon, VirusIcon } from "../messages/reactIcons"
-import { GreekTemple, AntibodyIcon, LocationIcon } from "../messages/reactIcons";
+import { GreekTemple, AntibodyIcon, LocationIcon, Globe } from "../messages/reactIcons";
+import {ReportColumns} from "iconoir-react";
 
 interface ShowcaseItem {
   title: string
@@ -13,13 +14,6 @@ interface ShowcaseItem {
 
 export const showCasesList: Record<Locale, ShowcaseItem[]> = {
   en: [
-    {
-      title: "Historical COVID-Data Germany",
-      description: "Discover the historical trends during the COVID-19 pandemic in Germany",
-      backgroundImage: "/showCases/historical_data_covid.png",
-      icon: <GreekTemple  />,
-      link: "/home/showCases/Historical_Data_COVID",
-    },
     {
       title: "Suitable Mosquito Habitats",
       description: "Investigate mosquito habitat suitability predictions for different years and species",
@@ -61,16 +55,23 @@ export const showCasesList: Record<Locale, ShowcaseItem[]> = {
       backgroundImage: "/showCases/uncertainty_quantification.png",
       icon: <ChartSpline  />,
       link: "/home/showCases/Uncertainty_Vis",
+    },
+     {
+      title: "Historical COVID-Data Germany Dashboard",
+      description: "Discover historical data of the COVID-19 pandemic in Germany",
+      backgroundImage: "/showCases/historical_data_covid.png",
+      icon: <ReportColumns  />,
+      link: "/covidDashboard",
+    },
+     {
+      title: "Historical COVID-Data Worldwide",
+      description: "Investigate the historical trends during the COVID-19 pandemic worldwide",
+      backgroundImage: "/showCases/historical_data_covid_worldwide.png",
+      icon: <GreekTemple  />,
+      link: "/worldViewCovid",
     }
   ],
   de: [
-    {
-      title: "Historische COVID-Daten Deutschland",
-      description: "Entdecken Sie die historischen Entwicklungen während der COVID-19-Pandemie in Deutschland",
-      backgroundImage: "/showCases/historical_data_covid.png",
-      icon: <GreekTemple />,
-      link: "/home/showCases/Historical_Data_COVID",
-    },
     {
       title: "Geeignete Mückenlebensräume",
       description: "Untersuchen Sie Vorhersagen zur Eignung von Mückenlebensräumen für verschiedene Jahre und Arten",
@@ -112,6 +113,20 @@ export const showCasesList: Record<Locale, ShowcaseItem[]> = {
       backgroundImage: "/showCases/uncertainty_quantification.png",
       icon: <ChartSpline  />,
       link: "/home/showCases/Uncertainty_Vis",
-    }
+    },
+     {
+      title: "Historische COVID-Daten Deutschland Dasboard",
+      description: "Betrachten Sie die historischen Daten der COVID-19-Pandemie in Deutschland",
+      backgroundImage: "/showCases/historical_data_covid.png",
+      icon: <ReportColumns />,
+      link: "/home/showCases/Historical_Data_COVID",
+    },
+    {
+      title: "Historische COVID-Daten Weltweit",
+      description: "Untersuchen Sie die historischen Entwicklungen während der COVID-19-Pandemie Weltweit",
+      backgroundImage: "/showCases/historical_data_covid_worldwide.png",
+      icon: <GreekTemple />,
+      link: "/worldViewCovid",
+    },
   ]
 };

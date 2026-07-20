@@ -60,7 +60,7 @@ let md = MDXContentProvider[locale];
   p1.mapUIsettings.isPresenceDataChecked = false;
   p1.mapUIsettings.isSequenceMetaData = true;
   p1.mapUIsettings.isSequenceMetaDataChecked = true;
-  p1.mapUIsettings.defaultDonutSize = 40;
+  p1.mapUIsettings.defaultDonutSize = 50;
   p1.mapInteractions = {
     disableMouse: true,
     disableScroll: true
