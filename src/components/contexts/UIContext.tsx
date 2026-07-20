@@ -26,6 +26,9 @@ export interface UIContextI {
     isDemoModeDialogOpen: boolean;
     setIsDemoModeDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
     demoMode: boolean;
+    setDemoMode: React.Dispatch<React.SetStateAction<boolean>>;
+    showCov: boolean;
+    setShowCov: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export interface SidebarSelectionI {
@@ -52,12 +55,20 @@ function UIContextProvider({children}: any) {
     const updateHash = useRef(0);
     const [isDemoModeDialogOpen, setIsDemoModeDialogOpen] = useState<boolean>(false);
     const [demoMode, setDemoMode] = useState<boolean>(false);
+    const [showCov, setShowCov] = useState<boolean>(false);
 
     // Fetch demo mode on mount
     React.useEffect(() => {
-        fetch('/api/demo-mode')
+        fetch('/api/demoMode')
             .then(res => res.json())
             .then(data => setDemoMode(data.demoMode))
+            .catch(err => console.error('Failed to fetch demo mode:', err));
+    }, []);
+
+     React.useEffect(() => {
+        fetch('/api/showCov')
+            .then(res => res.json())
+            .then(data => setShowCov(data.showCov))
             .catch(err => console.error('Failed to fetch demo mode:', err));
     }, []);
 
@@ -82,7 +93,8 @@ function UIContextProvider({children}: any) {
             curDocsNameRef,
             updateHash,
             isDemoModeDialogOpen, setIsDemoModeDialogOpen,
-            demoMode
+            demoMode, setDemoMode,
+            showCov, setShowCov
            }}>
             {children}
          </UIContext.Provider>

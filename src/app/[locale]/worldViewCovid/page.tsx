@@ -54,7 +54,7 @@ let md = MDXContentProvider[locale];
   p1.isApplyContextData = false;
   p1.isProjection_equirectangular = true;
   p1.mapUIsettings.filterStringForAvailableDatasetInclude = "epi";
-  p1.mapUIsettings.defaultDatasetName = "epidemiology_geography_df_1_2_w_geometry";
+  p1.mapUIsettings.defaultDatasetName = "epidemiology_geography_whole_df_w_geometry";
   p1.mapUIsettings.inCovidDataView = true;
   p1.isApplyTransitions = false;
   p1.mapUIsettings.isSequenceMetaData = false;
@@ -68,6 +68,7 @@ let md = MDXContentProvider[locale];
   // Overview map (zoom=2 < 4) => country-level data
   p1.mapUIsettings.isCountryLevelData = true;
   p1.mapUIsettings.isSubregionLevelData = false;
+  p1.mapStyles.backgroundColor = "rgb(215, 234, 245)";
 
 
   let mapPropsWorld2 = LeafD3MapLayerProps();
@@ -75,7 +76,7 @@ let md = MDXContentProvider[locale];
   p2.chartName = 'map_World2';
   p2.dataURL = apiRoutes.FETCH_MAP_DATA.WORLD_MAP;
   p2.center = [-20, -60];
-  p2.zoom = 3.0;
+  p2.zoom = 3.1;
   p2.mapUIsettings.isLongitudeSlider = true;
   p2.mapUIsettings.isLatitudeSlider = true;
   p2.mapUIsettings.isZoomSlider = true;
@@ -101,6 +102,8 @@ let md = MDXContentProvider[locale];
   // Detail map (zoom=4.4 >= 4) => subregion-level data
   p2.mapUIsettings.isCountryLevelData = false;
   p2.mapUIsettings.isSubregionLevelData = true;
+  p2.mapStyles.backgroundColor = "rgb(215, 234, 245)";
+  p2.mapUIsettings.areSettingsOpen = false;
 
 
 

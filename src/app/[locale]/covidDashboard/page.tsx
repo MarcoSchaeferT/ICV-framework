@@ -10,7 +10,6 @@ import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
 import { createSwapy, Swapy } from 'swapy';
 import BarchartComponent,{ BarchartProps } from '@/components/plots/barchart/barchart';
-import {LoadingSpinner} from '@/components/plots/maps/helpers';
 import { useLocale, useTranslations } from 'next-intl';
 import { useGetJSONData } from '@/app/hooks/useFetchAndCache';
 import { metaDataT } from '@/components/plots/MetaDataHandler';
@@ -139,7 +138,7 @@ function DynamicBarChart({ featureRaw, name }: { featureRaw: string, name: strin
   const metaData = rawMetaData as unknown as metaDataT;
 
   if(dataSet === null || feature === null)   return (
-  <SGridPlotCard rowColSpan={[4,8]} cardProps={CardPropsClass(featureRaw+"Linechart",name,"asas","")}> <LoadingSpinner/></SGridPlotCard>);
+  <SGridPlotCard rowColSpan={[4,8]} cardProps={CardPropsClass(featureRaw+"Linechart",name,"asas","")}> ERROR</SGridPlotCard>);
 
   let dataURL = apiRoutes.fetchDbData({ relationName: dataSet, feature: c.curFeature });
   let bchartProps = BarchartProps("Barchart", dataURL , "exampleVar");

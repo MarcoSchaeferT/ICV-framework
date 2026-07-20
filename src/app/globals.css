@@ -238,6 +238,23 @@ body {
   cursor: default !important;
 }
 
+/* ── Leaflet map country-polygon hover transitions ──────────────── */
+/* Fast fade-in for the fill, slower fade-out for the stroke/outline */
+.leaflet-interactive {
+  transition:
+    fill 1300ms ease-out,
+    fill-opacity 150ms ease-out,
+    stroke 400ms ease-in-out,
+    stroke-width 400ms ease-in-out,
+    stroke-opacity 400ms ease-in-out,
+    filter 300ms ease-in-out;
+}
+
+/* Subtle glow on hovered country paths */
+.leaflet-path-hover {
+  filter: drop-shadow(0 0 1px rgba(75, 75, 75, 0.55));
+}
+
 .markdown-alert {
   --github-alert-default-color: #24292f;
   --github-alert-note-color: #0969da;

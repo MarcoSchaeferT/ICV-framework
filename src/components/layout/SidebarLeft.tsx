@@ -29,6 +29,18 @@ export function DiseaseSidebar({ className }: DiseaseSidebarProps) {
 
   const defaultTransmissionKey = "vector"
   let transmissionDataLocal: TransmissionDataT = transmissionData[locale]
+
+  const { showCov } = UI_contextT;
+
+  if (!showCov) {
+    transmissionDataLocal = Object.fromEntries(
+      Object.entries(transmissionDataLocal).map(([key, value]) => {
+        const filteredDiseases = value.diseases.filter(d => d.group !== "covid");
+        return [key, { ...value, diseases: filteredDiseases }];
+      })
+    ) as TransmissionDataT;
+  }
+
   const defaultDisease = transmissionDataLocal[defaultTransmissionKey].diseases.find(d => d.enabled)?.name || "";
   const defaultTransmission = transmissionDataLocal[defaultTransmissionKey].transmissionPath;
 

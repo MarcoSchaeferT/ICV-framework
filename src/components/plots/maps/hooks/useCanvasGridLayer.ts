@@ -5,6 +5,7 @@
 import { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import type { VisDataT, MapDimensions } from '../types';
+import { useLoadingTask } from '@/components/plots/maps/utils/loadingSpinner';
 
 interface UseCanvasGridLayerParams {
     map: L.Map | null;
@@ -44,10 +45,14 @@ export function useCanvasGridLayer({
 }: UseCanvasGridLayerParams): void {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const overlayRef = useRef<L.ImageOverlay | null>(null);
+    const L_gridRender = useLoadingTask("Grid Layer");
 
     useEffect(() => {
+
         if (!map || !L) return;
-        if (isLoading || hasError || gridData.size === 0) return;
+        if (isLoading || hasError || gridData.size < 3) return;
+        L_gridRender.start();
+
 
         // Reuse existing canvas if available
         let canvas = canvasRef.current;
@@ -64,6 +69,8 @@ export function useCanvasGridLayer({
         const context = canvas.getContext('2d');
         if (!context) return;
 
+
+
         context.clearRect(0, 0, canvas.width, canvas.height);
 
         // Draw each grid cell as a filled rectangle
@@ -75,6 +82,8 @@ export function useCanvasGridLayer({
             );
 
             if (coords.length > 3) {
+
+
                 const x1 = coords[0].x;
                 const y1 = coords[0].y;
                 const x2 = coords[1].x;
@@ -141,6 +150,7 @@ export function useCanvasGridLayer({
             }
             setTimeout(() => {
                 overlayElement.style.opacity = layerOpacity.toString();
+                L_gridRender.stop();
             }, transitionDuration > 0 ? transitionDuration : 0);
         }
     }, [isUpdate]);

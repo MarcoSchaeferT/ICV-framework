@@ -15,7 +15,7 @@ import { Locale, useLocale, useTranslations } from "next-intl";
 import { t_richConfig } from "@/app/const_store";
 import { useUIContext } from '@/components/contexts/UIContext';
 import { availableColorMapsNames } from '@/components/plots/maps/constants';
-import { LoadingSpinner } from '@/components/plots/maps/helpers';
+import { useLoadingTask, LoadingSpinnerAnimation } from '@/components/plots/maps/utils/loadingSpinner';
 
 
 const isSWAPY = true;
@@ -162,6 +162,16 @@ function UncertaintySvgComponent({fileName}: {fileName: string}) {
   const rowID = contexT.dbRowID_of_selectedGridcellID;
 
   const [isLoading, setIsLoading] = useState(false);
+
+  const L_svgLoader = useLoadingTask('Uncertainty SVG');
+
+  useEffect(() => {
+    if (isLoading) {
+      L_svgLoader.start();
+    } else {
+      L_svgLoader.stop();
+    }
+  }, [isLoading, L_svgLoader]);
   const initialSrc = rowID !== -1 ? apiRoutes.getUncertaintySvg({ filename: fileName, cellID: rowID }) : "";
   const [displayedSrc, setDisplayedSrc] = useState(initialSrc);
   const pendingRowID = useRef(rowID);
@@ -223,7 +233,7 @@ function UncertaintySvgComponent({fileName}: {fileName: string}) {
       {/* Loading spinner overlay */}
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/30 backdrop-blur-[1px] z-10">
-          <LoadingSpinner />
+          <LoadingSpinnerAnimation />
         </div>
       )}
     </div>

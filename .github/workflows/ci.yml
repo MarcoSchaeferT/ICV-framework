@@ -95,3 +95,24 @@ jobs:
         push: true
         tags: ${{ steps.meta-frontend.outputs.tags }}
         labels: ${{ steps.meta-frontend.outputs.labels }}
+
+    # Metadata extraction for PgBouncer
+    - name: Extract PgBouncer Metadata
+      id: meta-pgbouncer
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/marcoschaefert/icv-pgbouncer
+        tags: |
+          type=ref,event=branch
+          type=raw,value=latest,enable=${{ github.ref_name == 'main' }}
+
+    # 4. Build and push PgBouncer image
+    - name: Build and push icv-pgbouncer
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: ./pgbouncer/Dockerfile.pgbouncer
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta-pgbouncer.outputs.tags }}
+        labels: ${{ steps.meta-pgbouncer.outputs.labels }}

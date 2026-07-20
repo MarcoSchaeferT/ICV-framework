@@ -59,9 +59,8 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
 
 
   return (
-    <html lang={locale} >
+    <html lang={locale} suppressHydrationWarning={true}>
       <body className={`${inter.className} overflow-y-scroll overflow-x-clip bg-surface-default`} suppressHydrationWarning={true}>
-
         <Script
           /* Privacy-friendly analytics by Plausible */
           async
@@ -74,7 +73,7 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
               plausible.init();
             `}
         </Script>
-
+        
         <PageTracker />
         <NextIntlClientProvider messages={messages}>
 

@@ -8,14 +8,21 @@ import dynamic from 'next/dynamic';
 import { MapLibreGermanyMapProps } from '@/components/plots/maps/maplibre/MapLibreGermanyMap';
 const MapLibreGermanyMap = dynamic(
     () => import('@/components/plots/maps/maplibre/MapLibreGermanyMap'),
-    { ssr: false, loading: () => <LoadingSpinner /> }
+    { 
+        ssr: false, 
+        loading: () => (
+            <div className="flex items-center justify-center h-full w-full">
+                <div className="w-16 h-16 border-4 border-t-4 border-gray-200 rounded-full border-t-blue-500 animate-spin"></div>
+            </div>
+        )
+    }
 );
 import DataTableComponent from '@/components/DataTable';
 import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
 import { createSwapy, Swapy } from 'swapy';
 import BarchartComponent,{ BarchartProps } from '@/components/plots/barchart/barchart';
-import {LoadingSpinner} from '@/components/plots/maps/helpers';
+
 import { useLocale, useTranslations } from 'next-intl';
 import { useGetJSONData } from '@/app/hooks/useFetchAndCache';
 import { metaDataT } from '@/components/plots/MetaDataHandler';
@@ -142,7 +149,7 @@ function DynamicBarChart({ featureRaw, name }: { featureRaw: string, name: strin
   const metaData = rawMetaData as unknown as metaDataT;
 
   if(dataSet === null || feature === null)   return (
-  <SGridPlotCard rowColSpan={[4,8]} cardProps={CardPropsClass(featureRaw+"Linechart",name,"asas","")}> <LoadingSpinner/></SGridPlotCard>);
+  <SGridPlotCard rowColSpan={[4,8]} cardProps={CardPropsClass(featureRaw+"Linechart",name,"asas","")}> ERROR </SGridPlotCard>);
 
   let dataURL = apiRoutes.fetchDbData({ relationName: dataSet, feature: c.curFeature });
   let bchartProps = BarchartProps("Barchart", dataURL , "exampleVar");

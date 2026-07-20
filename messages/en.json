@@ -209,7 +209,9 @@
         "copyrightRest": " file for details.",
         "funding": "Funded by the Federal Ministry of Health (BMG) under grant No. 2523DAT400 (project: ",
         "projectName": " AI-DAVis PANDEMICS)",
-        "furtherInfo": "About"
+        "furtherInfo": "About",
+        "dataProtection": "Data Protection",
+        "impressum": "Legal Notice"
     },
     "swapyHandle_component": {
         "enable": "Enable Component Swap",
@@ -267,9 +269,9 @@
             "subregion": "Subregion",
             "country": "Country",
             "time_range": "Time range",
-            "time_range_data": "Show Data for Time Range",
-            "time_range_data_short": "Show Data",
-            "select_country_name": "Select country or type country name"
+            "time_range_data": "Show Time Range",
+            "time_range_data_short": "Show Time Range",
+            "select_country_name": "Select country / type country name"
         }
     },
     "page_covidDashboard": {

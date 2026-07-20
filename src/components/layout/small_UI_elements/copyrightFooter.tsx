@@ -19,7 +19,7 @@ const CopyrightFooter = ({ textColor = "#000000" }: { textColor?: string }) => {
               <div className="text-sm max-w-[260px]">
                {t.rich('copyright', { ...t_richConfig })}
                <br />
-              <Link href="https://github.com/MarcoSchaeferT/ICV-framework/blob/master/LICENSE" className="text-sm hover:underline">
+              <Link href="https://github.com/MarcoSchaeferT/dashboardDAVis/blob/master/LICENSE" className="text-sm hover:underline">
                 LICENCE
               </Link>
                {t.rich('copyrightRest', { ...t_richConfig })}
@@ -39,13 +39,13 @@ const CopyrightFooter = ({ textColor = "#000000" }: { textColor?: string }) => {
               
               </div>
               <div className="flex items-start gap-3 ">
-                <Image
+               <Image
                   src="/BMG_Logo.svg"
                   alt="BMG Logo"
-                  width={150}
+                  width={140}
                   height={106}
                   className="rounded"
-                  style={{ minHeight: 96 }}
+                  style={{ minHeight: 96, backgroundColor: "white", padding: "0px", borderRadius: "4px" }}
                 />
                  <p className="text-sm max-w-[250px] pt-1">
                                               {t.rich('funding', { ...t_richConfig })}: <a className="underline hover:font-semibold" href="https://www.bundesgesundheitsministerium.de/ministerium/ressortforschung/handlungsfelder/digitalisierung/ai-davis-pandemics.html">{t.rich('projectName', { ...t_richConfig })}</a>
@@ -57,8 +57,16 @@ const CopyrightFooter = ({ textColor = "#000000" }: { textColor?: string }) => {
                 {t.rich('furtherInfo', { ...t_richConfig })}
               </Link>
               
-              <Link href="https://github.com/MarcoSchaeferT/ICV-framework" className="flex items-center gap-2 hover:underline">
+              <Link href="https://github.com/MarcoSchaeferT/dashboardDAVis" className="flex items-center gap-2 hover:underline">
                 GitHub
+              </Link>
+
+              <Link href="/dataProtection" className="text-md hover:underline">
+                {t.rich('dataProtection', { ...t_richConfig })}
+              </Link>
+
+              <Link href="/impressum" className="text-md hover:underline">
+                {t.rich('impressum', { ...t_richConfig })}
               </Link>
             </div>
           </div>

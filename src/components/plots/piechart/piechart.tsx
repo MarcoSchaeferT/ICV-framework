@@ -25,7 +25,6 @@ import { apiRoutes } from '@/app/api_routes';
 import { useLocale ,useTranslations } from "next-intl";
 import { Locale } from '@/i18n/routing';
 import { t_richConfig, monthNames, dbDATA } from '@/app/const_store';
-import { LoadingSpinner } from '../maps/helpers';
 import { getGoodReadableRange } from '../maps/helpers';
 
 /**

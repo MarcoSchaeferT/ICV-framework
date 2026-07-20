@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy and install Python dependencies
 COPY ./backend/requirements.txt ./
-RUN pip install --no-cache-dir --user -r requirements.txt \
+RUN pip install --user -r requirements.txt \
   && find /root/.local -type d -name "tests" -exec rm -rf {} + 2>/dev/null; \
   find /root/.local -type d -name "docs" -exec rm -rf {} + 2>/dev/null; \
   find /root/.local -type d -name "doc" -exec rm -rf {} + 2>/dev/null; \
@@ -48,6 +48,9 @@ COPY --from=builder /root/.local /home/appuser/.local
 # Copy application code
 COPY ./backend /app/backend
 
+# Copy Gunicorn config
+COPY ./backend/gunicorn.conf.py /app/gunicorn.conf.py
+
 # Copy localizations
 COPY ./messages /app/messages
 
@@ -73,5 +76,10 @@ EXPOSE 5222
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:5222/health || exit 1
 
+# Run with Gunicorn (production WSGI server)
+# - gthread workers for Flask async route support
+# - Configurable via gunicorn.conf.py
+CMD ["gunicorn", "--config", "gunicorn.conf.py", "backend.index:app"]
+
 # Run with Flask
-CMD ["python", "-m", "flask", "--app", "./backend/index", "run", "--host=0.0.0.0", "--port=5222"]
+#CMD ["python", "-m", "flask", "--app", "./backend/index", "run", "--host=0.0.0.0", "--port=5222"]

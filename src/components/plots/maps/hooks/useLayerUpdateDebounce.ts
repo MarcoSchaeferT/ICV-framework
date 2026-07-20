@@ -10,8 +10,10 @@ interface UseLayerUpdateDebounceParams {
     curMouseEventRef: React.MutableRefObject<string>;
     /** Ref for the debounce timer */
     timerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
-    /** Ref for the loading spinner flag */
-    isLoadingSpinnerRef: React.MutableRefObject<boolean>;
+    /** Start loading callback (called when debounce begins) */
+    startLoading: () => void;
+    /** Stop loading callback (called when debounce completes) */
+    stopLoading: () => void;
     /** Callback to toggle the isUpdate flag (triggers layer re-render) */
     setIsUpdate: React.Dispatch<React.SetStateAction<boolean>>;
     /** Optional: callback to run after the debounce completes */
@@ -39,7 +41,8 @@ const DEFAULT_DELAYS: Record<string, number> = {
 export function useLayerUpdateDebounce({
     curMouseEventRef,
     timerRef,
-    isLoadingSpinnerRef,
+    startLoading,
+    stopLoading,
     setIsUpdate,
     onDebounceComplete,
     clearSpinnerOnComplete = true,
@@ -48,7 +51,7 @@ export function useLayerUpdateDebounce({
 }: UseLayerUpdateDebounceParams): void {
     useEffect(() => {
         resetTimeout(timerRef);
-        isLoadingSpinnerRef.current = true;
+        startLoading();
 
         const delays = { ...DEFAULT_DELAYS, ...delayOverrides };
         const delay = delays[curMouseEventRef.current] ?? 500;
@@ -56,7 +59,7 @@ export function useLayerUpdateDebounce({
         timerRef.current = setTimeout(() => {
             setIsUpdate((prev) => !prev);
             if (clearSpinnerOnComplete) {
-                isLoadingSpinnerRef.current = false;
+                stopLoading();
             }
             onDebounceComplete?.();
         }, delay);

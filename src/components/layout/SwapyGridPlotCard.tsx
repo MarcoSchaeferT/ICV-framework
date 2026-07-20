@@ -3,6 +3,7 @@ import CardWrapper, { CardPropsClass } from './CardWrapper';
 import styled, { keyframes, css } from 'styled-components';
 import { Hand } from 'lucide-react';
 import { useUIContext } from '../contexts/UIContext';
+import { LoadingSpinnerProvider } from '../plots/maps/utils/loadingSpinner';
 
 const StyledGridPlotCard = styled.div<{ rowSpan: number; colSpan: number; $glow?: boolean }>`
   background-color: gray;
@@ -65,9 +66,11 @@ const SGridPlotCard: React.FC<Props> = ({
           <Hand className="w-7 h-7" />
         </div>
         {/* Card */}
+        <LoadingSpinnerProvider>
         <CardWrapper cardProps={cardProps}>
           {children}
         </CardWrapper>
+        </LoadingSpinnerProvider>
       </div>
     </StyledGridPlotCard>
   );

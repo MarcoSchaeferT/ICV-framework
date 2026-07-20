@@ -11,7 +11,7 @@ import {
   alignFeature_to_Metadata,
 } from '../MetaDataHandler';
 import { apiRoutes } from '@/app/api_routes';
-import { LoadingSpinner } from '../maps/helpers';
+import { useLoadingTask, LoadingSpinnerAnimation } from '../maps/utils/loadingSpinner';
 import  CovidDataStates from "@/components/dataTableClasses/CovidDataStates";
 import { t_richConfig, dbDATA } from '@/app/const_store';
 import { getGoodReadableRange } from '../maps/helpers';
@@ -98,6 +98,18 @@ const BarchartComponent = ({chartProps}: {chartProps: BarchartProps}) => {
   const [isSorting, setIsSorting] = useState(false);
   const [isUpdated, setIsUpdated] = useState(false);
 
+  const [isDataLoading, rawData] = useGetJSONData(props.dataURL);
+  const [isLoading_Metadata, rawMetaData] = useGetJSONData(apiRoutes.getDatasetsMetadata({ LANGID: locale || "en" }));
+
+  const L_barchartData = useLoadingTask('Barchart Data');
+
+  useEffect(() => {
+    if (isDataLoading || isLoading_Metadata) {
+      L_barchartData.start();
+    } else {
+      L_barchartData.stop();
+    }
+  }, [isDataLoading, isLoading_Metadata, L_barchartData]);
 
   /********************
   * *** LOAD DATA *** *
@@ -105,10 +117,6 @@ const BarchartComponent = ({chartProps}: {chartProps: BarchartProps}) => {
   let collectDataLoadingErrors: string[] = [];
   const params = useMemo(() => getParamsOfURL(props.dataURL), [props.dataURL]);
   const feature = useMemo(() => params['feature']?.replace(/[_*]/g, ''), [params]);
- 
-
-  const [isDataLoading, rawData] = useGetJSONData(props.dataURL);
-  const [isLoading_Metadata, rawMetaData] = useGetJSONData(apiRoutes.getDatasetsMetadata({ LANGID: locale || "en" }));
 
   collectDataLoadingErrors.push(handleLoadDataError(isDataLoading, rawData as unknown as dbDat));
   collectDataLoadingErrors.push(handleLoadDataError(isLoading_Metadata, rawMetaData as unknown as dbDat));
@@ -293,7 +301,7 @@ let [xLabel, yLabel] = useMemo(() => {
     if(procData.length == 0 && collectDataLoadingErrors.some((error) => error == undefined) && contextT.curFeatureValue != "NA" && contextT.curFeatureValue != "undefined"){
     return (
       <div className="flex items-center justify-center h-full">
-        <LoadingSpinner />
+        <LoadingSpinnerAnimation />
          <ChartHeader ErrorData={collectDataLoadingErrors} />
       </div>
     );
@@ -304,7 +312,8 @@ let [xLabel, yLabel] = useMemo(() => {
   }
 
   return (
-    <div className="flex flex-col h-full w-full min-h-0"> 
+    <div className="flex flex-col h-full w-full min-h-0 relative"> 
+      <LoadingSpinnerAnimation />
       <div className="flex items-center mt-1 ml-8">
         <button
           className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-sm"

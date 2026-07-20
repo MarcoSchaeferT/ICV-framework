@@ -7,8 +7,6 @@ export const consts: { [key: string]: string } =
         "API_ADDRES": "http://localhost:3000/api"
     };
 
-export const IS_DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
-
 
 export type LayoutSizesT = {
     rowSpanSize: number;

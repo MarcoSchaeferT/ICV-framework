@@ -13,13 +13,13 @@
 'use client';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    LoadingSpinner,
     getMinMaxFeature,
     getGridCellIndex,
     getGridOffset,
     snapToGrid,
     roundLatLng,
 } from '../helpers';
+import { useLoadingTask, LoadingSpinnerAnimation, LoadingSpinnerProvider } from '../utils/loadingSpinner';
 import { metaDataT } from '../../MetaDataHandler';
 import { availableColorMaps, availableColorMapsNames } from '../constants';
 import * as d3 from 'd3';
@@ -237,7 +237,19 @@ const MapLibreGermanyMap = ({ props }: { props: MapLibreGermanyMapProps }) => {
     const ischanged = useRef(false);
     let time = useRef<ReturnType<typeof setTimeout> | null>(null);
     let mapTime = useRef<ReturnType<typeof setTimeout> | null>(null);
-    let isLoadingSpinner = useRef(false);
+    const L_mapLibreLoader = useLoadingTask('maplibre');
+    const isLoadingSpinner = useMemo(() => ({
+        get current() {
+            return false;
+        },
+        set current(value: boolean) {
+            if (value) {
+                L_mapLibreLoader.start();
+            } else {
+                L_mapLibreLoader.stop();
+            }
+        }
+    }), [L_mapLibreLoader]);
 
     // ─── Grid data parsing (unchanged from Leaflet version) ───
     const { gridData: parsedGridData, parseErrors } = useGridDataParser({
@@ -772,7 +784,8 @@ const MapLibreGermanyMap = ({ props }: { props: MapLibreGermanyMapProps }) => {
     // JSX — identical layout to LeafD3MapGermanyCovid
     // ══════════════════════════════════════════════════════════════
     return (
-        <div className="relative size-full">
+        <LoadingSpinnerProvider>
+            <div className="relative size-full">
             <div className="absolute top-1 right-1 z-20">
                 <button
                     onClick={() => setIsSettingsOpen(!isSettingsOpen)}
@@ -909,7 +922,7 @@ const MapLibreGermanyMap = ({ props }: { props: MapLibreGermanyMapProps }) => {
                 </div>
             )}
 
-            {isLoadingSpinner.current && (<LoadingSpinner />)}
+            <LoadingSpinnerAnimation />
             <div ref={divRef} className='flex justify-center items-center size-full'>
                 <svg id={chart} className='w-full h-full'></svg>
 
@@ -952,6 +965,7 @@ const MapLibreGermanyMap = ({ props }: { props: MapLibreGermanyMapProps }) => {
                 )}
             </div>
         </div>
+        </LoadingSpinnerProvider>
     );
 };
 

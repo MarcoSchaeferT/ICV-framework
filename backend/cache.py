@@ -10,6 +10,7 @@ Thread-safe via a threading.Lock.
 """
 
 import sys
+import os
 import time
 import threading
 from collections import OrderedDict
@@ -43,6 +44,15 @@ def _deep_getsizeof(obj: Any, _seen: Optional[set] = None) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Cache configuration defaults from environment variables
+# ---------------------------------------------------------------------------
+
+DEFAULT_CACHE_MAX_GB = float(os.getenv("CACHE_MAX_GB", "3.0"))
+DEFAULT_CACHE_MAX_BYTES = int(DEFAULT_CACHE_MAX_GB * 1024 ** 3)
+DEFAULT_CACHE_MAX_ENTRIES = int(os.getenv("CACHE_MAX_ENTRIES", "256"))
+
+
+# ---------------------------------------------------------------------------
 # Cache entry
 # ---------------------------------------------------------------------------
 
@@ -66,17 +76,17 @@ class ResponseCache:
     Parameters
     ----------
     max_entries : int
-        Maximum number of cached responses (default 265).
+        Maximum number of cached responses (default dynamically loaded).
     max_bytes : int
-        Maximum total memory for cached values (default 7 GB).
+        Maximum total memory for cached values (default dynamically loaded).
     ttl_seconds : float
         Time-to-live per entry in seconds (default 86 400 = 24 h).
     """
 
     def __init__(
         self,
-        max_entries: int = 256,
-        max_bytes: int = 7 * 1024 ** 3,  # 7 GB
+        max_entries: int = DEFAULT_CACHE_MAX_ENTRIES,
+        max_bytes: int = DEFAULT_CACHE_MAX_BYTES,
         ttl_seconds: float = 86_400,       # 24 hours
     ):
         self._max_entries = max_entries

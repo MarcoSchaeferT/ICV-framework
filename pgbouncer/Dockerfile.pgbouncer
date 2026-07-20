@@ -1,0 +1,29 @@
+# =============================================================================
+# PgBouncer – lightweight connection pooler for PostgreSQL
+# =============================================================================
+FROM alpine:3.21
+
+# Labels (OCI standard)
+LABEL org.opencontainers.image.title="icv-pgbouncer"
+LABEL org.opencontainers.image.description="ICV Connection Pooler"
+LABEL org.opencontainers.image.version="latest"
+LABEL org.opencontainers.image.source="https://github.com/MarcoSchaeferT/icv-framework"
+
+# Install PgBouncer
+RUN apk add --no-cache pgbouncer
+
+# Copy entrypoint script (generates config from env vars)
+COPY pgbouncer/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Create pgbouncer user/group and ensure it owns its directories
+RUN addgroup -S pgbouncer 2>/dev/null || true && \
+    adduser -S -G pgbouncer -H -D pgbouncer 2>/dev/null || true && \
+    mkdir -p /etc/pgbouncer /var/log/pgbouncer /var/run/pgbouncer && \
+    chown -R pgbouncer:pgbouncer /etc/pgbouncer /var/log/pgbouncer /var/run/pgbouncer
+
+USER pgbouncer
+
+EXPOSE 6432
+
+ENTRYPOINT ["/entrypoint.sh"]

@@ -18,12 +18,32 @@ services:
     networks:
       - internal-network
 
+  icv-pgbouncer:
+    image: ghcr.io/marcoschaefert/icv-pgbouncer:latest
+    restart: always
+    build:
+      context: .
+      dockerfile: ./pgbouncer/Dockerfile.pgbouncer
+      network: host
+    container_name: icv-pgbouncer
+    environment:
+      PGBOUNCER_DB_HOST: icv-database
+      PGBOUNCER_DB_PORT: "5333"
+      PGBOUNCER_DB_NAME: icv-database
+      PGBOUNCER_DB_USER: ${DATABASE_USER}
+      PGBOUNCER_DB_PASSWORD: ${DB_PASSWORD_SECRET}
+    depends_on:
+      - icv-database
+    networks:
+      - internal-network
+
   icv-frontend:
     image: ghcr.io/marcoschaefert/icv-frontend:latest
     environment:
       IS_DOCKER: "true"
       NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE}
       NEXT_PUBLIC_SHOW_DISCLAIMER: ${NEXT_PUBLIC_SHOW_DISCLAIMER}
+      NEXT_PUBLIC_SHOW_COV: ${NEXT_PUBLIC_SHOW_COV}
     build:
       context: .
       dockerfile: ./Dockerfile.frontend
@@ -51,8 +71,11 @@ services:
       - "5222:5222"
     networks:
       - internal-network
+    depends_on:
+      - icv-pgbouncer
     environment:
-      DATABASE_URL: ${DATABASE_URL_SECRET}
+      # Route through PgBouncer (port 6432) instead of directly to PostgreSQL
+      DATABASE_URL: "postgresql://${DATABASE_USER}:${DB_PASSWORD_SECRET}@icv-pgbouncer:6432/icv-database"
       IS_DOCKER: "true"
 
 volumes:
