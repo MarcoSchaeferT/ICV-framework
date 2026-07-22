@@ -9,6 +9,7 @@ import { useEffect } from "react";
 import NavbarLeft from "./navbarLeft";
 import FpsIndicator from "./fpsIndicator";
 import DemoModeDialog from "./DemoModeDialog";
+import UpdateNoticeDialog from "./UpdateNoticeDialog";
 
 interface DynamicUIProps {
   children: React.ReactNode;
@@ -36,6 +37,7 @@ export default function DynamicUI({children, layoutSizes}: DynamicUIProps) {
     </div>
     {isPerformanceIndicator && <FpsIndicator />}
     <DemoModeDialog />
+    <UpdateNoticeDialog />
     </UIContextProvider>
     </>
   )
