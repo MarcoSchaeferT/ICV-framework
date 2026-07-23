@@ -1,0 +1,38 @@
+tags:
+  - Utility Endpoints
+summary: Get upload status (progress + error)
+description: Returns the processing progress and error state of one upload, identified by the upload_id returned from /api/setFilesToDB. Polled by the frontend once per second while an upload is being processed. Progress 100 means every file of the upload batch has been processed.
+parameters:
+  - name: id
+    in: query
+    description: Upload ID returned by the setFilesToDB endpoint
+    required: true
+    schema:
+      type: string
+      example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+responses:
+  200:
+    description: Current status of the upload
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            progress:
+              type: number
+              description: Progress percentage from 0 to 100 (100 = whole batch processed)
+              example: 75.3
+            error:
+              type: string
+              description: Error message, or "false" if no error occurred
+              example: "false"
+  400:
+    description: Missing id query parameter
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              example: "Missing 'id' query parameter"

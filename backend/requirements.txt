@@ -11,6 +11,7 @@ requests==2.34.2
 debugpy==1.8.21
 flasgger==0.9.7.1
 psycopg[binary]==3.3.4
+redis==5.2.1
 pydantic==2.13.4
 matplotlib
 uncertainty_toolbox

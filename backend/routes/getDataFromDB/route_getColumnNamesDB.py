@@ -38,7 +38,7 @@ async def getColumnNamesDB():
       return jsonify({"error": f"Database error: {str(e)}"}), 500
 
     # --- Store in cache ---
-    response_cache.set(cache_key, columnNames)
+    response_cache.set(cache_key, columnNames, scopes=(relationName,))
 
     resp = make_response(jsonify(columnNames))
     resp.headers["X-Cache"] = "MISS"

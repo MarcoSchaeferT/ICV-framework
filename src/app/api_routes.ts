@@ -33,8 +33,6 @@ class apiRoutes {
     // ── Simple endpoints (no query parameters) ───────────────────────────
 
     public static readonly FETCH_COMPRESSED_JSON: string = `${apiRoutes.API_URL}/get_compressed_json`;
-    public static readonly GET_UPLOAD_ERROR: string = `${apiRoutes.API_URL}/getUploadError`;
-    public static readonly GET_UPLOAD_PROGRESS: string = `${apiRoutes.API_URL}/getUploadProgress`;
     public static readonly CREATE_TABLE_FROM_FILE: string = `${apiRoutes.API_URL}/setFilesToDB`;
     public static readonly SET_ENTRY_TO_TABLE: string = `${apiRoutes.API_URL}/setEntryToTable`;
 
@@ -52,11 +50,11 @@ class apiRoutes {
 
     // ── Parameterised endpoints (typed function signatures) ───────────────
 
-    /** Set upload progress value. */
-    static setUploadProgress(params: {
-        progressVal: number;
+    /** Poll combined upload status (progress + error) for one upload. */
+    static uploadStatus(params: {
+        id: string;
     }): string {
-        return buildUrl(`${apiRoutes.API_URL}/setUploadProgress`, params);
+        return buildUrl(`${apiRoutes.API_URL}/uploadStatus`, params);
     }
 
     /** Fetch column names of a DB relation. */

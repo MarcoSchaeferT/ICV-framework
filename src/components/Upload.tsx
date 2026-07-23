@@ -13,6 +13,37 @@ import { apiRoutes } from '@/app/api_routes';
 import {useLocale, useTranslations} from 'next-intl';
 import { t_richConfig } from '@/app/const_store';
 
+/**
+ * POST one file as multipart/form-data via XMLHttpRequest so the real
+ * transfer progress can be observed (fetch() exposes no upload progress).
+ * Resolves with the parsed JSON response, or null when the body is not
+ * valid JSON (e.g. a proxy error page).
+ */
+function uploadFileWithProgress(
+  url: string,
+  file: File,
+  onProgress: (percent: number) => void
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append("files", file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.responseType = "json";
+    // No xhr.timeout: multi-GB uploads over slow connections may take hours.
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        onProgress(Number(((event.loaded / event.total) * 100).toFixed(1)));
+      }
+    };
+    xhr.onload = () => resolve(xhr.response);
+    xhr.onerror = () => reject(new Error("Network error during upload"));
+    xhr.onabort = () => reject(new Error("Upload aborted"));
+    xhr.send(formData);
+  });
+}
+
 export default function FileUploadForm() {
 
   
@@ -28,14 +59,15 @@ export default function FileUploadForm() {
   }>({});
   const [collectErrors, setCollectErrors] = useState<string[]>([]);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+  // Real byte-level transfer progress (0–100) of the multipart POST,
+  // reported by XHR upload events — fetch() cannot observe upload progress.
+  const [transferProgress, setTransferProgress] = useState<number>(0);
+  // "transfer" = bytes still leaving the browser, "db" = backend integration
+  const [phase, setPhase] = useState<"idle" | "transfer" | "db">("idle");
   const [isUpdate, setIsUpdate] = useState<boolean>(false);
-  const watchProgressRunning = useRef<boolean>(false);
 
   let message = useRef<string>("created");
-  let data: { progress: number } = { progress: 1 };
-  let complete = useRef<boolean>(
-    files.current.length === 0 && (data.progress === 0 || data.progress === 100)
-  );
+  let complete = useRef<boolean>(false);
   let error =  useRef<boolean>(false);
 
   interface UploadResponse {
@@ -50,8 +82,10 @@ export default function FileUploadForm() {
       alert(`${file.name} is not a CSV file.`);
       return false;
     }
-    if (file.size > 3000 * 1024 * 1024) {
-      alert(`${file.name} exceeds the 3000MB size limit.`);
+    // Must match proxyClientMaxBodySize in next.config.mjs — bigger files
+    // would pass here and then be rejected by the proxy with a non-JSON error.
+    if (file.size > 2500 * 1024 * 1024) {
+      alert(`${file.name} exceeds the 2500MB size limit.`);
       return false;
     }
     if (file.name.length >= 70) {
@@ -67,20 +101,6 @@ export default function FileUploadForm() {
     complete.current = false;
     setUploadProgress(0);
     processedFilesRef.current = {};
-    try {
-      fetch(apiRoutes.setUploadProgress({ progressVal: 0 }), {
-        method: "GET",
-      });
-    } catch (e) {
-      console.error(e);
-    }
-    try {
-      fetch(apiRoutes.GET_UPLOAD_ERROR, {
-        method: "GET",
-      });
-    } catch (e) {
-      console.error(e);
-    }
     setCollectErrors([]);
   }, []);
 
@@ -105,129 +125,91 @@ export default function FileUploadForm() {
   }, []);
   
 
-  let jsonResponse: any = null;
-
   const handleUpload = async () => {
     if (demoMode) {
       setIsDemoModeDialogOpen(true);
       return;
     }
-    
+
     processedFilesRef.current = {};
     setuploadResponse({});
-    
-    async function watchProgress() {
+    setCollectErrors([]);
+    complete.current = false;
+    error.current = false;
 
-      if (watchProgressRunning.current) return;
-      watchProgressRunning.current = true;
-      
-      try {
-        complete.current = false;
-        error.current = false;
+    // Poll the combined status endpoint (one request per second) until the
+    // backend reports completion (progress === 100) or an error.
+    async function watchProgress(uploadId: string) {
+      while (true) {
+        const response = await fetch(apiRoutes.uploadStatus({ id: uploadId }));
+        const status: { progress: number; error: string } = await response.json();
 
-        while (!complete.current && !error.current) {
-          const response = await fetch(apiRoutes.GET_UPLOAD_PROGRESS, {
-            method: "POST",
-          });
-          const errorResponse = await fetch(apiRoutes.GET_UPLOAD_ERROR, {
-            method: "POST",
-          });
-        
-          const errorData = await errorResponse.json();
-          if (errorData["ERROR"] !== "false") {
-            setuploadResponse({ ERROR: (t("feedback.error") + ": " + errorData["ERROR"]) });
-            console.log("Progress:", errorData["ERROR"]);
-            setCollectErrors((prev) => [...prev, errorData["ERROR"]]);
-            error.current = true;
-          
-          }
-          data = await response.json();
-          data.progress =
-            Math.ceil(data.progress) == -1 ? 1 : (data.progress.toFixed(2) as unknown as number);
-          console.log("Progress:", data.progress);
-          setUploadProgress(data.progress);
-
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          if (data.progress === 100) {
-            //console.log("-----:", Math.ceil(data.progress), files[files.length-1].name, "===", curFile, "complete", complete, processedFiles);
-            complete.current = true;
-          }
+        if (status.error !== "false") {
+          setuploadResponse({ ERROR: (t("feedback.error") + ": " + status.error) });
+          setCollectErrors((prev) => [...prev, status.error]);
+          error.current = true;
+          return;
         }
-        setuploadResponse(() => {
-          console.log("SETTING: Files successfully uploaded");
-          return { SUCCESS: (t("feedback.success")) };
-        });
-        //files.current = [];
-        setCurFile("");
-      // setUploadProgress(0);
-        await fetch(apiRoutes.setUploadProgress({ progressVal: 1 }), {
-          method: "GET",
-        });
-      }
-      catch (error) {
-        console.error("Error watching progress:", error);
-      } finally {
-        watchProgressRunning.current = false;
+
+        const progress = Number(status.progress.toFixed(2));
+        console.log("Progress:", progress);
+        setUploadProgress(progress);
+        if (progress === 100) return;
+
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
 
-
-
-
-    // Here you would typically send the files to your server
     console.log("Files to upload:", files);
-    await fetch(apiRoutes.setUploadProgress({ progressVal: 1 }), {
-      method: "GET",
-    });
-   
     for (const file of files.current) {
-      await fetch(apiRoutes.setUploadProgress({ progressVal: 1 }), {
-        method: "GET",
-      });
-      setUploadProgress(1);
-      data.progress = 1;
       setCurFile(file.name);
-      watchProgress();
+      // Transfer phase: XHR reports the real byte progress of the POST.
+      // uploadProgress = 1 keeps the existing "busy" gating (disabled button,
+      // visible progress area) until the DB phase takes over.
+      setPhase("transfer");
+      setTransferProgress(0);
+      setUploadProgress(1);
       try {
-        const formData = new FormData();
-        formData.append("files", file);
-        if(data.progress > 1)  return;
+        const jsonResponse: any = await uploadFileWithProgress(
+          apiRoutes.CREATE_TABLE_FROM_FILE,
+          file,
+          setTransferProgress
+        );
+        console.log("response: ", jsonResponse);
 
-        const response2 = await fetch(apiRoutes.CREATE_TABLE_FROM_FILE, {
-          method: "POST",
-          body: formData,
-        });
-
-          try {
-            jsonResponse = await response2.json();
-          } catch (error) {
-            jsonResponse = null;
-          }
-
-          message.current = (jsonResponse["table_exist"] === true) ? "updated" : "created";
-          console.log("response: ", jsonResponse);
-
-        // check if the response contains an error message
-        if (
-          jsonResponse &&
-          jsonResponse["ERROR"]
-        ) {
-          setCollectErrors((prev) => [...prev, jsonResponse["ERROR"]]);
+        if (!jsonResponse || jsonResponse["ERROR"] || !jsonResponse["upload_id"]) {
+          const uploadError =
+            (jsonResponse && jsonResponse["ERROR"]) || "Upload failed: no response from server";
+          setuploadResponse({ ERROR: (t("feedback.error") + ": " + uploadError) });
+          setCollectErrors((prev) => [...prev, uploadError]);
+          error.current = true;
+          break;
         }
-        console.log("ERROR: ", collectErrors);
+        message.current = (jsonResponse["table_exist"] === true) ? "updated" : "created";
 
-
-        while (data.progress < 100) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
-        console.log("Files successfully uploaded");
-      } catch (error) {
-        console.error("Error uploading files:", error);
+        // Processing phase: poll until the backend has finished this upload
+        setPhase("db");
+        await watchProgress(jsonResponse["upload_id"]);
+        if (error.current) break;
+        console.log("File successfully uploaded:", file.name);
+      } catch (uploadError) {
+        console.error("Error uploading files:", uploadError);
+        const msg = `${file.name}: connection lost during transfer`;
+        setuploadResponse({ ERROR: (t("feedback.error") + ": " + msg) });
+        setCollectErrors((prev) => [...prev, msg]);
+        error.current = true;
+        break;
       }
+    }
+
+    if (!error.current) {
+      setuploadResponse({ SUCCESS: (t("feedback.success")) });
     }
     files.current = [];
     setCurFile("");
     setUploadProgress(0);
+    setTransferProgress(0);
+    setPhase("idle");
     complete.current = true;
   };
   //let complete: boolean = (files.length === 0 && uploadResponse !== undefined && (typeof uploadResponse["ERROR"] === 'string' || typeof uploadResponse["SUCCESS"] === 'string'));
@@ -335,25 +317,31 @@ export default function FileUploadForm() {
           )}
             {uploadProgress > 0 && (
               <>
-                <Progress value={uploadProgress} className="w-full" />
-                <div className="text-center text-xs text-slate-600">{uploadProgress}%</div>
+                {/* transfer phase: real bytes sent; db phase: backend progress */}
+                <Progress
+                  value={phase === "transfer" ? transferProgress : uploadProgress}
+                  className="w-full"
+                />
+                <div className="text-center text-xs text-slate-600">
+                  {phase === "transfer" ? transferProgress : uploadProgress}%
+                </div>
               </>
             )}
           {(complete.current || uploadProgress > 0) && files.current.length !== 0 && (
             <div className="flex truncate max-w-xl items-center space-x-2">
               {/* uploading...: */}
               {t.rich("feedback.progressText")}
-              {uploadProgress >= 0 && uploadProgress != 1 ? (
+              {phase !== "transfer" ? (
                 <Check />
               ) : (
                 <LoadingSpinner />
               )}
             </div>
           )}
-          {(complete.current || uploadProgress > 1) && files.current.length !== 0 && (
+          {(complete.current || phase === "db") && files.current.length !== 0 && (
             <div className="flex truncate max-w-xl items-center space-x-2">
                {/* db integration...: */}
-              {t.rich("feedback.progressDBIntegration")} 
+              {t.rich("feedback.progressDBIntegration")}
               {!complete.current && uploadProgress < 99 ? (
                 <LoadingSpinner />
               ) : (

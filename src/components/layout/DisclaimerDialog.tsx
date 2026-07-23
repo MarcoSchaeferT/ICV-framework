@@ -63,12 +63,12 @@ export default function DisclaimerDialog() {
           </h2>
           
           <p className="mb-8 text-md leading-relaxed text-gray-600">
-            Please note that this hosted version of the ICV-Framework is provisioned for the participants of the <span className="font-semibold text-gray-900">CLIMADAMIC Summer School 2026</span>.
+            Please note that this hosted version of the ICV-Framework is a test version only.
             <span className="block mt-4">
-              Access to this specific testing environment is temporary and will remain available for two weeks following the conclusion of the CLIMADAMIC Summer School.
+              Access to this testing environment is temporary.
             </span>
             <span className="block mt-4 font-medium text-amber-700">
-              Data and access links will not be maintained after this period.
+              Data and access links may not be permanently maintained.
             </span>
           </p>
           

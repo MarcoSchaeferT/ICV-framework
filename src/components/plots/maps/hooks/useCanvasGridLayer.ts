@@ -82,17 +82,17 @@ export function useCanvasGridLayer({
             );
 
             if (coords.length > 3) {
-
-
-                const x1 = coords[0].x;
-                const y1 = coords[0].y;
-                const x2 = coords[1].x;
-                const y2 = coords[3].y;
+                const xCoordinates = coords.map(({ x }) => x);
+                const yCoordinates = coords.map(({ y }) => y);
+                const x1 = Math.min(...xCoordinates);
+                const y1 = Math.min(...yCoordinates);
+                const x2 = Math.max(...xCoordinates);
+                const y2 = Math.max(...yCoordinates);
 
                 context.fillStyle =
                     d3.color(colorMap(Number(d.feature)))?.copy({ opacity: layerOpacity })?.toString() ||
                     'rgba(0, 0, 0, 0)';
-                context.fillRect(x1, y1, Math.abs(x2 - x1), Math.abs(y2 - y1));
+                context.fillRect(x1, y1, x2 - x1, y2 - y1);
 
                 if (debug) {
                     context.fillStyle = 'black';

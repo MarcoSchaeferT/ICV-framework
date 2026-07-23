@@ -14,7 +14,8 @@ const nextConfig = {
   experimental: {
     // Increase the default 10MB middleware/proxy limit
     proxyClientMaxBodySize: '2500mb',
-    proxyTimeout: 120000,
+    // Idle-socket timeout for proxied /api requests (http-proxy proxyTimeout).
+    proxyTimeout: 600000,
   },
   compiler: {
     styledComponents: true,

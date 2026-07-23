@@ -137,7 +137,7 @@ export interface LeafD3MapLayerProps {
         isDatePicker: boolean;
         isDistanceLegend: boolean;
         isColorMapLegend: boolean;
-        filterStringForAvailableDatasetInclude: string;
+        filterStringForAvailableDatasetInclude: string | string[];
         filterStringForAvailableDatasetExclude: string;
         filterStringForAvailableFeature: string;
         defaultDatasetName: string;
@@ -183,6 +183,27 @@ export interface LeafD3MapLayerProps {
     isApplyTransitions?: boolean;
     isStaticAutoFitFullSize: boolean;
     isProjection_equirectangular?: boolean;
+}
+
+export function isDatasetIncluded(
+    key: string,
+    includeFilter?: string | string[],
+    excludeFilter?: string
+): boolean {
+    if (excludeFilter && excludeFilter !== "" && key.includes(excludeFilter)) {
+        return false;
+    }
+    if (!includeFilter) {
+        return true;
+    }
+    if (Array.isArray(includeFilter)) {
+        if (includeFilter.length === 0) return true;
+        return includeFilter.some((filter) => filter !== "" && key.includes(filter));
+    }
+    if (includeFilter === "") {
+        return true;
+    }
+    return key.includes(includeFilter);
 }
 
 export function LeafD3MapLayerProps(
@@ -1069,8 +1090,7 @@ const baseStyle: Leaflet.PathOptions = {
         let filterStr = props.mapUIsettings.defaultDatasetName !== "" ? props.mapUIsettings.defaultDatasetName : ""; 
         let key = Object.keys(listOfDataSets).find(key => filterStr === "" || key.includes(filterStr)) ||  "-1";
         if(key === "-1" || filterStr === "") {
-            filterStr = props.mapUIsettings.filterStringForAvailableDatasetInclude || "";
-            key = Object.keys(listOfDataSets).find(key => filterStr === "" || (key.includes(filterStr) && !key.includes(props.mapUIsettings.filterStringForAvailableDatasetExclude))) || Object.keys(listOfDataSets)[0];
+            key = Object.keys(listOfDataSets).find(k => isDatasetIncluded(k, props.mapUIsettings.filterStringForAvailableDatasetInclude, props.mapUIsettings.filterStringForAvailableDatasetExclude)) || Object.keys(listOfDataSets)[0];
         }
         console.log("key:", key, "filterStr:", filterStr, "listOfDataSets:", listOfDataSets);
         curDatasetname.current = listOfDataSets[key];
@@ -2406,15 +2426,17 @@ function DrawSelectedGridCell(GridCellID: number) {
             // Find the selected grid cell's coordinates
             let selectedGridData = gridData.get(GridCellID);
             if (selectedGridData && selectedGridData.geometry) {
-                // Get the bounds of the selected grid cell
-                const selectedGridLat = selectedGridData.geometry[0][0];
-                const selectedGridLng = selectedGridData.geometry[0][1];
-                
-                const selectedTopLeft = map.latLngToLayerPoint([selectedGridLat, selectedGridLng]);
-                const selectedBottomRight = map.latLngToLayerPoint([
-                    selectedGridLat + gridcellSizeLatLng.current.lat,
-                    selectedGridLng + gridcellSizeLatLng.current.lng
-                ]);
+                // Derive bounds from every vertex so polygon winding and
+                // starting-point conventions cannot offset the highlight.
+                const selectedLatitudes = selectedGridData.geometry.map(([lat]) => lat);
+                const selectedLongitudes = selectedGridData.geometry.map(([, lng]) => lng);
+                const north = Math.max(...selectedLatitudes);
+                const south = Math.min(...selectedLatitudes);
+                const west = Math.min(...selectedLongitudes);
+                const east = Math.max(...selectedLongitudes);
+
+                const selectedTopLeft = map.latLngToLayerPoint([north, west]);
+                const selectedBottomRight = map.latLngToLayerPoint([south, east]);
                 
                 const selectedWidth = Math.abs(selectedBottomRight.x - selectedTopLeft.x);
                 const selectedHeight = Math.abs(selectedBottomRight.y - selectedTopLeft.y);
@@ -2423,8 +2445,8 @@ function DrawSelectedGridCell(GridCellID: number) {
                 // Draw the selected grid cell as a non-filled rectangle with yellow stroke
                 svg.append("rect")
                     .attr("class", "selected-grid-cell")
-                    .attr("x", selectedTopLeft.x)
-                    .attr("y", selectedTopLeft.y)
+                    .attr("x", Math.min(selectedTopLeft.x, selectedBottomRight.x))
+                    .attr("y", Math.min(selectedTopLeft.y, selectedBottomRight.y))
                     .attr("width", selectedWidth)
                     .attr("height", selectedHeight)
                     .attr("fill", "none")
@@ -3418,20 +3440,14 @@ useEffect(() => {
                 <SelectGroup>
                     <SelectLabel></SelectLabel>
                         {Object.keys(listOfDataSets).map((key: string, index: number) => {
-                            if (props.mapUIsettings.filterStringForAvailableDatasetInclude != "" ) {
-                                if(key.includes(props.mapUIsettings.filterStringForAvailableDatasetInclude) && !key.includes(props.mapUIsettings.filterStringForAvailableDatasetExclude)) {
+                            if (isDatasetIncluded(key, props.mapUIsettings.filterStringForAvailableDatasetInclude, props.mapUIsettings.filterStringForAvailableDatasetExclude)) {
                                 return (
                                     <SelectItem key={index} value={key}>
                                         {key}
                                     </SelectItem>
                                 );
                             }
-                        }
-                        else {
-                        return(<SelectItem key={index} value={key}>
-                            {key}
-                        </SelectItem>)
-                        }
+                            return null;
                         })}
                     </SelectGroup>
         </SelectContent>

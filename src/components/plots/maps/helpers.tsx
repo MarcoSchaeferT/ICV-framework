@@ -120,9 +120,17 @@ export function pointParser(polygonString: string): [number, number] {
 }
 
 export function getGridCellDims(geoRect: [number, number][]): { gridDimLat: number; gridDimLng: number } {
-    const lngDim =  Math.abs(Number(geoRect[1][0]) - Number(geoRect[2][0]));
-    const latDim =  Math.abs(Number(geoRect[0][1]) - Number(geoRect[1][1]));
-    return { gridDimLat: latDim, gridDimLng: lngDim };
+    if (geoRect.length === 0) {
+        return { gridDimLat: 0, gridDimLng: 0 };
+    }
+
+    const latitudes = geoRect.map(([lat]) => Number(lat));
+    const longitudes = geoRect.map(([, lng]) => Number(lng));
+
+    const gridDimLat = Math.max(...latitudes) - Math.min(...latitudes);
+    const gridDimLng = Math.max(...longitudes) - Math.min(...longitudes);
+
+    return { gridDimLat, gridDimLng };
 }
 
 

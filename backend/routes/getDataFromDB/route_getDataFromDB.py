@@ -145,7 +145,7 @@ async def getDataFromDB():
       # --- Store in cache (only successful responses) ---
       result = response_json.model_dump()
       if response_json.error is None:
-          response_cache.set(cache_key, result)
+          response_cache.set(cache_key, result, scopes=(params.relationName,))
           print(f"[CACHE STORE] {cache_key}")
 
       resp = make_response(jsonify(result))
@@ -702,7 +702,7 @@ async def get_relation_schema(relationName: str) -> dict:
 
   if not records:
       schema = {"exists": False, "has_data": False, "columns": {}}
-      response_cache.set(cache_key, schema)
+      response_cache.set(cache_key, schema, scopes=(sanitized_table,))
       return schema
 
   # Check if table has data
@@ -720,7 +720,7 @@ async def get_relation_schema(relationName: str) -> dict:
       "has_data": has_data,
       "columns": columns
   }
-  response_cache.set(cache_key, schema)
+  response_cache.set(cache_key, schema, scopes=(sanitized_table,))
   return schema
 
 

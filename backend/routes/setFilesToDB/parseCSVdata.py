@@ -1,4 +1,5 @@
 import csv
+import io
 from pathlib import Path
 from typing import Generator, Optional, Union
 
@@ -10,14 +11,14 @@ class ParsedData:
     db_name: str
     column_names: list[str]
     sanitized_column_names: list[str]
-    total_rows: int
+    file_size: int
     file_path: Optional[Path]
 
     def __init__(self):
         self.db_name: str = ""
         self.column_names: list[str] = []
         self.sanitized_column_names: list[str] = []
-        self.total_rows: int = 0
+        self.file_size: int = 0
         self.file_path: Optional[Path] = None
 
 
@@ -30,17 +31,16 @@ async def parseCSVdata(file_path: Path) -> Union[ParsedData, dict]:
             parserObj = csv.DictReader(csvfile)
             column_names = [name for name in parserObj.fieldnames if name] if parserObj.fieldnames is not None else []
 
-            # Count rows without loading into memory
-            total_rows = sum(1 for _ in parserObj)
-
             db_name: str = sanitize_names([Path(filename).stem])[0]
             sanitized_column_names: list[str] = sanitize_names(column_names)
 
-            # Set the parsed data (no rows stored in memory)
+            # Set the parsed data (no rows stored in memory). No row counting —
+            # progress is derived from bytes consumed while streaming, so the
+            # file does not need to be read twice.
             parsedCSVdata.db_name = db_name
             parsedCSVdata.column_names = column_names
             parsedCSVdata.sanitized_column_names = sanitized_column_names
-            parsedCSVdata.total_rows = total_rows
+            parsedCSVdata.file_size = file_path.stat().st_size
             parsedCSVdata.file_path = file_path
 
             return parsedCSVdata
@@ -50,13 +50,21 @@ async def parseCSVdata(file_path: Path) -> Union[ParsedData, dict]:
         return data
 
 
-def stream_csv_rows(file_path: Path) -> Generator[dict, None, None]:
-    """Generator that yields CSV rows one at a time without loading entire file into memory"""
+def stream_csv_rows(file_path: Path) -> Generator[tuple[dict, int], None, None]:
+    """Generator that yields (row, bytes_consumed) pairs one at a time without
+    loading the entire file into memory.
+
+    bytes_consumed is the byte offset the underlying reader has consumed so
+    far — used together with ParsedData.file_size for progress reporting
+    (slightly ahead of the parsed row due to read buffering, which is fine
+    for a progress bar).
+    """
     try:
-        with open(file_path, mode="r", encoding="utf-8") as csvfile:
+        with open(file_path, mode="rb") as rawfile:
+            csvfile = io.TextIOWrapper(rawfile, encoding="utf-8", newline="")
             parserObj = csv.DictReader(csvfile)
             for row in parserObj:
-                yield row
+                yield row, rawfile.tell()
     except Exception as e:
         print(f"ERROR streaming CSV file: {e}")
         raise

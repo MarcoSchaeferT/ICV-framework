@@ -77,11 +77,12 @@ async def delete_relation() -> Response:
     except Exception as e:
         return jsonify({"error": f"Failed to drop table: {e}"}), 500
 
-    # Invalidate cache entries for the deleted table
+    # Invalidate cache entries for the deleted table — the Redis epoch bump
+    # inside invalidate() makes ALL workers drop their entries, not just the
+    # one that handled this request. (getListOfRelationsDB is uncached, so
+    # no extra invalidation is needed for the relations list.)
     evicted = response_cache.invalidate(relation_name)
-    # Also invalidate the relations-list cache
-    response_cache.invalidate("getListOfRelationsDB")
-    print(f"[CACHE] Invalidated {evicted} entries for table '{relation_name}'")
+    print(f"[CACHE] Invalidated {evicted} local entries for table '{relation_name}'")
 
     return jsonify({"success": True, "deleted": relation_name})
 

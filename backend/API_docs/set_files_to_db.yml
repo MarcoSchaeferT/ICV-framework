@@ -1,7 +1,7 @@
 tags:
   - REST Endpoints
 summary: Upload CSV files to database
-description: Uploads one or more CSV files to the database, creating new tables or updating existing ones. The endpoint processes the files, parses the CSV data, creates appropriate database schema, and inserts the data. After successful upload, it syncs the Prisma schema with the database.
+description: Uploads one or more CSV files to the database, creating new tables or updating existing ones. The files are saved and the endpoint returns immediately with an upload_id; parsing and insertion continue in the background. Poll /api/uploadStatus?id=<upload_id> for progress and errors.
 consumes:
   - multipart/form-data
 parameters:
@@ -13,7 +13,7 @@ parameters:
     collectionFormat: multi
 responses:
   200:
-    description: Files successfully uploaded and processed
+    description: Files saved, background processing started
     content:
       application/json:
         schema:
@@ -21,13 +21,21 @@ responses:
           properties:
             SUCCESS:
               type: string
-              example: "Files uploaded successfully"
+              example: "Files upload started"
+            upload_id:
+              type: string
+              description: ID to poll via /api/uploadStatus for progress and errors.
+              example: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
             file_paths:
               type: array
               items:
                 type: string
               description: List of file paths where the files were saved.
               example: ["/backend/assets/uploads_tmp/mosquito_data.csv"]
+            table_exist:
+              type: boolean
+              description: Whether a table for the uploaded file already existed (upload updates it instead of creating it).
+              example: false
   400:
     description: Bad request - no files provided or invalid request
     content:

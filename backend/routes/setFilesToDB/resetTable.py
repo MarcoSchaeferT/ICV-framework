@@ -3,8 +3,6 @@ from backend.routes.setFilesToDB.db_utils import get_db_connection_params
 
 
 async def resetTable(db_name: str):
-    from backend.index import fileUploadErrors
-    
     try:
         conn_params = get_db_connection_params()
         

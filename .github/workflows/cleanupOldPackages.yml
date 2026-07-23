@@ -35,11 +35,3 @@ jobs:
           package: icv-backend
           keep-n-tagged: 3
           delete-untagged: true
-
-      # 4. Cleanup PgBouncer Versions Safely
-      - name: Clean up icv-pgbouncer
-        uses: dataaxiom/ghcr-cleanup-action@v1
-        with:
-          package: icv-pgbouncer
-          keep-n-tagged: 3
-          delete-untagged: true

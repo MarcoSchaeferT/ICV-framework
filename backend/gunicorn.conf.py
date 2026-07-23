@@ -19,7 +19,8 @@ bind = "0.0.0.0:5222"
 # Formula: workers = min(2 * CPU + 1, 4) — capped at 4 by default to keep the memory footprint
 # low, since we use gthread with 4 threads (giving 16 concurrent request handlers).
 # Configurable via GUNICORN_WORKERS env var.
-workers = int(os.getenv("GUNICORN_WORKERS", min(2 * multiprocessing.cpu_count() + 1, 4)))
+_env_workers = os.getenv("GUNICORN_WORKERS")
+workers = int(_env_workers) if _env_workers and _env_workers.isdigit() else min(2 * multiprocessing.cpu_count() + 1, 4)
 worker_class = "gthread"
 
 # Threads per worker — each thread can handle one request concurrently.
@@ -30,10 +31,17 @@ threads = 4
 # ---------------------------------------------------------------------------
 # Timeouts
 # ---------------------------------------------------------------------------
-# Large CSV uploads (up to 2.5 GB via Next.js proxy) and SVG generation
-# can take a long time. The graceful timeout gives workers time to finish
-# in-flight requests during reload/shutdown.
-timeout = 300          # 5 minutes — matches proxyTimeout (120s) with margin
+# NOTE: with gthread workers `timeout` is a LIVENESS check, not a per-request
+# limit — the worker's main thread heartbeats to the arbiter while request
+# threads run, so slow multi-GB uploads and long SVG generation are NOT
+# bounded by it. Request duration is instead limited upstream:
+#   - Node requestTimeout: disabled in the frontend container
+#     (server-timeouts.cjs) so slow client uploads can stream in
+#   - Next.js proxyTimeout (600s idle, next.config.mjs): time the backend may
+#     stay silent after the last request byte before responding
+# The graceful timeout gives workers time to finish in-flight requests during
+# reload/shutdown.
+timeout = 300
 graceful_timeout = 120
 
 # ---------------------------------------------------------------------------
@@ -58,9 +66,12 @@ keepalive = 5
 # 3. Reduces per-worker startup time
 #
 # IMPORTANT: The ResponseCache singleton is initialized before fork,
-# but each forked worker gets its own copy (copy-on-write). This means
-# each worker maintains its own cache. For this app's scale this is fine,
-# but for multi-worker cache sharing, consider Redis in the future.
+# but each forked worker gets its own copy (copy-on-write), so cached
+# VALUES are per-worker (they can be hundreds of MB — too big for Redis).
+# INVALIDATION is still correct across workers: entries are validated
+# against shared Redis epoch counters (see backend/cache.py), on the same
+# Redis instance that backs the upload progress/error state
+# (backend/upload_state.py).
 preload_app = True
 
 # ---------------------------------------------------------------------------
