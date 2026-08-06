@@ -1,5 +1,6 @@
 from flask import request, jsonify, Blueprint, make_response
 from backend.routes.setFilesToDB.db_utils import query_raw
+from backend.routes.processData.aggregateRKIdata import aggregate_rki_data
 from backend.cache import response_cache, make_cache_key
 import time
 from math import ceil
@@ -23,6 +24,7 @@ class RequestParams(BaseModel):
   filterValue: Optional[str] = None
   startDate: Optional[str] = None
   endDate: Optional[str] = None
+  targetDate: Optional[str] = None
   task: Optional[str] = None
   aggregation_level: Optional[str] = None
 
@@ -51,6 +53,7 @@ async def getDataFromDB():
           filterValue=request.args.get("filterValue"),
           startDate=request.args.get("startDate"),
           endDate=request.args.get("endDate"),
+          targetDate=request.args.get("targetDate"),
           # aggregation_level is optional, used for filtering data by aggregation level (e.g., country (aggregation_level=0), (aggregation_level=1))
           aggregation_level=request.args.get("aggregation_level"),
           task=request.args.get("task")
@@ -63,7 +66,7 @@ async def getDataFromDB():
       cache_key = make_cache_key(
           "getDataFromDB", params.relationName, params.feature,
           params.filterBy, params.filterValue,
-          params.startDate, params.endDate,
+          params.startDate, params.endDate, params.targetDate,
           params.task, params.aggregation_level,
       )
       cached = response_cache.get(cache_key)
@@ -82,6 +85,9 @@ async def getDataFromDB():
       endDate: Optional[str] = params.endDate
       aggregation_level: Optional[str] = params.aggregation_level
 
+      if feature.upper() == "ALL":
+        feature = "ALL"
+
       isFeatureScan = False
       if feature.endswith("*"):
         feature = feature[:-1]
@@ -94,6 +100,18 @@ async def getDataFromDB():
       # Check table existence and retrieve columns using schema cache
       schema = await get_relation_schema(relationName)
       
+      # Auto-trigger incremental aggregation on demand if an aggregated table is requested
+      if relationName.endswith("_aggregated"):
+          source_table = relationName[:-11]
+          source_schema = await get_relation_schema(source_table)
+          if source_schema["exists"] and source_schema["has_data"]:
+              try:
+                  aggregate_rki_data(source_table=source_table, target_table=relationName, targetDate=params.targetDate)
+                  response_cache.invalidate(relationName)
+                  schema = await get_relation_schema(relationName)
+              except Exception as agg_err:
+                  print(f"[INCREMENTAL AGGREGATE ERROR] Failed for '{relationName}': {agg_err}")
+
       response_json.relationName = relationName
       if not schema["exists"]:
         response_json.error = f"Table '{relationName}' does not exist in the database. Please check the table name or upload the dataset first."
@@ -111,7 +129,7 @@ async def getDataFromDB():
         print("feature", feature)
 
       # Safeguards: Validate that requested columns exist in the table
-      if not isFeatureScan and feature != "ALL":
+      if not isFeatureScan and feature.upper() != "ALL":
         if feature not in response_json.header:
           response_json.error = f"Column '{feature}' does not exist in table '{relationName}'."
           return response_json.model_dump()
@@ -128,7 +146,7 @@ async def getDataFromDB():
       if isFeatureScan:
         [response_json.response, response_json.error] = await getDBdata_multiCol(relationName, feature, filterBy, filterValue, startDate, endDate, aggregation_level)
       elif feature == "ALL":
-         [response_json.response, response_json.error] = await getDBdata_allCols(relationName)
+         [response_json.response, response_json.error] = await getDBdata_allCols(relationName, params.targetDate, startDate, endDate)
       else:
         match params.task:
           case "getUniqueEntries":
@@ -138,7 +156,7 @@ async def getDataFromDB():
           case "getCount":
              [response_json.response, response_json.error] = await getDBdata_singleColCount(relationName, feature, filterBy, filterValue)
           case _:
-             [response_json.response, response_json.error] = await getDBdata_singleCol(relationName, feature, filterBy, filterValue, startDate, endDate, aggregation_level)
+             [response_json.response, response_json.error] = await getDBdata_singleCol(relationName, feature, filterBy, filterValue, startDate, endDate, aggregation_level, params.targetDate)
              if response_json.error:
                 response_json.error = "ERROR: task-> "+str(params.task)+ " unknown -OR- " + response_json.error
 
@@ -156,7 +174,7 @@ async def getDataFromDB():
 
 
 
-async def getDBdata_singleCol( relationName: str, feature: str, filterBy: Optional[List[str]], filterValue: Optional[List[str]], startDate: Optional[str], endDate: Optional[str], aggregation_level: Optional[str] = None) -> tuple[object, str | None]:
+async def getDBdata_singleCol( relationName: str, feature: str, filterBy: Optional[List[str]], filterValue: Optional[List[str]], startDate: Optional[str], endDate: Optional[str], aggregation_level: Optional[str] = None, targetDate: Optional[str] = None) -> tuple[object, str | None]:
   start_time = time.time()
   
   # 1. Get column names to set up filters from schema cache
@@ -164,13 +182,18 @@ async def getDBdata_singleCol( relationName: str, feature: str, filterBy: Option
   column_names = list(schema["columns"].keys())
   
   # 2. Build safe selection list
-  select_items = [sql.Identifier("id"), sql.Identifier("geometry"), sql.Identifier(feature)]
+  select_items = []
+  if "id" in column_names: select_items.append(sql.Identifier("id"))
+  if "geometry" in column_names: select_items.append(sql.Identifier("geometry"))
+  select_items.append(sql.Identifier(feature))
   
   if "bundesland" in column_names: select_items.append(sql.Identifier("bundesland"))
   if "latitude" in column_names: select_items.append(sql.Identifier("latitude"))
   if "longitude" in column_names: select_items.append(sql.Identifier("longitude"))
   if "subregion1_name" in column_names: select_items.append(sql.Identifier("subregion1_name"))
   if "country_name" in column_names: select_items.append(sql.Identifier("country_name"))
+  if "date" in column_names: select_items.append(sql.Identifier("date"))
+  if "datenstand" in column_names: select_items.append(sql.Identifier("datenstand"))
   
   feature_type = await get_feature_column_type(relationName, feature)
 
@@ -202,9 +225,16 @@ async def getDBdata_singleCol( relationName: str, feature: str, filterBy: Option
       conditions.append(conditionBuilderRange(startDate, endDate, 'date', params))
 
   if aggregation_level and "aggregation_level" in column_names:
-
       conditions.append(sql.SQL("aggregation_level = %s"))
       params.append(aggregation_level)
+
+  if "datenstand" in column_names:
+      filter_date = targetDate or endDate or startDate
+      if filter_date:
+          conditions.append(sql.SQL("datenstand = (SELECT MAX(datenstand) FROM {} WHERE datenstand <= %s)").format(sql.Identifier(relationName)))
+          params.append(filter_date)
+      else:
+          conditions.append(sql.SQL("datenstand = (SELECT MAX(datenstand) FROM {})").format(sql.Identifier(relationName)))
 
   # 4. Construct final query
   query = sql.SQL("SELECT {} FROM {}").format(
@@ -215,7 +245,8 @@ async def getDBdata_singleCol( relationName: str, feature: str, filterBy: Option
   if conditions:
       query += sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions)
       
-  query += sql.SQL(" ORDER BY id")
+  if "id" in column_names:
+      query += sql.SQL(" ORDER BY id")
   
   print("**query", query)
   try:
@@ -241,14 +272,15 @@ async def getDBdata_singleCol( relationName: str, feature: str, filterBy: Option
     try:
         records_json = [
             {
-              "id": record["id"],
-              "geometry": record["geometry"],
+              "id": record.get("id"),
+              "geometry": record.get("geometry"),
               "feature": record[feature],
               "bundesland": record.get("bundesland", ""),
               "latitude": record.get("latitude"),
               "longitude": record.get("longitude"),
               "subregion_name": record.get("subregion1_name", ""),
-              "country_name": record.get("country_name", "")
+              "country_name": record.get("country_name", ""),
+              "date": str(record.get("date") or record.get("datenstand") or "") if (record.get("date") or record.get("datenstand")) else None
             }
             for record in records_raw
         ]
@@ -574,18 +606,57 @@ async def getDBdata_multiCol( relationName: str, feature: str, filterBy: Optiona
 
 
 
-async def getDBdata_allCols(relationName) -> tuple[object, str | None]:
+async def getDBdata_allCols(relationName: str, targetDate: Optional[str] = None, startDate: Optional[str] = None, endDate: Optional[str] = None) -> tuple[object, str | None]:
   start_time = time.time()
-  
-  query = sql.SQL("SELECT * FROM {}").format(sql.Identifier(relationName))
-  records_raw  = None
-  print("query", query)
-  try:
-    records_raw = await query_raw(query)
-  except Exception as e:
-        print("ERROR DB QUERY-", e)
-        data = "ERROR DB QUERY " + str(e)
-        return ("", data)
+  schema = await get_relation_schema(relationName)
+  column_names = list(schema["columns"].keys())
+
+  date_col = "datenstand" if "datenstand" in column_names else ("date" if "date" in column_names else None)
+
+  if date_col:
+      if startDate and endDate:
+          if startDate == endDate:
+              query = sql.SQL("SELECT * FROM {} WHERE {} = %s ORDER BY id").format(
+                  sql.Identifier(relationName), sql.Identifier(date_col)
+              )
+              query_params = (endDate,)
+          else:
+              query = sql.SQL("""
+                  SELECT * FROM {} 
+                  WHERE {} = %s OR {} = (SELECT MAX({}) FROM {} WHERE {} <= %s)
+                  ORDER BY {}, id
+              """).format(
+                  sql.Identifier(relationName),
+                  sql.Identifier(date_col),
+                  sql.Identifier(date_col),
+                  sql.Identifier(date_col),
+                  sql.Identifier(relationName),
+                  sql.Identifier(date_col),
+                  sql.Identifier(date_col)
+              )
+              query_params = (endDate, startDate)
+      elif targetDate:
+          query = sql.SQL("SELECT * FROM {} WHERE {} = %s ORDER BY id").format(
+              sql.Identifier(relationName), sql.Identifier(date_col)
+          )
+          query_params = (targetDate,)
+      else:
+          query = sql.SQL("SELECT * FROM {} WHERE {} = (SELECT MAX({}) FROM {}) ORDER BY id").format(
+              sql.Identifier(relationName), sql.Identifier(date_col), sql.Identifier(date_col), sql.Identifier(relationName)
+          )
+          query_params = ()
+      try:
+          records_raw = await query_raw(query, query_params)
+      except Exception as e:
+          print("ERROR DB QUERY-", e)
+          return ("", f"ERROR DB QUERY {e}")
+  else:
+      query = sql.SQL("SELECT * FROM {}").format(sql.Identifier(relationName))
+      try:
+          records_raw = await query_raw(query)
+      except Exception as e:
+          print("ERROR DB QUERY-", e)
+          return ("", f"ERROR DB QUERY {e}")
   print("records_raw", len(records_raw))
   
 
@@ -595,8 +666,16 @@ async def getDBdata_allCols(relationName) -> tuple[object, str | None]:
   print(f"Query execution time: {end_time - start_time} seconds")
   start_processing_time = time.time()
 
-  records_json = {}
-  records_json = [dict(record) for record in records_raw]
+  import datetime
+  records_json = []
+  for record in records_raw:
+      rec_dict = {}
+      for k, v in record.items():
+          if isinstance(v, (datetime.date, datetime.datetime)):
+              rec_dict[k] = v.strftime("%Y-%m-%d")
+          else:
+              rec_dict[k] = v
+      records_json.append(rec_dict)
   print("records_json", len(records_json))
 
 
@@ -693,7 +772,7 @@ async def get_relation_schema(relationName: str) -> dict:
       return cached
 
   sanitized_table = relationName.strip('"')
-  query = sql.SQL("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = %s")
+  query = sql.SQL("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = %s ORDER BY ordinal_position")
   try:
       records = await query_raw(query, (sanitized_table,))
   except Exception as e:

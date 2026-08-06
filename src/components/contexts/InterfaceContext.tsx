@@ -69,6 +69,8 @@ export interface interfaceContextI {
     setDonutChartSelectedColumnName: React.Dispatch<React.SetStateAction<string>>;
     geoAssignmentColumnNameForDonut: string;
     setGeoAssignmentColumnNameForDonut: React.Dispatch<React.SetStateAction<string>>;
+    targetDate?: string;
+    setTargetDate: React.Dispatch<React.SetStateAction<string | undefined>>;
 }
 
 
@@ -117,6 +119,7 @@ function InterfaceContextProvider({children}: any) {
     const [donutChartSelectedColumnName, setDonutChartSelectedColumnName] = useState<string>("serotype_genbank");
     const [geoAssignmentColumnNameForDonut, setGeoAssignmentColumnNameForDonut] = useState<string>("country");
     const [mapCoords, setMapCoords] = useState<{ latitude: number; longitude: number; zoom: number }>({ latitude: 0, longitude: 0, zoom: 0 });
+    const [targetDate, setTargetDate] = useState<string | undefined>(undefined);
 
   
     return (
@@ -152,7 +155,8 @@ function InterfaceContextProvider({children}: any) {
             donutChartSelectedColumnName, setDonutChartSelectedColumnName,
             geoAssignmentColumnNameForDonut, setGeoAssignmentColumnNameForDonut,
             mapCoords, setMapCoords,
-            mouseEvent,}}>
+            mouseEvent,
+            targetDate, setTargetDate,}}>
             {children}
          </GinterfaceContext.Provider>
          </>

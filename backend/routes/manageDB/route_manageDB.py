@@ -74,6 +74,10 @@ async def delete_relation() -> Response:
             sql.Identifier(relation_name)
         )
         await execute_raw(drop_query)
+
+        # Clean up corresponding metadata entries for the deleted relation
+        await execute_raw("DELETE FROM column_metadata_en WHERE relation_name = %s", (relation_name,))
+        await execute_raw("DELETE FROM column_metadata_de WHERE relation_name = %s", (relation_name,))
     except Exception as e:
         return jsonify({"error": f"Failed to drop table: {e}"}), 500
 

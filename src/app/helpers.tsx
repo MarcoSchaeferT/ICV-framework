@@ -1,4 +1,4 @@
-import { dictStates_mapGermany, dictStates_TableGermany, dbDATA } from "./const_store";
+import { dictStates_mapGermany, dictStates_TableGermany, dictStates_AbbrGermany, dbDATA } from "./const_store";
 
 
 /**
@@ -72,6 +72,22 @@ class stateMappersGermany {
     let result = stateName === undefined ? "" : stateName[0];
     console.log(result);
     return result;
+  }
+
+  /**
+   * Maps a state name or ID to its 3-letter abbreviation.
+   * @param state - The name or ID of the state.
+   * @returns The 3-letter abbreviation of the state.
+   */
+  public static Table__State_to_Abbr(state: string | number): string {
+    if (typeof state === "number" || (!isNaN(Number(state)) && typeof state === "string" && state.trim() !== "" && !dictStates_AbbrGermany[state])) {
+      const stateName = this.Table__ID_to_State(Number(state));
+      if (stateName && dictStates_AbbrGermany[stateName]) {
+        return dictStates_AbbrGermany[stateName];
+      }
+    }
+    const stateStr = String(state);
+    return dictStates_AbbrGermany[stateStr] ?? stateStr;
   }
 
   /***************************

@@ -15,6 +15,7 @@ import {
     useGridLayer,
     useLayerUpdateDebounce,
     useTooltipCleanup,
+    useDynamicSettingsTop,
 } from './hooks';
 import { clampCoordinates, resetTimeout as sharedResetTimeout, removeReusedTooltip } from './utils/mapUtils';
 import MapContentChild from './MapContentChild';
@@ -30,7 +31,9 @@ import {
     getCountryCenterFromMapData,
     getContrastTextColorForBgColor,
     getOceanMaskGeoJSON,
+    renderStandardTooltipHTML,
 } from './helpers';
+import stateMappersGermany from '@/app/helpers';
 import {
     metaDataT,
     alignFeature_to_Metadata,
@@ -54,7 +57,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Checkbox } from "@/components/ui/checkbox";
 import { useLocale ,useTranslations } from "next-intl";
-import { t_richConfig, country_names, country_names_de, dbDATA, categoricalColors, categoryCoordsMap } from '@/app/const_store';
+import { t_richConfig, country_names, country_names_de, dbDATA, categoricalColors, categoryCoordsMap, GERMAN_STATE_ALIASES } from '@/app/const_store';
 import { Locale } from '@/i18n/routing';
 import useChartResizer from '@/app/hooks/useChartResizer';
 import * as GEOjson from 'geojson';
@@ -98,93 +101,406 @@ import { getGoodReadableRange } from './helpers';
 import type * as Leaflet from "leaflet";
 import { metadata } from '@/app/[locale]/layout';
 
+/** Pre-configured Leaflet base-map props used as a starting template by every `LeafD3MapLayerComponent` instance. */
 let leafProps = LeafletComponentProps("LeafletMap1", apiRoutes.FETCH_MAP_DATA.WORLD_MAP, "exampleVar");
 leafProps.center = [-20, 25.8];
 leafProps.zoom = 1.5;
 
+/**
+ * Duration in milliseconds for the animated `flyTo` transition when the map
+ * navigates to a newly selected country or region.
+ *
+ * @remarks
+ * This value is shared with `useMapTransition` and controls both the Leaflet
+ * `flyTo` animation and the grid-layer transition guard that suppresses
+ * redundant canvas redraws during the tween.
+ */
 const mapFlyTransitionTime = 1800;
 
+/** Horizontal pixel offset between overlay legends and the map container edge. */
 const legendDistanceToMapBorderX = 5;
+/** Vertical pixel offset between overlay legends and the map container edge. */
 const legendDistanceToMapBorderY = 5;
+/** Approximate pixel height of the Leaflet attribution logo, used to offset the color-map legend. */
 const leafletLogoHeight = 14;
 
 // Default dates moved to state within the component
 
 
 /**
- * Class representing the properties for a D3 map with layer.
+ * Full configuration interface for a single ICV `LeafD3MapLayerComponent`
+ * instance.
+ *
+ * Combines map viewport settings, UI control visibility, data-layer
+ * toggles, interaction guards, and visual styling into one cohesive
+ * props contract. Use the companion factory function
+ * {@link LeafD3MapLayerProps} to create a fully-defaulted instance.
+ *
+ * @remarks
+ * The component supports three heterogeneous data streams rendered as
+ * independent visual layers:
+ * 1. **Grid data** – rasterised environmental / model-prediction cells
+ *    drawn via a Leaflet `L.GridLayer` (canvas tiles).
+ * 2. **Presence data** – point observations (e.g. mosquito sightings or
+ *    COVID-19 case aggregates) rendered as D3 circles / image overlays.
+ * 3. **Sequence metadata** – per-country donut charts showing
+ *    taxonomic or serotype distributions (e.g. Dengue DENV-1–4).
+ *
+ * Client and server state are decoupled via `InterfaceContext`; set
+ * `isApplyContextData` to subscribe to global context changes and
+ * `isSetIntialContextDataFromComponent` to seed the context from this
+ * component's defaults on mount.
+ *
+ * @example
+ * ```tsx
+ * import { LeafD3MapLayerProps } from './LeafD3Map';
+ *
+ * const config: LeafD3MapLayerProps = {
+ *   chartName: "albopictus-habitat-map",
+ *   mapDataURL: "/api/map/world",
+ *   dataURL: "/api/data/grid",
+ *   center: [51.16, 10.45],
+ *   zoom: 5,
+ *   mapUIsettings: {
+ *     areSettingsOpen: true,
+ *     isLongitudeSlider: true,
+ *     isLatitudeSlider: true,
+ *     isZoomSlider: true,
+ *     isColorMapSelectionDropdown: true,
+ *     isFeatureSelectionDropdown: true,
+ *     isDatasetSelectionDropdown: true,
+ *     isCountrySelectionDropdown: false,
+ *     isCountrySelectionDropdownMapBased: false,
+ *     isDoNotApplyCountryFromContext: false,
+ *     isDatePicker: false,
+ *     isDistanceLegend: true,
+ *     isColorMapLegend: true,
+ *     filterStringForAvailableDatasetInclude: "albopictus",
+ *     filterStringForAvailableDatasetExclude: "?",
+ *     filterStringForAvailableFeature: "",
+ *     defaultDatasetName: "t_2024_monthly_mean_7_ocsvm_albopictus",
+ *     defaultFeatureName: "prob_7",
+ *     defaultDatasetURL: "",
+ *     defaultFeatureColorMap: "interpolateInferno",
+ *     isPresenceData: true,
+ *     isPresenceDataChecked: true,
+ *     presenceDataColor: "rgb(239, 23, 23)",
+ *     isSequenceMetaData: false,
+ *     isSequenceMetaDataChecked: false,
+ *     defaultDonutSize: 50,
+ *     defaultLayerOpacity: 0.85,
+ *   },
+ *   mapInteractions: { disableMouse: false, disableScroll: false, disableClick: false },
+ *   mapDataSets: { isGridData: true, isPresenceData: true, isSequenceMetaData: false },
+ *   mapStyles: {
+ *     strokeWidth: 1.5,
+ *     strokeColor: "#000000",
+ *     fillColor: "#ffffff",
+ *     fillOpacity: 0.0,
+ *     backgroundColor: "#ffffff",
+ *   },
+ *   isApplyContextData: true,
+ *   isStaticAutoFitFullSize: false,
+ * };
+ * ```
+ *
+ * @see {@link LeafD3MapLayerProps} (factory function)
+ * @see {@link LeafD3MapLayerComponent} for the primary map component consumer.
+ * @see {@link useInterfaceContext} for multi-view state context synchronization.
+ * @see {@link useGridLayer} for spatial canvas tile layer rendering.
+ * @see {@link useGetJSONData} for API payload fetching and LRU caching.
+ * @see {@link useGridDataParser} for geometry indexing.
  */
 export interface LeafD3MapLayerProps {
+    /** Unique DOM id for the root `<svg>` / chart container. Must be page-unique when multiple maps coexist. */
     chartName: string;
+    /** URL (or GeoJSON object) for the base political boundary map (e.g. world countries). */
     mapDataURL: any;
+    /** URL (or raw data) for the primary analytical dataset rendered as the grid layer. */
     dataURL: any;
+    /** Initial map centre as `[latitude, longitude]`. */
     center: [number, number];
+    /** Initial zoom level. Clamped to `[MIN_ZOOM, MAX_ZOOM]` at runtime. */
     zoom: number;
+
+    /**
+     * UI control visibility and defaults for the settings panel overlay.
+     *
+     * @remarks
+     * All boolean `is*` flags toggle the **visibility** of the respective
+     * control widget. The `default*` strings set the initial value for
+     * dropdowns and are reconciled with the global `InterfaceContext`
+     * on mount.
+     */
     mapUIsettings: {
+        /**
+         * Whether the settings panel starts expanded.
+         * @default true
+         */
         areSettingsOpen?: boolean;
+        /**
+         * Enable a CSS opacity+scale transition when toggling the settings panel.
+         * @default false
+         */
         isSettingsBlendAnimation?: boolean;
+        /**
+         * If `true`, the settings-toggle gear icon auto-hides after the panel closes.
+         * @default false
+         */
         isAutoHideSettingsToggle?: boolean;
+        /** Show the longitude range slider. */
         isLongitudeSlider: boolean;
+        /** Show the latitude range slider. */
         isLatitudeSlider: boolean;
+        /** Show the zoom range slider. */
         isZoomSlider: boolean;
+        /**
+         * Show the lat/lng/zoom numeric overlay in the lower-left corner.
+         * @default true
+         */
         isLatLngZoomOverlay?: boolean;
+        /** Show the color-map palette dropdown (e.g. Inferno, Viridis, RdBu). */
         isColorMapSelectionDropdown: boolean;
+        /** Show the feature / variable selection dropdown. */
         isFeatureSelectionDropdown: boolean;
+        /** Show the dataset selection dropdown. */
         isDatasetSelectionDropdown: boolean;
+        /** Show the country selection dropdown (plain text list). */
         isCountrySelectionDropdown: boolean;
+        /**
+         * When `true`, selecting a country from the dropdown also flies the map
+         * viewport to the selected country's bounding box.
+         */
         isCountrySelectionDropdownMapBased: boolean;
+        /**
+         * When `true`, the component ignores `selectedCountry` updates from
+         * `InterfaceContext`. Useful when two maps share a context but need
+         * independent country selections.
+         */
         isDoNotApplyCountryFromContext: boolean;
+        /** Show the date-range picker (calendar popover). */
         isDatePicker: boolean;
+        /** Show the distance scale-bar legend in the lower-left corner. */
         isDistanceLegend: boolean;
+        /** Show the continuous colour-map legend in the lower-right corner. */
         isColorMapLegend: boolean;
+        /**
+         * Include filter for dataset keys. Only datasets whose key contains at
+         * least one of these substrings are shown in the dropdown.
+         * An empty string or empty array means "show all".
+         */
         filterStringForAvailableDatasetInclude: string | string[];
+        /**
+         * Exclude filter for dataset keys. Datasets whose key contains this
+         * substring are hidden from the dropdown.
+         * @default "?"
+         */
         filterStringForAvailableDatasetExclude: string;
+        /**
+         * If set, only features (column names) containing this substring are
+         * shown in the feature dropdown. Useful for monthly prediction columns
+         * like `"prob_"` or `"mean_"`. An empty string means "show all".
+         */
         filterStringForAvailableFeature: string;
+        /** Database relation name of the initially selected dataset. */
         defaultDatasetName: string;
+        /** Column name of the initially selected feature / variable. */
         defaultFeatureName: string;
+        /**
+         * Activates the COVID-19 epidemiology view mode. In this mode the map
+         * reads aggregated RKI data for Germany, renders SVG circles instead of
+         * a raster grid, and supports country/sub-region aggregation toggles.
+         * @default false
+         */
         inCovidDataView?: boolean;
+        /** Fully-resolved API URL for the default dataset (auto-populated by the factory). */
         defaultDatasetURL: string;
+        /**
+         * D3 interpolator key used as the default color map.
+         * @default "interpolateInferno"
+         */
         defaultFeatureColorMap: string;
+        /** Enable the presence-data layer toggle checkbox in the UI. */
         isPresenceData: boolean;
+        /** Whether the presence-data layer is initially checked (active). */
         isPresenceDataChecked: boolean;
+        /**
+         * CSS colour string for presence-data point markers.
+         * Falls back to `"rgb(239, 23, 23)"` (red) when empty.
+         */
         presenceDataColor: string;
+        /** Enable the sequence-metadata (donut chart) layer toggle in the UI. */
         isSequenceMetaData: boolean;
+        /** Whether the sequence-metadata layer is initially checked (active). */
         isSequenceMetaDataChecked: boolean;
+        /**
+         * Base diameter (in pixels) of per-country donut charts.
+         * Actual rendered size is scaled by a `d3.scaleSqrt` based on sample count.
+         * @default 50
+         */
         defaultDonutSize: number;
+        /**
+         * Opacity of the data overlay layer (grid tiles, presence dots).
+         * Range: `[0, 1]`.
+         * @default 0.85
+         */
         defaultLayerOpacity: number;
+        /**
+         * Request country-level aggregation (`aggregation_level=0`) from the API.
+         * Mutually exclusive with `isSubregionLevelData` unless both are active
+         * (in which case no aggregation filter is appended).
+         */
         isCountryLevelData?: boolean;
+        /**
+         * Request sub-region-level aggregation (`aggregation_level=1`) from the API.
+         * Auto-toggled at runtime when zoom crosses `zoomBreakpoint` in COVID view.
+         */
         isSubregionLevelData?: boolean;
+        /**
+         * Show country-level / sub-region-level checkboxes for data filtering.
+         * Only meaningful in COVID epidemiology view.
+         */
         dataFilteringCheckboxes?: boolean;
     };
+
+    /**
+     * Guards to selectively disable user interaction with the Leaflet map.
+     *
+     * @remarks
+     * Useful for "thumbnail" or "preview" map instances embedded inside
+     * showcase cards where pan/zoom should be locked.
+     */
     mapInteractions: {
+        /** Disable mouse dragging (pan). @default false */
         disableMouse?: boolean;
+        /** Disable scroll-wheel zoom. @default false */
         disableScroll?: boolean;
+        /** Disable click-to-select on polygons and grid cells. @default false */
         disableClick?: boolean;
     };
+
+    /**
+     * Feature flags controlling which data layers the component should
+     * fetch and render.
+     */
     mapDataSets: {
+        /** Fetch and render the rasterised grid data layer (canvas tiles). */
         isGridData: boolean;
+        /** Fetch and render point-based presence / occurrence data. */
         isPresenceData: boolean;
+        /** Fetch and render per-country sequence-metadata donut charts. */
         isSequenceMetaData: boolean;
+        /**
+         * Fetch and render capital city name labels at high zoom levels.
+         * @default true
+         */
         isCityNames?: boolean;
     };
+
+    /**
+     * Leaflet `PathOptions`-compatible styling for country polygons
+     * and the map background.
+     */
     mapStyles: {
+        /** Stroke width in pixels for country borders. @default 1.5 */
         strokeWidth: number;
+        /** Hex colour for country border strokes. @default "#000000" */
         strokeColor: string;
+        /** Hex colour for country polygon fills. @default "#ffffff" */
         fillColor: string;
+        /** Fill opacity for country polygons. Range `[0, 1]`. @default 0.0 */
         fillOpacity: number;
+        /** CSS background colour of the map container (ocean areas). @default "#ffffff" */
         backgroundColor: string;
+        /**
+         * Show the standard grid-data tooltip on mouse hover.
+         * @default true
+         */
         isTooltopVisible?: boolean;
+        /**
+         * Show a pin-style marker at the cursor position instead of the tooltip.
+         * @default false
+         */
         isMapMarkerTooltipVisible?: boolean;
     };
+
+    /**
+     * Subscribe to shared `InterfaceContext` state changes (dataset URL,
+     * selected feature, color map, date range, country selection, etc.).
+     *
+     * @remarks
+     * When `true`, the component synchronises its local state with the
+     * global context on every relevant context change. This is the
+     * primary mechanism for coordinated multi-view dashboards.
+     */
     isApplyContextData: boolean;
+
+    /**
+     * If `true`, the component writes its initial local state (dataset URL,
+     * feature, color map, layer opacity, etc.) into `InterfaceContext` on mount.
+     * Use this on the "primary" map in a multi-view layout to seed defaults.
+     */
     isSetIntialContextDataFromComponent?: boolean;
+
+    /**
+     * When `true`, this map instance broadcasts its current
+     * `{ latitude, longitude, zoom }` to `InterfaceContext.mapCoords`
+     * (debounced at 1 s) so other RECEIVER maps can mirror the viewport.
+     */
     isSyncMapCoordsOnTheFly_SETTER?: boolean;
+
+    /**
+     * When `true`, this map instance listens to `InterfaceContext.mapCoords`
+     * and updates its viewport to match the SETTER map.
+     */
     isSyncMapCoordsOnTheFly_RECIEVER?: boolean;
+
+    /**
+     * Enable animated `flyTo` transitions when the global
+     * `mapSelectionObj` changes (e.g. user clicks a country in another
+     * view).
+     */
     isApplyTransitions?: boolean;
+
+    /**
+     * Automatically fit the map viewport to the full extent of the loaded
+     * GeoJSON boundaries on first render. Overrides `center` / `zoom`.
+     */
     isStaticAutoFitFullSize: boolean;
+
+    /**
+     * Use a D3 equirectangular projection for distance calculations
+     * instead of the default Leaflet Web-Mercator projection.
+     */
     isProjection_equirectangular?: boolean;
 }
 
+/**
+ * Determines whether a dataset key passes both include and exclude
+ * substring filters.
+ *
+ * Used by the dataset-selection dropdown to reduce the visible list to
+ * only those datasets relevant to the current showcase or view.
+ *
+ * @param key            - The dataset key (relation name) to test.
+ * @param includeFilter  - A single substring **or** an array of substrings.
+ *                         The key must contain **at least one** non-empty
+ *                         substring to pass. An empty string, empty array,
+ *                         or `undefined` disables the include filter.
+ * @param excludeFilter  - A single substring. If the key contains this
+ *                         substring it is excluded regardless of the
+ *                         include filter. An empty string or `undefined`
+ *                         disables the exclude filter.
+ * @returns `true` if the dataset should be shown in the UI.
+ *
+ * @example
+ * ```ts
+ * isDatasetIncluded("t_2024_albopictus_predictions", "albopictus", "?");  // true
+ * isDatasetIncluded("t_2024_aegypti_predictions",    "albopictus", "?");  // false
+ * isDatasetIncluded("t_2024_albopictus_debug?",       "albopictus", "?"); // false (excluded)
+ * isDatasetIncluded("anything",                       "",           "");  // true  (no filter)
+ * ```
+ */
 export function isDatasetIncluded(
     key: string,
     includeFilter?: string | string[],
@@ -206,6 +522,65 @@ export function isDatasetIncluded(
     return key.includes(includeFilter);
 }
 
+/**
+ * Factory function that creates a fully-defaulted {@link LeafD3MapLayerProps}
+ * object.
+ *
+ * Every nested settings group is shallow-merged with sensible ICV defaults,
+ * so callers only need to specify the overrides they care about.
+ *
+ * @param chartName                        - Unique chart / DOM id.
+ *                                           @default `"D3mapLayer"`
+ * @param mapDataURL                       - URL for the base GeoJSON boundaries.
+ *                                           @default `apiRoutes.FETCH_MAP_DATA.WORLD_MAP`
+ * @param dataURL                          - Optional data-layer URL override.
+ * @param mapUIsettings                    - Partial UI settings merged onto defaults.
+ * @param mapInteractions                  - Partial interaction guards merged onto defaults.
+ * @param mapDataSets                      - Partial data-layer toggles merged onto defaults.
+ * @param center                           - Initial `[lat, lng]` viewport centre.
+ *                                           @default `[9.7, 52]`
+ * @param zoom                             - Initial zoom level. @default `2`
+ * @param mapStyles                        - Partial polygon / background styles merged onto defaults.
+ * @param isStaticAutoFitFullSize          - Auto-fit viewport to GeoJSON bounds on mount.
+ *                                           @default `false`
+ * @param isApplySelectionsAndTransitions  - Subscribe to global `InterfaceContext`.
+ *                                           @default `true`
+ * @param isApplyTransitions               - Enable `flyTo` transitions on selection change.
+ *                                           @default `false`
+ * @param isProjection_equirectangular     - Use equirectangular projection for distance calcs.
+ *                                           @default `false`
+ * @param isSyncMapCoordsOnTheFly_SETTER   - Broadcast viewport coords to context.
+ *                                           @default `false`
+ * @param isSyncMapCoordsOnTheFly_RECIEVER - Mirror viewport coords from context.
+ *                                           @default `false`
+ * @param isSetContextData                 - Seed `InterfaceContext` from this component on mount.
+ *                                           @default `false`
+ * @returns A complete, ready-to-render `LeafD3MapLayerProps` object.
+ *
+ * @example
+ * ```tsx
+ * const props = LeafD3MapLayerProps(
+ *   "dengue-map",
+ *   apiRoutes.FETCH_MAP_DATA.WORLD_MAP,
+ *   undefined,
+ *   {
+ *     defaultDatasetName: "dengue_serotype_counts",
+ *     defaultFeatureName: "country",
+ *     isSequenceMetaData: true,
+ *     isSequenceMetaDataChecked: true,
+ *     defaultDonutSize: 60,
+ *   },
+ *   {},
+ *   { isSequenceMetaData: true },
+ *   [10.0, 8.0],
+ *   3,
+ * );
+ *
+ * <LeafD3MapLayerComponent props={props} />
+ * ```
+ *
+ * @see {@link LeafD3MapLayerProps} (interface)
+ */
 export function LeafD3MapLayerProps(
     chartName = "D3mapLayer",
     mapDataURL = apiRoutes.FETCH_MAP_DATA.WORLD_MAP,
@@ -296,6 +671,62 @@ export function LeafD3MapLayerProps(
         isProjection_equirectangular
     };
 }
+/**
+ * Primary ICV map component that composites a Leaflet base map with
+ * D3-powered analytical overlays.
+ *
+ * Renders up to four visual layers on a single Leaflet map instance:
+ * 1. **Country polygons** – GeoJSON boundaries with hover/click interaction.
+ * 2. **Grid data tiles** – equirectangular canvas tiles coloured by a
+ *    sequential D3 colour map (e.g. habitat-suitability predictions).
+ * 3. **Presence data** – point observations drawn as circles or canvas dots.
+ * 4. **Sequence metadata** – D3 donut/pie charts anchored to country centroids.
+ *
+ * State is synchronised across multiple map instances via `InterfaceContext`
+ * (see `isApplyContextData` / `isSyncMapCoordsOnTheFly_SETTER`).
+ *
+ * @param props - Fully-defaulted configuration created by the
+ *                {@link LeafD3MapLayerProps} factory function.
+ *
+ * @remarks
+ * - The component contains several nested "hook-functions" (`MapDrawLayer_*`,
+ *   `MapMouseEvents`) that are called unconditionally at the top level of
+ *   the render function. They use `useEffect` internally and **must not**
+ *   be called conditionally to comply with the Rules of Hooks.
+ * - During animated `flyTo` transitions, the `gridLayerTransitionRef` guard
+ *   suppresses canvas tile redraws to avoid 60 synchronous repaints/s.
+ *   A single clean repaint fires in `onTransitionEnd`.
+ * - All data fetching is handled by the `useGetJSONData` hook which
+ *   integrates SWR-style caching.
+ *
+ * @example
+ * ```tsx
+ * import LeafD3MapLayerComponent, { LeafD3MapLayerProps } from './LeafD3Map';
+ *
+ * const mapProps = LeafD3MapLayerProps(
+ *   "habitat-suitability",
+ *   undefined,
+ *   undefined,
+ *   {
+ *     defaultDatasetName: "t_2024_monthly_mean_7_ocsvm_albopictus_predictions_2023_mod",
+ *     defaultFeatureName: "prob_7",
+ *     defaultFeatureColorMap: "interpolateInferno",
+ *     isPresenceData: true,
+ *     isPresenceDataChecked: true,
+ *   },
+ * );
+ *
+ * export default function HabitatPage() {
+ *   return (
+ *     <div className="w-full h-[600px]">
+ *       <LeafD3MapLayerComponent props={mapProps} />
+ *     </div>
+ *   );
+ * }
+ * ```
+ *
+ * @see {@link LeafD3MapLayerProps} (interface & factory)
+ */
 const LeafD3MapLayerComponent = ({props}: {props: LeafD3MapLayerProps}) => {
 
 
@@ -354,9 +785,9 @@ const LeafD3MapLayerComponent = ({props}: {props: LeafD3MapLayerProps}) => {
        
 const strokeWidth = props.mapStyles?.strokeWidth ?? 1.5;
 const baseStyle: Leaflet.PathOptions = {
-            color: props.mapStyles?.strokeColor,
-            fillColor: props.mapStyles?.fillColor,
-            fillOpacity: props.mapStyles?.fillOpacity,
+            color: props.mapStyles?.strokeColor ?? "#000000",
+            fillColor: props.mapStyles?.fillColor ?? "#ffffff",
+            fillOpacity: props.mapStyles?.fillOpacity ?? 1,
             weight: strokeWidth,
             fill: true,
             lineJoin: "round",
@@ -448,49 +879,104 @@ const baseStyle: Leaflet.PathOptions = {
    const mapUIsettings = { ...props.mapUIsettings };
 
     // *** Types *** //
+
+    /**
+     * Parsed visual-data record for a single grid cell.
+     *
+     * @remarks
+     * The `geometry` array contains the polygon vertices as
+     * `[latitude, longitude]` pairs (equirectangular grid cells are
+     * typically rectangles with 5 vertices including the closing point).
+     * `visDatIdx` is the flat index into the original response array;
+     * `rowID` maps back to the database primary key for drill-down.
+     */
     type visDataT = {
+        /** Polygon vertices as `[lat, lng]` tuples. */
         geometry: [number, number][];
+        /** Numeric feature value for this cell (e.g. habitat-suitability probability). */
         feature: number;
+        /** Index within the parsed visual-data `Map`. */
         visDatIdx?: number;
+        /** Database row id, used for linking click events back to raw records. */
         rowID?: number;
     }
+
+    /**
+     * Raw presence / occurrence record as returned by the ICV backend.
+     *
+     * In the standard (non-COVID) flow the `geometry` field is a WKT
+     * `POINT(lng lat)` string parsed by `pointParser()`. In COVID view,
+     * `latitude` / `longitude` are used directly.
+     */
     type presDBdataT = {
+        /** WKT geometry string (e.g. `"POINT(13.4 52.5)"`). */
         geometry: string
+        /** String-encoded feature value (cast to `number` at render time). */
         feature: string
+        /** Optional parsed coordinate tuples. */
         longLat?: [number, number][]
+        /** Decimal longitude (used in COVID epidemiology view). */
         longitude?: number
+        /** Decimal latitude (used in COVID epidemiology view). */
         latitude?: number
+        /** Sub-region / state name (e.g. `"Bayern"`). */
         subregion_name?: string
+        /** Country name (e.g. `"Germany"`). */
         country_name?: string
+        /** Date string (YYYY-MM-DD). */
+        date?: string
     }
+
+    /**
+     * Shape returned by `getUniqueEntries` API tasks –
+     * a single string value per unique entry.
+     */
     type UniquesDB_entriesT = {
+        /** Unique value string (species name, year, serotype, etc.). */
         feature: string
     }
 
+    /** Typed wrapper around a database response containing unique-entry rows. */
     interface UniquesDB_entriesI extends dbDATA {
         response: UniquesDB_entriesT[]
     }
+
+    /** Typed wrapper around a database response containing presence-data rows. */
     interface presDBdataI extends dbDATA {
         response: presDBdataT[]
     }
+
+    /**
+     * Internal representation of the most recent map mouse event,
+     * used to coordinate tooltip rendering across synced map instances.
+     */
     interface  mapMouseEvents {
+        /** Event category. */
         type?: string; // "hover" | "click"
+        /** Cursor position as `[lng, lat]`. */
         position?: [number, number];
+        /** Raw Leaflet mouse event (shared via `InterfaceContext.mouseEvent`). */
         event?: L.LeafletMouseEvent | null;
+        /** `Date.now()` timestamp of the last context broadcast (16 ms throttle). */
         lastSetTime?: number;
     }
 
+    /** GeoJSON properties for a world-capital feature (localised titles). */
     interface CapitalProperties {
+        /** Localised capital-city name. */
         title: {
             en:string;
             de:string;
         };
     }
 
+    /** GeoJSON `Point` geometry narrowed to a 2D coordinate tuple. */
     type CapitalGeometry = GEOjson.Point & { coordinates: [number, number] };
 
+    /** A single capital-city GeoJSON feature. */
     type CapitalFeature = GEOjson.Feature<CapitalGeometry, CapitalProperties>;
 
+    /** GeoJSON `FeatureCollection` of world-capital points. */
     interface CapitalsFeatureCollection extends GEOjson.FeatureCollection<CapitalGeometry, CapitalProperties> {
         features: CapitalFeature[];
     }
@@ -513,6 +999,7 @@ const baseStyle: Leaflet.PathOptions = {
     const [selectedCountry, setSelectedCountry] = useState<string>("");
     const [isSettingsOpen, setIsSettingsOpen] = useState(true);
     const [isSettingsOpenFixed, setIsSettingsOpenFixed] = useState(props.mapUIsettings.areSettingsOpen ?? true);
+    const { containerRef: settingsContainerRef, settingsTop: settingsButtonTop } = useDynamicSettingsTop();
     const curMouseEvent = useRef<string>("null");
     const screenDistanceOneKM = useRef<number>(0);
     const curDatasetname = useRef<string>(props.mapUIsettings.defaultDatasetName || "");
@@ -528,7 +1015,14 @@ const baseStyle: Leaflet.PathOptions = {
     const highlightedCountryRef = useRef<L.GeoJSON | null>(null);
 
     const [min_date, setMinDate] = useState<Date>(new Date("2020-01-01"));
-    const [max_date, setMaxDate] = useState<Date>(new Date("2024-12-31"));
+    const [max_date, setMaxDate] = useState<Date>(new Date("2022-02-14"));
+
+    const disabledMatcher = useMemo(() => {
+        const matchers: any[] = [];
+        if (min_date) matchers.push({ before: min_date });
+        if (max_date) matchers.push({ after: max_date });
+        return matchers;
+    }, [min_date, max_date]);
 
     // set default dataset URL
     if (props.mapUIsettings.defaultDatasetURL === "" && props.mapUIsettings.defaultDatasetName !== "") {
@@ -536,8 +1030,8 @@ const baseStyle: Leaflet.PathOptions = {
             relationName: props.mapUIsettings.defaultDatasetName,
             feature: props.mapUIsettings.defaultFeatureName,
             aggregation_level: props.mapUIsettings.isCountryLevelData ? 0 : props.mapUIsettings.isSubregionLevelData ? 1 : undefined,
-            startDate: props.mapUIsettings.inCovidDataView && contextT.dateRange?.from ? format(contextT.dateRange.from, "yyyy-MM-dd") : undefined,
-            endDate: props.mapUIsettings.inCovidDataView && contextT.dateRange?.to ? format(contextT.dateRange.to, "yyyy-MM-dd") : undefined,
+            startDate: props.mapUIsettings.inCovidDataView && (contextT.dateRange?.from && contextT.dateRange?.to) ? format(contextT.dateRange.from, "yyyy-MM-dd") : undefined,
+            endDate: props.mapUIsettings.inCovidDataView && (contextT.dateRange?.from && contextT.dateRange?.to) ? format(contextT.dateRange.to, "yyyy-MM-dd") : undefined,
         });
     } else {
         props.mapUIsettings.defaultDatasetURL = "";
@@ -562,8 +1056,13 @@ const baseStyle: Leaflet.PathOptions = {
                 const response = await fetch(url);
                 const data = await response.json();
                 if (data && data.response && data.response.min_val && data.response.max_val) {
-                    setMinDate(new Date(data.response.min_val));
-                    setMaxDate(new Date(data.response.max_val));
+                    const parsedMin = new Date(data.response.min_val);
+                    const parsedMax = new Date(data.response.max_val);
+                    const cutoffMax = new Date("2022-02-14");
+                    if (!isNaN(parsedMin.getTime())) setMinDate(parsedMin);
+                    if (!isNaN(parsedMax.getTime())) {
+                        setMaxDate(parsedMax > cutoffMax ? cutoffMax : parsedMax);
+                    }
                 }
             } catch (error) {
                 console.error("Error fetching dynamic dates:", error);
@@ -658,6 +1157,22 @@ const baseStyle: Leaflet.PathOptions = {
     const [isLoadingPresenceData, rawPresenceData] = useGetJSONData(presenceDataURL, props.mapDataSets.isPresenceData);
     const [isLoadingP_species, rawP_species] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "species", task: "getUniqueEntries" }), props.mapDataSets.isPresenceData && !props.mapUIsettings.inCovidDataView);
     const [isLoadingP_years, rawP_years] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "year", task: "getUniqueEntries" }), props.mapDataSets.isPresenceData && !props.mapUIsettings.inCovidDataView);
+    const effectiveTargetDate = dateRange?.to
+        ? format(dateRange.to, "yyyy-MM-dd")
+        : dateRange?.from
+        ? format(dateRange.from, "yyyy-MM-dd")
+        : contextT.targetDate;
+
+    const rkiDataURL = mapUIsettings.inCovidDataView
+        ? apiRoutes.fetchDbData({
+              relationName: "aktuell_deutschland_sarscov2_infektionen_aggregated",
+              feature: "ALL",
+              targetDate: effectiveTargetDate,
+              startDate: (dateRange?.from && dateRange?.to) ? format(dateRange.from, "yyyy-MM-dd") : undefined,
+              endDate: (dateRange?.from && dateRange?.to) ? format(dateRange.to, "yyyy-MM-dd") : undefined,
+          })
+        : "";
+    const [isLoadingCOVIDData, rawRkiData] = useGetJSONData(rkiDataURL, mapUIsettings.inCovidDataView);
     const [curSpecies, setCurSpecies] = useState<string>("ALL")
     const [curYear, setCurYear] = useState<string>("ALL")
     const prev_presenceDrawHash = useRef<number>(0);
@@ -693,6 +1208,16 @@ const baseStyle: Leaflet.PathOptions = {
     const [isCountryLevelData, setIsCountryLevelData] = useState(props.mapUIsettings.isCountryLevelData);
     const [isSubregionLevelData, setIsSubregionLevelData] = useState(props.mapUIsettings.isSubregionLevelData);
 
+    /**
+     * Clears the country selection and reloads the full (unfiltered) presence
+     * dataset for all countries.
+     *
+     * @remarks
+     * Invoked by the "Reset" button in the country-selection dropdown. It
+     * rebuilds the API URL without a `filterBy` / `filterValue` clause,
+     * updates both local and `InterfaceContext` state, removes the
+     * highlighted country polygon, and shows a transient success toast.
+     */
     const handleResetToAllCountries = useCallback(() => {
         setSelectedCountry("");
         contextT.setSelectedCountry("");
@@ -745,9 +1270,11 @@ const baseStyle: Leaflet.PathOptions = {
 
     // Clear loading spinner when all main datasets finish loading
     useEffect(() => {
+        const isCOVIDLoading = mapUIsettings.inCovidDataView && isLoadingCOVIDData;
         if (!isLoading_mapData &&
             !isLoading_MosquitoData && 
             !isLoadingPresenceData && 
+            !isCOVIDLoading &&
             !isLoading_sequenceMetadata &&
             !isLoadingDatalist && 
             !isLoading_Metadata && 
@@ -758,12 +1285,14 @@ const baseStyle: Leaflet.PathOptions = {
             !isLoadingCapitals && 
             !isLoading_ColumnNames) {
             L_dataLoading.stop();
-        }else{
-          L_dataLoading.start();
+        } else {
+            L_dataLoading.start();
         }
     }, [isLoading_mapData,
         isLoading_MosquitoData, 
         isLoadingPresenceData, 
+        isLoadingCOVIDData,
+        mapUIsettings.inCovidDataView,
         isLoading_sequenceMetadata, 
         isLoadingDatalist, 
         isLoading_Metadata, 
@@ -845,6 +1374,19 @@ const baseStyle: Leaflet.PathOptions = {
  }, [contextT.dateRange]);
 
  
+    /**
+     * Synchronises local component state with the shared `InterfaceContext`.
+     *
+     * Called inside a `useEffect` that depends on `isApplyContextData`.
+     * Each field is compared individually and only updated when the
+     * context value has actually changed, preventing feedback loops
+     * between SETTER and RECEIVER map instances.
+     *
+     * @remarks
+     * In COVID view, the incoming `presenceDatasetURL` from the context
+     * is sanitised to strip the sender's `aggregation_level` and
+     * re-apply the correct level for **this** map's current zoom.
+     */
     const applyGlobalContext = useCallback(() => {
         if(curColorMapType != contextT.curColorMap){
             setColorMapType(contextT.curColorMap);
@@ -1037,6 +1579,7 @@ const baseStyle: Leaflet.PathOptions = {
 
     useEffect(() => {
         if (props.isSyncMapCoordsOnTheFly_RECIEVER === true) {
+            if (gridLayerTransitionRef.current) return;
             updateCoordinates(contextT.mapCoords.latitude, contextT.mapCoords.longitude, contextT.mapCoords.zoom);
             console.log("updateCoordinates:", latitude, longitude, zoom);
         }
@@ -1106,25 +1649,240 @@ const baseStyle: Leaflet.PathOptions = {
         return [];
     }, [sequenceMetaData]);   
    
+    /**
+     * Resolves a raw country name (which may be in English, German, or ISO
+     * format) to the correctly localised display name for the current locale.
+     *
+     * @param rawCountryName  - Country name as received from the API (may be
+     *                          English, German, or an ISO 3166-1 alpha-3 code).
+     * @param currentLocale   - Active UI locale (`"en"` or `"de"`).
+     * @returns The localised country name, or the raw input unchanged if no
+     *          match is found.
+     */
+    function getLocalizedCountryName(rawCountryName: string | undefined, currentLocale: string): string {
+        if (!rawCountryName) return "";
+        const list = currentLocale === "de" ? country_names_de : country_names;
+        const norm = rawCountryName.trim().toLowerCase();
+        
+        const found = list.find(([iso, name]) => 
+            name.toLowerCase() === norm || iso.toLowerCase() === norm
+        );
+        if (found) return found[1];
+        
+        if (currentLocale === "de") {
+            const enMatch = country_names.find(([iso, name]) => name.toLowerCase() === norm);
+            if (enMatch) {
+                const deMatch = country_names_de.find(([iso]) => iso === enMatch[0]);
+                if (deMatch) return deMatch[1];
+            }
+        }
+        return rawCountryName;
+    }
+
+    /**
+     * Translates a sub-region / federal-state name to its German alias
+     * when the current locale is `"de"` (e.g. `"Bavaria"` → `"Bayern"`).
+     *
+     * @param subName        - Raw sub-region name from the API.
+     * @param currentLocale  - Active UI locale.
+     * @returns The localised sub-region name, or the raw input unchanged.
+     */
+    function getLocalizedSubregionName(subName: string | undefined, currentLocale: string): string {
+        if (!subName || subName === "NULL") return "";
+        if (currentLocale === "de") {
+            const subLower = subName.trim().toLowerCase();
+            return GERMAN_STATE_ALIASES[subLower] || subName;
+        }
+        return subName;
+    }
+
+    /**
+     * Extracts a numeric feature value from a raw RKI (Robert Koch Institute)
+     * COVID-19 record by trying a prioritised list of column-name synonyms.
+     *
+     * @remarks
+     * RKI datasets use German column names (`accucases`, `newdeaths`, etc.)
+     * while the ICV frontend normalises to English (`cumulative_confirmed`,
+     * `new_deceased`). This function bridges the two naming conventions via
+     * a static lookup table with ordered fallback keys.
+     *
+     * @param rkiRecord    - A single row from the RKI API response.
+     * @param featureName  - The ICV-normalised feature name to resolve.
+     * @returns The numeric value if found, or `undefined` if no matching
+     *          column exists or the value is non-numeric.
+     */
+    function getRkiFeatureValue(rkiRecord: any, featureName: string): number | undefined {
+        if (!rkiRecord) return undefined;
+        const featureMap: Record<string, string[]> = {
+            cumulative_confirmed: ["accucases", "newcases"],
+            new_confirmed: ["newcases", "accucasesperweek"],
+            cases: ["accucases", "newcases"],
+            cumulative_deceased: ["accudeaths", "newdeaths"],
+            accudeaths: ["accudeaths", "newdeaths"],
+            deaths: ["accudeaths", "newdeaths"],
+            new_deceased: ["newdeaths", "accudeathsperweek"],
+            newdeaths: ["newdeaths", "accudeathsperweek"],
+            accucasesperweek: ["accucasesperweek", "accucases"],
+            accudeathsperweek: ["accudeathsperweek", "accudeaths"],
+            cumulative_recovered: ["accurecovered", "newrecovered"],
+            new_recovered: ["newrecovered"],
+        };
+        const keysToTry = [...(featureMap[featureName] || [featureName]), featureName, "feature"];
+        for (const key of keysToTry) {
+            if (rkiRecord[key] != null) {
+                const num = Number(rkiRecord[key]);
+                if (!isNaN(num)) return num;
+            }
+        }
+        return undefined;
+    }
+
+    /**
+     * Replaces the feature value of a Germany presence-data entry with the
+     * corresponding aggregated value from the RKI (Robert Koch Institute)
+     * dataset.
+     *
+     * At country level (`isCountryLevel === true`), the function sums all
+     * matching RKI records into a single national total. At sub-region
+     * level it performs a fuzzy match on the state name (normalised via
+     * `GERMAN_STATE_ALIASES`) and picks the first matching record.
+     *
+     * @param item           - Original presence-data record to enrich.
+     * @param rkiResp        - Full RKI API response array.
+     * @param activeFeature  - The currently selected ICV feature name.
+     * @param isCountryLevel - When `true`, aggregate all sub-regions into
+     *                         a single country-wide total.
+     * @returns A shallow clone of `item` with an updated `feature` value.
+     *          Non-German entries or entries without a matching RKI record
+     *          are returned unchanged.
+     */
+    function processRkiGermanyDataReplacement(
+        item: presDBdataT,
+        rkiResp: any[],
+        activeFeature: string,
+        isCountryLevel?: boolean
+    ): presDBdataT {
+        const isDE = item.country_name === "Germany" || item.country_name === "Deutschland" || (item as any).iso_3166_1_alpha_3 === "DEU" || (item as any).country_code === "DE";
+        if (!isDE || !Array.isArray(rkiResp) || rkiResp.length === 0) return { ...item };
+
+        const newItem = { ...item };
+
+        const datesInRki = Array.from(
+            new Set(
+                rkiResp
+                    .map((r: any) => String(r.datenstand || r.date || "").slice(0, 10))
+                    .filter((d: string) => d.length === 10)
+            )
+        ).sort();
+
+        const hasRange = datesInRki.length > 1;
+        const minDate = hasRange ? datesInRki[0] : undefined;
+        const maxDate = datesInRki.length > 0 ? datesInRki[datesInRki.length - 1] : undefined;
+
+        const endRecords = maxDate
+            ? rkiResp.filter((r: any) => String(r.datenstand || r.date || "").slice(0, 10) === maxDate)
+            : rkiResp;
+        const startRecords = (hasRange && minDate)
+            ? rkiResp.filter((r: any) => String(r.datenstand || r.date || "").slice(0, 10) === minDate)
+            : [];
+
+        if (isCountryLevel) {
+            let totalEnd = 0, foundEnd = false;
+            endRecords.forEach((r: any) => {
+                const val = getRkiFeatureValue(r, activeFeature);
+                if (val !== undefined) { totalEnd += val; foundEnd = true; }
+            });
+
+            if (foundEnd) {
+                let totalStart = 0, foundStart = false;
+                if (hasRange) {
+                    startRecords.forEach((r: any) => {
+                        const val = getRkiFeatureValue(r, activeFeature);
+                        if (val !== undefined) { totalStart += val; foundStart = true; }
+                    });
+                }
+                const rangeVal = (hasRange && foundStart) ? Math.max(0, totalEnd - totalStart) : totalEnd;
+                newItem.feature = String(rangeVal);
+            }
+        } else {
+            const rawSub = (newItem.subregion_name || (newItem as any).subregion1_name || (newItem as any).name || "").trim();
+            const normName = GERMAN_STATE_ALIASES[rawSub.toLowerCase()] || rawSub;
+            const normLower = normName.toLowerCase();
+
+            const findStateRec = (records: any[]) => {
+                // Priority 1: Exact state ID match via stateMappersGermany
+                const tableId = stateMappersGermany.Table__State_to_ID(normName);
+                const mapId = stateMappersGermany.Map__State_to_ID(normName);
+                const expectedTableId = tableId !== -1 ? tableId : (mapId !== -1 ? stateMappersGermany.mapper__MapTable__ID_to_ID(mapId) : -1);
+
+                if (expectedTableId !== -1) {
+                    const matchById = records.find((r: any) => r && Number(r.idbundesland) === expectedTableId);
+                    if (matchById) return matchById;
+                }
+
+                // Priority 2: Exact string match (case-insensitive)
+                const matchByExactName = records.find((r: any) => {
+                    if (!r) return false;
+                    const b = (r.bundesland || "").trim().toLowerCase();
+                    return b === normLower || b === rawSub.toLowerCase();
+                });
+                if (matchByExactName) return matchByExactName;
+
+                // Priority 3: Fallback alias/substring match ONLY if exact match fails
+                return records.find((r: any) => {
+                    if (!r) return false;
+                    const b = (r.bundesland || "").trim().toLowerCase();
+                    if (!b) return false;
+                    if (normLower === "sachsen" && (b === "sachsen-anhalt" || b === "niedersachsen")) return false;
+                    if (rawSub.toLowerCase() === "sachsen" && (b === "sachsen-anhalt" || b === "niedersachsen")) return false;
+                    return b.includes(normLower) || normLower.includes(b);
+                });
+            };
+
+            const recEnd = findStateRec(endRecords);
+            if (recEnd) {
+                const valEnd = getRkiFeatureValue(recEnd, activeFeature);
+                if (valEnd !== undefined) {
+                    let valStart: number | undefined = undefined;
+                    if (hasRange) {
+                        const recStart = findStateRec(startRecords);
+                        if (recStart) {
+                            valStart = getRkiFeatureValue(recStart, activeFeature);
+                        }
+                    }
+                    const rangeVal = (hasRange && valStart !== undefined) ? Math.max(0, valEnd - valStart) : valEnd;
+                    newItem.feature = String(rangeVal);
+                }
+            }
+        }
+        return newItem;
+    }
+
     useEffect(() => {
-        if(!isLoadingPresenceData && props.mapDataSets.isPresenceData) {
-            let presDat: {geometry: [number, number], feature: string, country_name?: string, subregion_name?: string}[] = [];
+        const isRkiLoading = mapUIsettings.inCovidDataView && isLoadingCOVIDData;
+        if (!isLoadingPresenceData && !isRkiLoading && props.mapDataSets.isPresenceData && presenceDat?.response) {
+            let presDat: { geometry: [number, number]; feature: string; country_name?: string; subregion_name?: string }[] = [];
             let groupedPresData: presDBdataT[] = [];
+            const rkiResp = (rawRkiData as unknown as dbDATA)?.response;
+            const activeFeature = selectedFeature || contextT.curFeature || props.mapUIsettings.defaultFeatureName;
+
             try {
                 presenceDat.response.forEach((d: presDBdataT) => {
-                    if (d.geometry || (d.latitude && d.longitude && !isNaN(d.latitude) && !isNaN(d.longitude))) {
-                        if (d.latitude && d.longitude && !isNaN(d.latitude) && !isNaN(d.longitude)) {
+                    let item = mapUIsettings.inCovidDataView
+                        ? processRkiGermanyDataReplacement(d, rkiResp, activeFeature, isCountryLevelData)
+                        : { ...d };
 
-                            if (mapUIsettings.inCovidDataView == true){
-                                preprocessPresenceDataForLatLng(d, groupedPresData);
-                            }
-                            else {
-                                presDat.push({ geometry: [d.latitude, d.longitude], feature: d.feature });
+                    if (item.geometry || (item.latitude && item.longitude && !isNaN(item.latitude) && !isNaN(item.longitude))) {
+                        if (item.latitude && item.longitude && !isNaN(item.latitude) && !isNaN(item.longitude)) {
+                            if (mapUIsettings.inCovidDataView == true) {
+                                preprocessPresenceDataForLatLng(item, groupedPresData);
+                            } else {
+                                presDat.push({ geometry: [item.latitude, item.longitude], feature: item.feature });
                             }
                         } else {
-                            const coords = pointParser(d.geometry);
+                            const coords = pointParser(item.geometry);
                             if (!isNaN(coords[0]) && !isNaN(coords[1])) {
-                                presDat.push({ geometry: coords, feature: "test" });
+                                presDat.push({ geometry: coords, feature: item.feature });
                             }
                         }
                     }
@@ -1132,20 +1890,24 @@ const baseStyle: Leaflet.PathOptions = {
                 if (groupedPresData.length > 0) {
                     for (const item of groupedPresData) {
                         if (item.latitude && item.longitude && !isNaN(item.latitude) && !isNaN(item.longitude)) {
-                            presDat.push({geometry: [item.latitude, item.longitude], feature: item.feature, subregion_name: item.subregion_name, country_name: item.country_name});   
+                            presDat.push({
+                                geometry: [item.latitude, item.longitude],
+                                feature: item.feature,
+                                subregion_name: item.subregion_name,
+                                country_name: item.country_name,
+                            });
                         }
                     }
                 }
-            }
-            catch(e) {
-                let errorMsg = { ERROR: "ERROR: while parsing the data set. csv format is required." +e};
-                let res = <div>{String(errorMsg['ERROR'])}</div>;
+            } catch (e) {
+                let errorMsg = { ERROR: "ERROR: while parsing the data set. csv format is required." + e };
+                let res = <div>{String(errorMsg["ERROR"])}</div>;
                 console.log("Error:", errorMsg);
-                collectDataLoadingErrors.current.push(res)
+                collectDataLoadingErrors.current.push(res);
             }
             setPresData(presDat);
         }
-    }, [presenceDat, selectedFeature, props.mapUIsettings.defaultFeatureName]);
+    }, [presenceDat, isLoadingPresenceData, rawRkiData, isLoadingCOVIDData, selectedFeature, contextT.curFeature, contextT.targetDate, dateRange, props.mapUIsettings.defaultFeatureName, isCountryLevelData]);
 
     // ------------------------------------------------------------------
     // Zoom-dependent auto-switch between country-level and subregion-level
@@ -1376,6 +2138,18 @@ useEffect(() => {
         };
     }, []);
 
+    /**
+     * Sets the map viewport to the given coordinates after clamping them
+     * to valid world bounds.
+     *
+     * When this component is configured as a SETTER (`isSyncMapCoordsOnTheFly_SETTER`),
+     * the coordinates are also debounced (1 s) and broadcast to
+     * `InterfaceContext.mapCoords` so that RECEIVER maps can mirror the viewport.
+     *
+     * @param latitude  - Target latitude (will be clamped to `[-90, 90]`).
+     * @param longitude - Target longitude (will be clamped to `[-180, 180]`).
+     * @param zoom      - Target zoom level (clamped to `[MIN_ZOOM, MAX_ZOOM]`).
+     */
     function updateCoordinates(latitude: number, longitude: number, zoom: number) {
         const [clampedLat, clampedLng, clampedZoom] = clampCoordinates(latitude, longitude, zoom);
 
@@ -1395,6 +2169,152 @@ useEffect(() => {
         setCoordinates([clampedLat, clampedLng, clampedZoom]);
     }
 
+    /**
+     * Unified country-selection handler used by both GeoJSON polygon click
+     * events and the country-selection dropdown.
+     *
+     * Performs the following steps:
+     * 1. Resolves `countryIdentifier` (ISO alpha-3, English name, or
+     *    localised name) to the matching GeoJSON feature.
+     * 2. In COVID data view, builds a filtered API URL scoped to the
+     *    selected country and updates `InterfaceContext` + local state
+     *    (dataset URL, date range, country code).
+     * 3. Applies `activeStyle` to the selected polygon and resets all
+     *    other polygons to `baseStyle`.
+     * 4. Sets `mapSelectionObj` on the context to trigger the
+     *    `useMapTransition` hook for a `flyTo` animation.
+     *
+     * @param countryIdentifier - ISO 3166-1 alpha-3 code, GeoJSON `name`,
+     *                            or `NAME` property of the target country.
+     *
+     * @remarks
+     * When `mapInteractions.disableClick` is `true` the function returns
+     * immediately. A 5 s success toast is shown after the selection via
+     * `setShowSuccessCountryDropdown`.
+     */
+    function selectCountry(countryIdentifier: string) {
+        if (!map) return;
+        if (props.mapInteractions.disableClick) return;
+
+        // 1. Find the matching GeoJSON feature in mapData
+        const matchingFeature = mapData?.features?.find(
+            (f: any) =>
+                f.properties?.iso_a3 === countryIdentifier ||
+                f.properties?.name === countryIdentifier ||
+                f.properties?.NAME === countryIdentifier
+        );
+        if (!matchingFeature) return;
+
+        const countryName = matchingFeature.properties?.name ?? "";
+        const countryCode = matchingFeature.properties?.iso_a3 ?? countryIdentifier;
+
+        // 2. COVID data view: build API URL and update state
+        if (mapUIsettings.inCovidDataView) {
+            d3.selectAll(".leaflet-popup-pane").each(function () {
+                d3.select(this).selectAll(".custom-popup").remove();
+            });
+            circlesSelectionRef.current = null;
+
+            let featureName = contextT.curFeature || selectedFeature;
+            if (!featureName) {
+                featureName = mapUIsettings.defaultFeatureName;
+                contextT.setCurFeature(featureName);
+            }
+
+            const datasetName =
+                curDatasetname.current ||
+                props.mapUIsettings.defaultDatasetName ||
+                contextT.curPresenceDatasetName ||
+                (mapUIsettings.inCovidDataView ? "epidemiology_geography_whole_df_w_geometry" : "");
+
+            if (!curDatasetname.current && datasetName) {
+                curDatasetname.current = datasetName;
+            }
+
+            const url = apiRoutes.fetchDbData({
+                relationName: datasetName,
+                feature: featureName,
+                filterBy: "iso_3166_1_alpha_3",
+                filterValue: countryCode,
+                startDate: (dateRange?.from && dateRange?.to) ? format(dateRange.from, "yyyy-MM-dd") : undefined,
+                endDate: (dateRange?.from && dateRange?.to) ? format(dateRange.to, "yyyy-MM-dd") : undefined,
+                aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
+            });
+
+            if (dateRange?.from && dateRange?.to) {
+                setDateRange({ from: dateRange.from, to: dateRange.to });
+                contextT.setDateRange({ from: dateRange.from, to: dateRange.to });
+            }
+
+            setSelectedCountry(countryCode);
+            contextT.setSelectedCountry(countryCode);
+            contextT.setCurPresenceDatasetName(datasetName);
+            contextT.setCurDatasetURL(url);
+            contextT.setCurPresenceDatasetURL(url);
+            contextT.setIsPresenceData(true);
+            setIsPresData(true);
+            setPresenceDataURL(url);
+            setShowSuccessCountryDropdown(true);
+
+            setTimeout(() => {
+                setShowSuccessCountryDropdown(false);
+            }, 3000);
+        }
+
+        // 3. Zoom/move to country bounds ONLY when explicitly configured (e.g. map-based country selection dropdown)
+        if (props.mapUIsettings.isCountrySelectionDropdownMapBased && matchingFeature && L && map) {
+            const bounds = L.geoJSON(matchingFeature as any).getBounds();
+            if (bounds && bounds.isValid()) {
+                map.fitBounds(bounds, { maxZoom: 8, padding: [20, 20] });
+            }
+        }
+
+        if (!props.mapInteractions.disableClick) {
+            contextT.setMapSelectionObj(matchingFeature as GEOjson.Feature);
+        }
+
+        // 4. Highlight the selected polygon with activeStyle
+        // Reset all layers to baseStyle first
+        geoLayerRef.current?.eachLayer((layer) => {
+            (layer as Leaflet.Path).setStyle({ ...baseStyle });
+        });
+        curPropertyNames.current = countryName;
+
+        // Find the actual Leaflet path layer and apply activeStyle
+        let targetPathLayer: Leaflet.Path | null = null;
+        if (geoLayerRef.current) {
+            geoLayerRef.current.eachLayer((layer) => {
+                const featureProps = (layer as any)?.feature?.properties ?? {};
+                if (
+                    featureProps?.iso_a3 === countryCode ||
+                    featureProps?.name === countryName ||
+                    featureProps?.NAME === countryName
+                ) {
+                    targetPathLayer = layer as Leaflet.Path;
+                }
+            });
+        }
+
+        if (targetPathLayer) {
+            activeLayerRef.current = targetPathLayer;
+            (targetPathLayer as Leaflet.Path).setStyle({ ...activeStyle });
+            if (typeof (targetPathLayer as Leaflet.Path).bringToFront === "function") {
+                (targetPathLayer as Leaflet.Path).bringToFront();
+            }
+        } else {
+            // Fallback: use applyActiveStyleToSelection if the layer wasn't found
+            applyActiveStyleToSelection(matchingFeature as GEOjson.Feature);
+        }
+    }
+
+    /**
+     * Inline alert component rendering a green success banner that
+     * confirms how many presence-data locations were loaded after a
+     * country selection.
+     *
+     * @returns A styled `<div role="alert">` with a check-circle icon
+     *          and a contextual message.
+     */
     function AlertSuccess() {
         return (
             <div
@@ -1414,13 +2334,26 @@ useEffect(() => {
 
 
     /**
-     * Aggregates feature values for a specific latitude-longitude pair in the provided grouped presence data.
-     * If a matching latitude-longitude pair is found in the grouped data, the feature values are updated.
-     * Otherwise, a new entry is added to the grouped data.
+     * Groups presence-data records by geographic coordinate, aggregating
+     * feature values for duplicate `[latitude, longitude]` pairs.
      *
-     * @param d - The presence data object containing the latitude, longitude, and other feature details.
-     * @param groupedPresData - The array of grouped presence data to be updated or appended to.
-     * @returns The updated array of grouped presence data.
+     * When a record with the same coordinates already exists in
+     * `groupedPresData`, its feature value is updated via
+     * {@link updateFeatureValueForLatLng}. Otherwise a new entry is
+     * appended.
+     *
+     * @param d              - A single presence-data record to merge.
+     * @param groupedPresData - Accumulator array of already-grouped records
+     *                          (mutated in place).
+     * @returns The same `groupedPresData` reference, now containing the
+     *          merged entry (returned for chaining convenience).
+     *
+     * @remarks
+     * Used exclusively in the COVID epidemiology data pipeline where
+     * multiple daily records share the same sub-region centroid and need
+     * to be collapsed into a single visual point.
+     *
+     * @see {@link updateFeatureValueForLatLng}
      */
     function preprocessPresenceDataForLatLng(d: presDBdataT, groupedPresData: presDBdataT[]): presDBdataT[]{
         // Aggregate feature values for a specific latitude-longitude pair
@@ -1444,19 +2377,26 @@ useEffect(() => {
     }
 
     /**
-     * Updates the feature value for a specific latitude-longitude location in the grouped presentation data.
+     * Merges a daily feature value into an existing grouped presence-data
+     * record at the given `[latitude, longitude]`.
      *
-     * @param groupedPresData - An array of objects representing grouped presentation data, 
-     *                          each containing geometry, feature, and optional longitude and latitude properties.
-     * @param d - An object representing the data to be used for updating, containing geometry, feature, 
-     *            and optional longitude and latitude properties.
-     * @param latLngElem_index - The index of the latitude-longitude element in the grouped presentation data array 
-     *                           that needs to be updated.
+     * The aggregation strategy depends on the active feature type:
+     * - **Cumulative metrics** (prefix `cumulative_` or `accu`) – the
+     *   maximum value is retained (idempotent for overlapping date ranges).
+     * - **Incremental metrics** (e.g. `new_confirmed`, `new_deceased`,
+     *   `new_recovered`) – values are summed across the date range.
      *
-     * The function finds the matching latitude-longitude group in the `groupedPresData` array and updates its 
-     * geometry, longitude, latitude, and feature values. If the `selectedFeature` is one of the specified types 
-     * ("new_recovered", "new_confirmed", "new_deceased", "new_tested"), the feature value is incremented by the 
-     * feature value of the provided data object `d`.
+     * @param groupedPresData   - Accumulator array of grouped presence
+     *                            records (mutated in place).
+     * @param d                 - The incoming daily record whose feature
+     *                            value is to be merged.
+     * @param latLngElem_index  - Index hint (unused internally; the
+     *                            match is re-verified by coordinate).
+     *
+     * @remarks
+     * `selectedFeature` and `mapUIsettings.defaultFeatureName` are
+     * captured from the enclosing component scope; they are **not**
+     * passed as parameters.
      */
     function updateFeatureValueForLatLng(groupedPresData: { geometry: string; feature: string; longitude?: number; latitude?: number; }[], d: { geometry: string; feature: string; longitude?: number; latitude?: number; }, latLngElem_index: number) {
         // Update the feature value for the existing latitude-longitude location
@@ -1467,9 +2407,16 @@ useEffect(() => {
             longLatGroup.longitude = d.longitude;
             longLatGroup.geometry = d.geometry;
     
-            // Since updateFeatureValueForLatLng is only called in the COVID view,
-            // we directly aggregate the numeric feature count values for matching locations.
-            longLatGroup.feature = String(Number(longLatGroup.feature) + Number(d.feature));
+            const feat = selectedFeature || mapUIsettings.defaultFeatureName || "";
+            const isCumulative = feat.startsWith("cumulative_") || feat.startsWith("accu");
+
+            if (isCumulative) {
+                // For cumulative metrics over a date range, take the MAX value
+                longLatGroup.feature = String(Math.max(Number(longLatGroup.feature), Number(d.feature)));
+            } else {
+                // For incremental metrics (e.g. new_recovered, new_confirmed, new_deceased), sum daily values
+                longLatGroup.feature = String(Number(longLatGroup.feature) + Number(d.feature));
+            }
     
             groupedPresData[latLngElem_index] = longLatGroup;
         }
@@ -1522,6 +2469,18 @@ useEffect(() => {
     applyActiveStyleToSelection(contextT.mapSelectionObj);
 }, [contextT.mapSelectionObj]);
 
+ /**
+  * Iterates over all GeoJSON polygon layers and applies `activeStyle` to
+  * the layer whose `name` / `NAME` / `admin` property matches the given
+  * `selection` feature, resetting every other layer to `baseStyle`.
+  *
+  * @param selection - The GeoJSON feature representing the selected
+  *                    country, or `null` / `undefined` to clear.
+  *
+  * @remarks
+  * Called from the `useEffect` that watches `contextT.mapSelectionObj`
+  * to synchronise highlighting across coordinated map instances.
+  */
  function applyActiveStyleToSelection(selection?: GEOjson.Feature | null) {
         if (!geoLayerRef.current) return;
         const targetIdentifiers = new Set(
@@ -1564,6 +2523,22 @@ useEffect(() => {
     };
 
 
+/**
+ * Hook-function that renders (or re-renders) the GeoJSON country
+ * polygon layer and an inverted ocean mask on the Leaflet map.
+ *
+ * @remarks
+ * Called unconditionally at the component's top-level render to comply
+ * with the Rules of Hooks. The internal `useEffect` gates execution on
+ * `map`, `L`, and `isLoading_mapData`.
+ *
+ * Registers click, mousemove, and mouseout handlers on every polygon
+ * for country selection, hover highlighting, and tooltip clearing.
+ *
+ * @param mapData      - The parsed GeoJSON `FeatureCollection` of world country boundaries.
+ * @param map          - The active Leaflet map instance (may be `null` during SSR).
+ * @param oceanGeoJSON - Inverted polygon used to mask ocean areas. `null` while loading.
+ */
 function MapDrawLayer_CountryPolygons(mapData: GEOjson.FeatureCollection, map: L.Map | null, oceanGeoJSON: GEOjson.FeatureCollection | null) {
 
     useEffect(() => {
@@ -1619,57 +2594,11 @@ function MapDrawLayer_CountryPolygons(mapData: GEOjson.FeatureCollection, map: L
             onEachFeature: (feature: GeoJSON.Feature, leafletLayer: L.Layer) => {
                 const pathLayer = leafletLayer as L.Path;
 
-                // Click
+                // Click – delegates to the common selectCountry function
                 const handleClick = () => {
-                    const countryName = feature.properties?.name ?? "";
-                    const countryCode = feature.properties?.iso_a3 ?? "";
-
-                    if (mapUIsettings.inCovidDataView) {
-                        clearPresenceOverlays();
-
-                        let featureName = contextT.curFeature || selectedFeature;
-                        if (!featureName) {
-                            featureName = mapUIsettings.defaultFeatureName;
-                            contextT.setCurFeature(featureName);
-                        }
-
-                        let url = apiRoutes.fetchDbData({
-                            relationName: curDatasetname.current,
-                            feature: featureName,
-                            filterBy: "iso_3166_1_alpha_3",
-                            filterValue: countryCode,
-                            startDate: dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined,
-                            endDate: dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined,
-                            aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
-                        });
-                      
-                        setDateRange({ from: dateRange?.from ?? min_date, to: dateRange?.to ?? max_date });
-                        contextT.setDateRange({ from: dateRange?.from ?? min_date, to: dateRange?.to ?? max_date });
-
-                        setSelectedCountry(countryCode);
-                        contextT.setSelectedCountry(countryCode);
-                        contextT.setCurDatasetURL(url);
-                        contextT.setCurPresenceDatasetURL(url);
-                        contextT.setIsPresenceData(true);
-                        setIsPresData(true);
-                        setPresenceDataURL(url);
-                        setShowSuccessCountryDropdown(true);
-                    }
-
-                    if (!props.mapInteractions.disableClick) {
-                        contextT.setMapSelectionObj(feature as GEOjson.Feature);
-                    }
-
-                    resetLayerStyles();
-                    curPropertyNames.current = countryName;
-                    // Track and bring active layer to front with active style
-                    activeLayerRef.current = pathLayer;
-                    pathLayer.setStyle({ ...activeStyle });
-                    pathLayer.bringToFront();
-
-                    setTimeout(() => {
-                        setShowSuccessCountryDropdown(false);
-                    }, 3000);
+                    if (props.mapInteractions.disableClick) return;
+                    const countryCode = feature.properties?.iso_a3 ?? feature.properties?.name ?? "";
+                    selectCountry(countryCode);
                 };
 
                 // Hover
@@ -1823,6 +2752,18 @@ useMapTransition({
 useMapResize({ map, dimensions });
 
 
+/**
+ * Hook-function that renders world-capital city markers and localised
+ * text labels on the Leaflet map.
+ *
+ * @remarks
+ * Labels are only displayed when `zoom >= 3.9` (controlled by the
+ * `isCapitalLabel` state). Each label is rendered as a `L.divIcon`
+ * attached to an invisible `L.marker`.
+ *
+ * @param capitalsData - GeoJSON `FeatureCollection` of capital-city points.
+ * @param map          - The active Leaflet map instance.
+ */
 function MapDrawLayer_Captials(capitalsData: CapitalsFeatureCollection, map: L.Map | null) {
     const capitalsLayerRef = useRef<L.LayerGroup | null>(null);
 
@@ -1930,7 +2871,14 @@ useEffect(() => {
 }, [zoom]);
 
 
-// Throttle helper
+/**
+ * Creates a throttled wrapper around `func` that ensures at most one
+ * invocation per `delay` milliseconds (leading-edge).
+ *
+ * @param func  - The function to throttle.
+ * @param delay - Minimum interval between invocations (ms).
+ * @returns A throttled function with the same signature.
+ */
 const throttle = (func: Function, delay: number) => {
     let lastCall = 0;
     return (...args: any[]) => {
@@ -1942,6 +2890,17 @@ const throttle = (func: Function, delay: number) => {
     };
 };
 
+/**
+ * Throttled Leaflet `mousemove` handler responsible for grid-cell hit-
+ * testing, tooltip rendering, feature-value lookup, and selected-cell
+ * highlighting.
+ *
+ * @remarks
+ * Wrapped in a 16 ms throttle (≈ 60 fps) to avoid layout thrashing.
+ * In non-COVID view, calls {@link addToolTip} to render the hover
+ * tooltip. In COVID view the tooltip is handled by the SVG circle
+ * `mouseover` handler inside `MapDrawLayer_CovidPresenceData`.
+ */
 const HandleMouseMoveX = useCallback(
     throttle((event: L.LeafletMouseEvent, map: L.Map, gridData: any) => {
 
@@ -1960,6 +2919,11 @@ const HandleMouseMoveX = useCallback(
         }
       
     
+        /**
+         * Renders the grid-cell hover tooltip (or pin marker) at the
+         * current cursor position, showing the feature value, unit,
+         * and cell coordinates.
+         */
         function addToolTip() {
         let unit = "";
         let value: any = "";
@@ -2026,47 +2990,22 @@ const HandleMouseMoveX = useCallback(
         if( props.mapStyles.isTooltopVisible==true) {
            
         
-        toolTipRef.current.setContent(`
-            <div id=${"toolTip" + chart} class="min-w-[220px] max-w-[280px] rounded-xl bg-linear-to-br from-indigo-600 via-indigo-700 to-slate-900 p-4 text-white shadow-xl font-sans">
-                
-                <div class="mb-2">
-                    <span class="text-3xl font-semibold align-baseline">
-                        ${value.toLocaleString(locale)}
-                    </span>
-                    <span class="text-lg font-medium text-indigo-200 ml-1 align-baseline">
-                        ${unit}
-                    </span>
-                </div>
-
-                ${colorBarHtml}
-
-                <table class="w-full text-sm">
-                    <tbody>
-                        <tr class="border-b border-white/20">
-                            <td class="py-1.5 pr-2 text-left font-normal text-indigo-200">
-                                ${t.rich("tooltip.country")}
-                            </td>
-                            <td class="py-1.5 pl-2 text-right font-medium" style="white-space: normal; word-break: break-word;">
-                                ${contextT.mouseEvent.current.country}
-                            </td>
-                        </tr>
-                        
-                        <tr class="border-b border-white/20">
-                            <td class="pt-1.5 pb-1.5 pr-2 text-left font-normal text-indigo-200">
-                                ${t.rich("tooltip.latLong")}
-                            </td>
-                            <td class="pt-1.5 pb-1.5 pl-2 text-right font-medium">
-                                ${curGridCell.current[0].toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${curGridCell.current[1].toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <p class="m-0 mt-3 pt-3  italic text-sm text-indigo-100/90" style="white-space: normal; word-break: break-word;">
-                    ${metaData[selectedFeature] !== undefined ? metaData[selectedFeature].description : "N/A"}
-                </p>
-            </div>
-        `)
+        toolTipRef.current.setContent(
+            renderStandardTooltipHTML({
+                value: value.toLocaleString(locale),
+                unit: unit,
+                description: metaData[selectedFeature] !== undefined ? metaData[selectedFeature].description : "N/A",
+                colorBarHtml: colorBarHtml,
+                rows: [
+                    { label: String(t.rich("tooltip.country")), value: getLocalizedCountryName(contextT.mouseEvent.current.country, locale) },
+                    {
+                        label: String(t.rich("tooltip.latLong")),
+                        value: `${curGridCell.current[0].toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${curGridCell.current[1].toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                    },
+                ],
+                chartId: "toolTip" + chart,
+            })
+        );
         }if (props.mapStyles.isMapMarkerTooltipVisible==true) {
             // Use a real L.marker with a custom SVG divIcon so the pin tip sits
             if (L && map) {
@@ -2203,6 +3142,15 @@ DrawSelectedGridCell(contextT.selectedGridcellID);
 
 const circlesSelectionRef = useRef<d3.Selection<any, any, any, any> | null>(null);
 
+/**
+ * Re-projects all COVID SVG `<circle>` elements to their current
+ * Leaflet layer-point positions after a `moveend` or `zoomend` event.
+ *
+ * @remarks
+ * Uses a cached D3 selection (`circlesSelectionRef`) to avoid
+ * querying the DOM on every call. The cache is invalidated whenever
+ * the underlying presence data changes.
+ */
 function updateCirclesOnMapMove() {
     if (!map) return;
     // Cache the selection instead of querying DOM every time
@@ -2224,6 +3172,21 @@ function updateCirclesOnMapMove() {
         });
 }
 
+/**
+ * Hook-function that registers Leaflet map interaction listeners
+ * (`moveend`, `zoomend`, `mousemove`, `mouseout`) and wires them
+ * to `HandleMouseMoveX`, `updateCoordinates`, and the COVID circle
+ * re-projection helper.
+ *
+ * @param isUpdate - Monotonic toggle that forces the `useEffect`
+ *                   dependency array to re-evaluate, re-attaching
+ *                   listeners after a data reload.
+ *
+ * @remarks
+ * Listeners are cleaned up on every re-run via the `useEffect`
+ * return function. The `circlesSelectionRef` cache is invalidated
+ * at the top of each cycle so stale DOM selections are never reused.
+ */
 function MapMouseEvents(isUpdate: boolean) {
     let debug = false;
     useEffect(() => {
@@ -2233,6 +3196,7 @@ function MapMouseEvents(isUpdate: boolean) {
         if (!map) return;
         if (true) {
             const handleMouseEvent = () => {
+                if (gridLayerTransitionRef.current) return;
                 let curCenter = map.getCenter();
                 let curZoom = map.getZoom();
                 curCenter.lat = Math.round(curCenter.lat * CALCER) / CALCER;
@@ -2416,6 +3380,18 @@ useEffect(() => {
         projectionFactory: d3.geoEquirectangular,
     });
 
+/**
+ * Draws a non-filled yellow-stroke rectangle highlighting the currently
+ * selected grid cell on the Leaflet SVG overlay.
+ *
+ * @remarks
+ * Called both from inside `HandleMouseMoveX` (to survive cursor
+ * movements) and at the component's top-level render (to survive
+ * zoom / pan reprojections).
+ *
+ * @param GridCellID - Index into the `gridData` Map. A value of `-1`
+ *                     clears any existing highlight.
+ */
 function DrawSelectedGridCell(GridCellID: number) {
         
         if (!map) return;
@@ -2469,22 +3445,27 @@ MapDrawLayer_SequenceMetadata(countryCounts);
 // MapDrawLayer_Grid is now handled by useCanvasGridLayer() hook below
 
 
-// longitude
+/** Handles the longitude range-slider `onChange`, forwarding the new value to {@link updateCoordinates}. */
 const handleInputChange1 = (event: React.ChangeEvent<HTMLInputElement>) => {
     updateCoordinates(latitude, Number(event.target.value), zoom);
     curMouseEvent.current = "slider";
 };
-// latitude
+/** Handles the latitude range-slider `onChange`, forwarding the new value to {@link updateCoordinates}. */
 const handleInputChange2 = (event: React.ChangeEvent<HTMLInputElement>) => {
     updateCoordinates( Number(event.target.value), longitude, zoom);
     curMouseEvent.current = "slider";
 };
 
+/** Handles the zoom range-slider `onChange`, forwarding the new value to {@link updateCoordinates}. */
 const handleInputChangeZoom = (event: React.ChangeEvent<HTMLInputElement>) => {
     updateCoordinates(latitude, longitude, Number(event.target.value));
     curMouseEvent.current = "slider";
 };
 
+    /**
+     * Handles the layer-opacity slider `onChange`. Clamps the value to
+     * `[0, 1]` and propagates to both local state and `InterfaceContext`.
+     */
     const handleLayerOpacityChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = Math.max(0, Math.min(1, Number(event.target.value)));
     curMouseEvent.current = "opacity";
@@ -2493,26 +3474,28 @@ const handleInputChangeZoom = (event: React.ChangeEvent<HTMLInputElement>) => {
 };
 
 const [minVal, maxVal] = useMemo(() => {
-    const loading = mapUIsettings.inCovidDataView ? isLoadingPresenceData : isLoading_MosquitoData;
-    const hasError = mapUIsettings.inCovidDataView ? false : (mosquitoData && mosquitoData.error !== null);
-    if (loading || hasError) {
-        return [0, 0];
-    }
     if (mapUIsettings.inCovidDataView) {
+        if (!presData || presData.length === 0) {
+            return [0, 0];
+        }
         return getMinMaxFeature(
-            (presData).map(d => ({
+            presData.map(d => ({
                 feature: Number(d.feature)
             }))
         );
-    }
-    else{
+    } else {
+        const loading = isLoading_MosquitoData;
+        const hasError = mosquitoData && mosquitoData.error !== null;
+        if (loading || hasError || !mosquitoData?.response) {
+            return [0, 0];
+        }
         return getMinMaxFeature(
             (mosquitoData.response as presDBdataT[]).map(d => ({
                 feature: Number(d.feature)
             }))
         );
     }
-}, [mosquitoData, isLoading_MosquitoData, presData, isLoadingPresenceData, mapUIsettings.inCovidDataView]);
+}, [mosquitoData, isLoading_MosquitoData, presData, mapUIsettings.inCovidDataView]);
 
 
 const radiusScale = useMemo(() => {
@@ -2546,12 +3529,38 @@ const colorMap = useMemo(() => {
 }, [curColorMapType, minVal, maxVal, selectedFeature, metaData]);
 
 
+/**
+ * Cancels a pending `setTimeout` stored in the provided ref and resets
+ * the ref to `null`.
+ *
+ * @param ref - Mutable ref holding a timeout id. Defaults to
+ *              `layerUpdateHandlerTime` (the layer-update debounce timer).
+ */
 function resetTimeout( ref: React.MutableRefObject<ReturnType<typeof setTimeout> | null> = layerUpdateHandlerTime) {
     if(ref.current) {
         clearTimeout(ref.current);
     }
 }
 
+/**
+ * Performs a cross-fade transition between two `L.ImageOverlay` layers.
+ *
+ * The previous overlay is faded out over `timer` ms, then removed.
+ * A new overlay is created from `imageUrl`, added to the map at the
+ * current viewport bounds, and faded in over the same duration.
+ *
+ * @param map          - The active Leaflet map instance.
+ * @param imageUrl     - Base-64 data-URL of the new canvas snapshot.
+ * @param timer        - Transition duration in milliseconds.
+ * @param layerOpacity - Target opacity for the incoming overlay.
+ * @param overlayRef   - Mutable ref holding the current overlay instance;
+ *                       updated in place to point at the new overlay.
+ *
+ * @remarks
+ * If the map container has zero pixel size (e.g. before the first
+ * `invalidateSize`), `map.getBounds()` throws. The function guards
+ * against this with a try-catch and silently skips the render cycle.
+ */
 function LayerTransition(
             map: L.Map,
             imageUrl: string,
@@ -2652,14 +3661,28 @@ useCanvasGridLayer({
 MapDrawLayer_MosquitoPresenceData(presenceDrawHash.current);
 MapDrawLayer_CovidPresenceData(presenceDrawHash.current);
 
+/**
+ * Hook-function that renders mosquito presence / occurrence points as
+ * a canvas-based `L.ImageOverlay` with a cross-fade transition.
+ *
+ * @remarks
+ * Skipped entirely when `mapUIsettings.inCovidDataView` is `true`;
+ * COVID presence data is rendered by `MapDrawLayer_CovidPresenceData`
+ * instead. Each point is drawn as a filled circle whose radius scales
+ * with the `screenDistanceOneKM` value to maintain consistent
+ * geographic sizing across zoom levels.
+ *
+ * @param presenceDrawHash - Monotonically increasing counter used to
+ *                           trigger re-renders after debounced map events.
+ */
 function MapDrawLayer_MosquitoPresenceData(presenceDrawHash: number) {
     const layerTansitionTime = 500;
     const canvasRef = useRef<HTMLCanvasElement | null>(null); // Reuse canvas instead of recreating
     const overlayRef = useRef<L.ImageOverlay | null>(null);
 
     useEffect(() => {
-        // Don't render if data is loading, we are in Covid view, or presence data is disabled
-        if (!map || isLoadingPresenceData || mapUIsettings.inCovidDataView || !mapUIsettings.isPresenceData) return;
+        // Don't render if map is not initialized, we are in Covid view, or presence data is disabled in datasets
+        if (!map || mapUIsettings.inCovidDataView || !props.mapDataSets.isPresenceData) return;
 
         function Render(){
             // Don't render if map is not initialized
@@ -2745,12 +3768,30 @@ function MapDrawLayer_MosquitoPresenceData(presenceDrawHash: number) {
     return overlayRef.current;
 }
 
+/**
+ * Hook-function that renders COVID-19 epidemiological data points as
+ * interactive SVG circles in the Leaflet overlay pane.
+ *
+ * @remarks
+ * Unlike `MapDrawLayer_MosquitoPresenceData` (canvas-based), this
+ * function uses D3 data-joins (`enter`/`exit`/`merge`) to create
+ * individual `<circle>` elements so that each point is clickable
+ * and shows a detailed popup with localised country/sub-region names,
+ * feature values, and date ranges.
+ *
+ * Circle radii are scaled via `radiusScale` (a `d3.scaleSqrt`
+ * derived from `[minVal, maxVal]`) and coloured by the active
+ * `colorMap`.
+ *
+ * @param presenceDrawHash - Monotonically increasing counter used to
+ *                           trigger re-renders after debounced map events.
+ */
 function MapDrawLayer_CovidPresenceData(presenceDrawHash: number) {
     const layerTansitionTime = 500;
 
     useEffect(() => {
-        // Don't render if data is loading or we are not in Covid view
-        if (!map || isLoadingPresenceData || !mapUIsettings.inCovidDataView) return;
+        // Don't render if map is not initialized or we are not in Covid view
+        if (!map || !mapUIsettings.inCovidDataView) return;
 
         function Render(){
             if (!map) return;
@@ -2829,16 +3870,41 @@ function MapDrawLayer_CovidPresenceData(presenceDrawHash: number) {
                     .on('click', function(event: any, d: any) {
                         event.stopPropagation();
                         const latlng = L ? L.latLng(+d.geometry[0], +d.geometry[1]) : { lat: 0, lng: 0 };
-                        const content = `
-                                <div class="p-2 rounded-lg bg-indigo-700 text-white shadow">
-                                    <h1 class="m-0 text-xl font-bold text-shadow">
-                                    ${new Intl.NumberFormat('de-DE').format(Number(d.feature))}
-                                    </h1>
-                                    <h2 style="margin: 0; font-size: 13px; font-weight: 600;">${contextT.curFeature}<h2>
-                                    <p style="margin-top:15px;margin-bottom:2px;" class="text-base"><b>${t.rich('covid19_world_data.country', {...t_richConfig})}:</b> ${d.country_name != null ? d.country_name : contextT.mouseEvent.current.country}</p>
-                                    <p style="margin:0px 0;margin-bottom:15px;" class="text-base"> ${d.subregion_name != 'NULL' ? '<b>'+ t.rich('covid19_world_data.subregion', {...t_richConfig})+': </b>' + d.subregion_name : ''}</p>
-                                    <p style="margin: 2px 0;"><b>${t.rich('covid19_world_data.time_range', {...t_richConfig})}:  </b> ${dateRange?.from ? format(dateRange.from, "dd.MM.yyyy") : "N/A"} - ${dateRange?.to ? format(dateRange.to, "dd.MM.yyyy") : "N/A"}</p>
-                                </div>`;
+                        const curFeatKey = selectedFeature || contextT.curFeature || props.mapUIsettings.defaultFeatureName;
+                        const featMeta = metaData && curFeatKey ? metaData[curFeatKey as keyof typeof metaData] : undefined;
+                        const featLabel = featMeta?.description ? featMeta.description : curFeatKey;
+                        const featDimension = featMeta?.dimension ? ` [${featMeta.dimension}]` : '';
+
+                        const rawCountry = d.country_name != null ? d.country_name : contextT.mouseEvent.current.country;
+                        const localizedCountry = getLocalizedCountryName(rawCountry, locale);
+
+                        const rawSubregion = d.subregion_name;
+                        const hasSubregion = rawSubregion && rawSubregion !== 'NULL' && rawSubregion !== '';
+                        const localizedSubregion = hasSubregion ? getLocalizedSubregionName(rawSubregion, locale) : '';
+
+                        const numFormatted = new Intl.NumberFormat(locale === 'de' ? 'de-DE' : 'en-US').format(Number(d.feature));
+                        const dateFormatStr = locale === 'de' ? 'dd.MM.yyyy' : 'MM/dd/yyyy';
+                        const dateFromStr = dateRange?.from ? format(dateRange.from, dateFormatStr) : undefined;
+                        const dateToStr = dateRange?.to ? format(dateRange.to, dateFormatStr) : undefined;
+                        const toWord = locale === 'de' ? 'bis' : 'to';
+
+                        const formattedDateRange = dateFromStr
+                            ? (dateToStr
+                                ? `<div class="inline-block text-right font-medium leading-tight"><span>${dateFromStr}</span><div class="text-[10px] text-indigo-300 font-normal italic my-0.5 text-center">${toWord}</div><span>${dateToStr}</span></div>`
+                                : dateFromStr)
+                            : 'N/A';
+
+                        const content = renderStandardTooltipHTML({
+                            value: numFormatted,
+                            unit: featDimension,
+                            description: featLabel,
+                            rows: [
+                                { label: String(t.rich('covid19_world_data.country', {...t_richConfig})), value: localizedCountry },
+                                ...(hasSubregion ? [{ label: String(t.rich('covid19_world_data.subregion', {...t_richConfig})), value: localizedSubregion }] : []),
+                                { label: String(t.rich('covid19_world_data.time_range', {...t_richConfig})), value: formattedDateRange },
+                            ],
+                            chartId: "toolTipPresence_" + props.chartName,
+                        });
                         setTimeout(() => {
                             const tooltip = L ? L.popup({ className: 'custom-popup' }) : null;
                             if (!tooltip) return;
@@ -2877,6 +3943,22 @@ function MapDrawLayer_CovidPresenceData(presenceDrawHash: number) {
 }
 
 
+/**
+ * Hook-function that renders per-country D3 donut / pie charts for
+ * sequence-metadata distributions (e.g. Dengue serotype DENV-1–4).
+ *
+ * @remarks
+ * Creates a dedicated Leaflet SVG renderer (`piesPane`) at z-index 650
+ * and positions each donut at the computed country centroid. Donut size
+ * is driven by a `d3.scaleSqrt` based on sample counts; slice colours
+ * are drawn from the `DonutColors` palette.
+ *
+ * On hover, individual slices enlarge with a D3 tween animation and a
+ * React-rendered `<DonutTooltip>` is mounted into `SVG_tooltip_ref`.
+ *
+ * @param countryCounts - Object keyed by country name, each value
+ *                        containing `count`, `center`, `counts[]`, and `labels[]`.
+ */
 function MapDrawLayer_SequenceMetadata(countryCounts: { [key: string]: any }) {
 
     useEffect(() => {
@@ -2900,6 +3982,16 @@ function MapDrawLayer_SequenceMetadata(countryCounts: { [key: string]: any }) {
 
     }, [countryCounts, isSequenceMetaData, pieSize, isLoading_sequenceMetadata]);
 
+    /**
+     * Re-projects and re-scales all existing donut-chart `<g>` groups
+     * after a zoom or pan event, keeping them anchored to their country
+     * centroids.
+     *
+     * @remarks
+     * The base zoom level for scale calculation is `3.0`. Each donut's
+     * outer `<g>` is translated to `latLngToLayerPoint` and the inner
+     * `<g.pie-scale>` is uniformly scaled by `getZoomScale(zoom, 3.0)`.
+     */
     function updatePieCharts() {
         if (!L || !map || isLoading_sequenceMetadata || !isSequenceMetaData) return;
         const z = 3.0;
@@ -2918,6 +4010,20 @@ function MapDrawLayer_SequenceMetadata(countryCounts: { [key: string]: any }) {
     }
 
 
+    /**
+     * Creates the D3 donut / pie charts from scratch inside a dedicated
+     * Leaflet SVG pane (`piesPane`, z-index 650).
+     *
+     * Each country entry in `countryCounts` produces one `<g.pie>` group
+     * positioned at the country centroid. Slice arcs are coloured from
+     * the `DonutColors` palette. Hover interactions trigger a D3 arc-
+     * tween enlargement and mount a `<DonutTooltip>` into `SVG_tooltip_ref`.
+     *
+     * @param countryCounts - Object keyed by country name, each value
+     *                        containing `count`, `center`, `counts[]`,
+     *                        and `labels[]`.
+     * @param pieSize       - Base diameter (px) before zoom-dependent scaling.
+     */
     function createPieCharts(countryCounts: { [key: string]: any }, pieSize: number) {
             if (!L || !map || SVG_ref.current) return;
             //if(piesMerged.current != undefined) return;
@@ -2930,8 +4036,7 @@ function MapDrawLayer_SequenceMetadata(countryCounts: { [key: string]: any }) {
                     piesPane.style.zIndex = "650"; // Ensure it is above the base pane
                 }
                 SVGLayer_ref.current = L.svg({ pane: 'piesPane' }); // Leaflet-managed <svg>
-                (SVGLayer_ref.current as any)
-                SVGLayer_ref.current.addTo(map);
+                SVGLayer_ref.current?.addTo(map);
                 SVG_ref.current = {
                 renderer: SVGLayer_ref.current,
                 baseZoom: map.getZoom(),
@@ -3171,8 +4276,12 @@ function MapDrawLayer_SequenceMetadata(countryCounts: { [key: string]: any }) {
 
                     const labelGroup = g.append("g").attr("class", "pie-labels");
 
+                    /**
+                     * Renders permanent polyline + text labels for each donut
+                     * slice, positioned outside the arc via `getLabelPolyline`.
+                     */
                     function renderStaticLabels(){
-                        // Example: Add a label for each slice with a polyline
+                        // Add a label for each slice with a polyline
                         pieData.forEach((arcData, i) => {
                             // Compute centroid for label position
                             const [posA, posB, posC] = getLabelPolyline(arcData, basePieSize, thickness);
@@ -3275,8 +4384,17 @@ useEffect(() => {
 
     const colWidth = 285; // Set the desired column width here in pixels
 
+    /**
+     * Returns a combined `{ className, style }` object used to style
+     * individual settings-panel grid cells with consistent padding,
+     * border-radius, and column-span behaviour.
+     *
+     * @param colSpan - Number of CSS Grid columns the element should
+     *                  span. @default 1
+     * @returns Props object spreadable onto a JSX element.
+     */
     function UI_elementStyler(colSpan: number = 1){
-        return { className: `text-sm p-2 border row-span-2 bg-white/75 z-10 rounded-lg shadow-md`, style: { gridColumn: `span ${colSpan} / span ${colSpan}` } };
+        return { className: `text-sm p-2 border row-span-2 bg-white/75 z-10 rounded-lg shadow-md pointer-events-auto`, style: { gridColumn: `span ${colSpan} / span ${colSpan}` } };
     }
 
 
@@ -3319,8 +4437,8 @@ useEffect(() => {
         <>
   
        
-<div className="@container relative size-full" >
-    <div className="absolute top-[-35px] right-14 z-600">
+<div ref={settingsContainerRef} className="@container relative size-full" >
+    <div className="absolute right-14 z-600" style={{ top: `${settingsButtonTop}px` }}>
         <button
             onClick={() =>{
                  setIsSettingsOpen(true);
@@ -3335,7 +4453,7 @@ useEffect(() => {
     <SizeHook element={element} sizeRef={sizeRef} setSize={setSizes}/>
 
       <div
-        className={`absolute w-full mt-1 ml-1 pr-2 grid gap-2 z-30 max-w-full   ${
+        className={`absolute w-full mt-1 ml-1 pr-2 grid gap-2 z-30 max-w-full pointer-events-none   ${
             props.mapUIsettings.isSettingsBlendAnimation
                 ? (isSettingsOpen
                     ? "transition-all delay-1000 duration-1000 opacity-100 scale-100 z-30"
@@ -3856,56 +4974,14 @@ useEffect(() => {
         )}
         {mapUIsettings.isCountrySelectionDropdownMapBased && Array.isArray(mapData.features) && mapData.features.length > 0 && map && (
             <div {...UI_elementStyler()}>
-            <label htmlFor="dataset-select">
-                 {t.rich('country', {...t_richConfig})}
-            </label>
+            <span className="mb-1 flex items-center justify-between">
+                {t.rich('country', {...t_richConfig})}:
+                <span className="ml-2"><HoverCardTooltip MDXContent={MDX.CountrySelection} /></span>
+            </span>
             {selected_country_names && metaData && (
-           <Select value={selectedCountry} onValueChange={(value) => {
-                
-                {mapData.features.map((feature, index) => {
-                        const country = feature.properties?.name || feature.properties?.NAME || "";
-                        if(country === value && L) {
-                            const bounds = L.geoJSON(feature).getBounds();
-                            map?.fitBounds(bounds, { maxZoom: 8, padding: [20, 20] });
-                        }
-                    })}
-                    const selectionColor = DonutColors[value] || "#2196f3";
-                    mapData.features.forEach((feature, index) => {
-                        const country = feature.properties?.name || feature.properties?.NAME || "";
-                        if (country === value && L) {
-                            const bounds = L.geoJSON(feature).getBounds();
-                            map?.fitBounds(bounds, { maxZoom: 8, padding: [20, 20] });
-                            // Highlight selected country with selection color
-                            map.eachLayer((layer) => {
-                                if (layer instanceof L.GeoJSON) {
-                                    (layer as L.GeoJSON).eachLayer((subLayer) => {
-                                        if (subLayer instanceof L.Path) {
-                                            const featureName = (subLayer as any).feature?.properties?.name || (subLayer as any).feature?.properties?.NAME || "";
-                                            if (featureName === value) {
-                                                (subLayer as L.Path).setStyle({
-                                                    color: selectionColor,
-                                                    fillColor: selectionColor,
-                                                    weight: props.mapStyles?.strokeWidth + 2,
-                                                    fillOpacity: 0.3,
-                                                });
-                                            } else {
-                                                (subLayer as L.Path).setStyle({
-                                                    color: "#000000",
-                                                    fillColor: "rgba(50, 95, 184, 0)",
-                                                    weight: props.mapStyles?.strokeWidth,
-                                                    fillOpacity: 0.0,
-                                                });
-                                            }
-                                        }
-                                    });
-                                }
-                            });
-                        }
-                    });
-    
-                setSelectedCountry(value);
-                }
-                } >
+            <Select value={selectedCountry} onValueChange={(value) => {
+                selectCountry(value);
+            }}>
                 <SelectTrigger className="w-full">
                 <SelectValue placeholder={"Select country..."} />
                 </SelectTrigger>
@@ -3913,7 +4989,7 @@ useEffect(() => {
                 <SelectGroup>
                     {[...mapData.features]
                         .map((feature) => feature.properties?.name || feature.properties?.NAME || "")
-                        .filter((country) => country) // filter out empty names
+                        .filter((country) => country)
                         .sort((a, b) => a.localeCompare(b))
                         .map((country, index) => (
                             <SelectItem key={index} value={country}>
@@ -3928,117 +5004,14 @@ useEffect(() => {
         </div>)}
         {mapUIsettings.isCountrySelectionDropdown && (
             <div {...UI_elementStyler()}>
-            <label htmlFor="dataset-select">
-                 {t.rich('country', {...t_richConfig})}:
-            </label>
+            <span className="mb-1 flex items-center justify-between">
+                {t.rich('country', {...t_richConfig})}:
+                <span className="ml-2"><HoverCardTooltip MDXContent={MDX.CountrySelection} /></span>
+            </span>
             {selected_country_names && metaData && (
            <Select value={selectedCountry} onValueChange={(value) => {
-                let url = apiRoutes.fetchDbData({
-                    relationName: curDatasetname.current,
-                    feature: contextT.curFeature,
-                    filterBy: "iso_3166_1_alpha_3",
-                    filterValue: value,
-                    startDate: mapUIsettings.inCovidDataView && (dateRange && dateRange.from && dateRange.to) ? format(dateRange.from, "yyyy-MM-dd") : undefined,
-                    endDate: mapUIsettings.inCovidDataView && (dateRange && dateRange.from && dateRange.to) ? format(dateRange.to, "yyyy-MM-dd") : undefined,
-                    aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
-                });
-
-                setDateRange(dateRange ? dateRange : {from: min_date, to: max_date});
-                contextT.setDateRange(dateRange ? dateRange : {from: min_date, to: max_date});
-
-                setSelectedCountry(value);
-                contextT.setSelectedCountry(value);
-                contextT.setCurDatasetURL(url);
-                contextT.setCurPresenceDatasetURL(url);
-                contextT.setIsPresenceData(true);
-                setIsPresData(true);
-                setPresenceDataURL(url);
-                setShowSuccessCountryDropdown(true);
-
-                let curCenter =  getCountryCenterFromMapData(mapData, value);
-
-                if(map!= null){
-                    if (highlightedCountryRef.current) {
-                        console.log("Layer exists in map?", map.hasLayer(highlightedCountryRef.current));
-
-                        console.log("** before remove", highlightedCountryRef.current);
-                        map.removeLayer(highlightedCountryRef.current);
-                        highlightedCountryRef.current = null;
-                      }
-                    
-                    const svg = d3.select(map.getContainer()).select("svg");
-                    const interpolateLat = d3.interpolate(latitude, curCenter.lat);
-                    const interpolateLong = d3.interpolate(longitude, curCenter.lng);
-                    let interpolateZoom = d3.interpolate(zoom,  zoom * 0.6);
-                      
-                    svg.transition()
-                        .duration(mapFlyTransitionTime)
-                        .on("start", () => {
-                            console.log("Transition started");
-                            setIsSettingsOpen(false);
-                        }) 
-                        .on("end", () => {
-
-                            const matchingFeature = mapData.features.find(
-                                (feature) =>
-                                feature.properties?.iso_a3 === value ||
-                                feature.properties?.name === value
-                            );
-
-                            if (matchingFeature) {
-    
-                                const countryLayer = L ? L.geoJSON(matchingFeature, {
-                                style: {
-                                    color: "rgba(106, 13, 173, 1)",
-                                    weight: 5,
-                                    fill: false,
-                                    fillOpacity: 0,
-                                    opacity:1
-                                },
-                                }) : null;
-                                if (!countryLayer) return;
-                                countryLayer.addTo(map);
-
-
-                                map.flyToBounds(countryLayer.getBounds(), {
-                                    padding: [200, 100],
-                                    maxZoom: 5,
-                                    duration:2.5
-                                  });
-
-
-                                highlightedCountryRef.current = countryLayer;
-                            }
-                            console.log("Transition ended");
-                        })
-                        .tween("coordinates", () => (t) => {
-
-                            console.log("**tween");
-
-                            const prarbT = (x: number): number => {
-                                return x * x;
-                            };
-                            let tnew = 0;
-                            let newZoom = 0;
-                             tnew = 1 - prarbT(t * 2 - 1.0);
-                            if(zoom < 3.2)  {
-                               newZoom = zoom;
-                            }
-                            else {
-                                newZoom = interpolateZoom(tnew);
-                            }
-                            const newLat = interpolateLat(t);
-                            const newLong = interpolateLong(t);
-                            updateCoordinates(newLat, newLong, newZoom);
-                        });
-                }
-
-                setTimeout(() => {
-                    setShowSuccessCountryDropdown(false);
-                }, 3000);
-
-                }
-                } >
+                selectCountry(value);
+            }}>
                 <SelectTrigger className="w-full">
                     <SelectValue placeholder={t.rich('covid19_world_data.select_country_name', {...t_richConfig})+"..."} />
                 </SelectTrigger>
@@ -4072,9 +5045,10 @@ useEffect(() => {
 
     {mapUIsettings.isDatePicker && (
         <div {...UI_elementStyler(2)}   > 
-            <label htmlFor="dataset-select">
-            {t.rich('time_range', {...t_richConfig})}:
-            </label>
+            <span className="mb-1 flex items-center justify-between">
+                {t.rich('time_range', {...t_richConfig})}:
+                <span className="ml-2"><HoverCardTooltip MDXContent={MDX.CalendarTimeRange} /></span>
+            </span>
             <div className="flex w-full flex-row items-start space-y-2 lg:space-y-0 lg:space-x-2 mt-2 min-w-0">
             <Popover>
                 <PopoverTrigger asChild>
@@ -4108,8 +5082,8 @@ useEffect(() => {
                                     newRange = { from: newRange.to, to: newRange.from };
                                 }
                                 setDateRange(newRange);
-                                contextT.setDateRange(newRange);
                             }}
+                            disabled={disabledMatcher}
                             modifiers={{
                                 range_start: dateRange?.from,
                                 range_end: dateRange?.to,
@@ -4135,8 +5109,8 @@ useEffect(() => {
                                     newRange = { from: newRange.to, to: newRange.from };
                                 }
                                 setDateRange(newRange);
-                                contextT.setDateRange(newRange);
                             }}
+                            disabled={disabledMatcher}
                             modifiers={{
                                 range_start: dateRange?.from,
                                 range_end: dateRange?.to,
@@ -4155,14 +5129,17 @@ useEffect(() => {
             <Button
                 className="mt-0 bg-purple-800 w-[40%] truncate  min-w-0 px-4 py-2 text-white p-1 rounded text-sm whitespace-nowrap overflow-hidden text-ellipsis"
                 onClick={ () => {
-                                   
+                    L_dataLoading.start();
+                    if (dateRange?.from && dateRange?.to) {
+                        contextT.setDateRange(dateRange);
+                    }
                     let url = apiRoutes.fetchDbData({
                         relationName: curDatasetname.current,
                         feature: selectedFeature || contextT.curFeature,
                         filterBy: selectedCountry ? "iso_3166_1_alpha_3" : undefined,
                         filterValue: selectedCountry || undefined,
-                        startDate: dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : undefined,
-                        endDate: dateRange?.to ? format(dateRange.to, "yyyy-MM-dd") : undefined,
+                        startDate: (dateRange?.from && dateRange?.to) ? format(dateRange.from, "yyyy-MM-dd") : undefined,
+                        endDate: (dateRange?.from && dateRange?.to) ? format(dateRange.to, "yyyy-MM-dd") : undefined,
                         aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
                     });
 
@@ -4547,6 +5524,7 @@ useEffect(() => {
 
 
 
+/** @see {@link LeafD3MapLayerComponent} */
 export default  LeafD3MapLayerComponent;
 
 

@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flasgger import swag_from
 from .assignGeoPosToCountry import assign_geo_pos_to_country
+from .aggregateRKIdata import aggregate_rki_data
 
 route_processData = Blueprint('route_processData', __name__)
 
@@ -43,3 +44,52 @@ def assign_countries():
         }), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@route_processData.route('/aggregateRKI', methods=['GET', 'POST'])
+def aggregate_rki():
+    """
+    Aggregate RKI COVID-19 / SARS-CoV-2 metrics by Bundesland.
+    ---
+    parameters:
+      - name: sourceTable
+        in: query
+        type: string
+        required: false
+        default: "aktuell_deutschland_sarscov2_infektionen"
+        description: The name of the raw RKI table to aggregate.
+      - name: targetTable
+        in: query
+        type: string
+        required: false
+        description: The target aggregated table name.
+      - name: targetDate
+        in: query
+        type: string
+        required: false
+        description: Target date for aggregation (YYYY-MM-DD). Defaults to latest date in dataset.
+    responses:
+      200:
+        description: Aggregation completed successfully
+    """
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        source_table = data.get('sourceTable') or request.args.get('sourceTable') or "aktuell_deutschland_sarscov2_infektionen"
+        target_table = data.get('targetTable') or request.args.get('targetTable')
+        target_date = data.get('targetDate') or data.get('date') or request.args.get('targetDate') or request.args.get('date')
+    else:
+        source_table = request.args.get('sourceTable', 'aktuell_deutschland_sarscov2_infektionen')
+        target_table = request.args.get('targetTable')
+        target_date = request.args.get('targetDate') or request.args.get('date')
+
+    try:
+        result = aggregate_rki_data(
+            source_table=source_table,
+            target_table=target_table,
+            targetDate=target_date
+        )
+        return jsonify(result), 200
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Error aggregating RKI data: {str(e)}"}), 500

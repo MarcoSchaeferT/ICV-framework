@@ -85,31 +85,32 @@ PointType,string,PointType,Type of the observation point,1
 Source,string,Source,Source of the observation,1
 id,int,NA,ID,0
 idbundesland,int,ID,ID of the federal state,0
-datenstand,string,NA,Date of the data status,0
-meldedatum,string,NA,Reporting date,0
-bundesland,string,Name,Name of the federal state,0
-accucases,int,,Accumulated number of cases,1
-newcases,int,,New cases,1
+datenstand,date,NA,Date of the data status,1
+meldedatum,date,NA,Reporting date,0
+bundesland,string,Name,Name of the federal state,1
+accucases,int,,Cumulative total of all cases,1
+newcases,int,,New cases for the day of datenstand,1
 accucasesperweek,int,,Accumulated cases per week,1
 newcasesperweek,int,,New cases per week,1
-accudeaths,int,,Accumulated number of deaths,1
-newdeaths,int,,New deaths,1
+accudeaths,int,,Cumulative total of all deaths,1
+newdeaths,int,,New deaths for the day of datenstand,1
 accudeathsperweek,int,,Accumulated deaths per week,1
 newdeathsperweek,int,,New deaths per week,1
-accurecovered,int,,Accumulated number of recoveries,1
-newrecovered,int,,New recoveries,1
+accurecovered,int,,Cumulative total of all recoveries,1
+accurecoveredperweek,int,,Accumulated recoveries per week,1
+newrecovered,int,,New recoveries for the day of datenstand,1
 population,int,,Population count,1
 date,date,NA,Date of the observation,1
 longitude_1,float,longitude,coordinate,0
 iso_3166_1_alpha_3,string,NA,the 3 letter country name,1
-cumulative_confirmed,float,,cumulative confirmed cases,0
-cumulative_recovered,float,,cumulative recovered cases,0
-cumulative_deceased,float,,cumulative deceased cases,0
+cumulative_confirmed,float,,cumulative confirmed cases,1
+cumulative_recovered,float,,cumulative recovered cases,1
+cumulative_deceased,float,,cumulative deceased cases,1
 cumulative_tested,float,,cumulative tested cases,0
-new_confirmed,float,,Confirmed Cases,1
-new_recovered,float,,Total Recoveries,1
-new_deceased,float,,Total Deaths,1
-new_tested,float,,Total Tests,1
+new_confirmed,float,,Confirmed Cases,0
+new_recovered,float,,Total Recoveries,0
+new_deceased,float,,Total Deaths,0
+new_tested,float,,Total Tests,0
 id,int,id,id,0
 location_key,string,,location key,0
 openstreetmap_id,string,,OpenStreetMap ID,0

@@ -37,9 +37,21 @@ function uploadFileWithProgress(
         onProgress(Number(((event.loaded / event.total) * 100).toFixed(1)));
       }
     };
-    xhr.onload = () => resolve(xhr.response);
-    xhr.onerror = () => reject(new Error("Network error during upload"));
-    xhr.onabort = () => reject(new Error("Upload aborted"));
+    xhr.onload = () => {
+      if (xhr.status >= 400) {
+        let errDetail = `Server returned HTTP ${xhr.status} ${xhr.statusText || ""}`.trim();
+        if (xhr.response && typeof xhr.response === "object" && xhr.response.ERROR) {
+          errDetail = xhr.response.ERROR;
+        }
+        resolve({ ERROR: errDetail });
+      } else if (!xhr.response) {
+        resolve({ ERROR: `Server returned HTTP ${xhr.status} with empty/non-JSON response` });
+      } else {
+        resolve(xhr.response);
+      }
+    };
+    xhr.onerror = () => resolve({ ERROR: "Network connection lost or server unreachable during upload transfer" });
+    xhr.onabort = () => resolve({ ERROR: "Upload aborted by user" });
     xhr.send(formData);
   });
 }

@@ -39,7 +39,7 @@ def get_db_connection_params() -> dict:
     
     # When running locally (not in Docker), resolve icv-database to localhost
     is_docker = os.getenv("IS_DOCKER", "false").lower() == "true"
-    if not is_docker and host == "icv-database":
+    if not is_docker and host in ("icv-database", "davis-db"):
         host = "localhost"
     
     return {

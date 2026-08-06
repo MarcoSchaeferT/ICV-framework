@@ -1,12 +1,11 @@
 services:
-
   icv-database:
-    image: ghcr.io/marcoschaefert/icv-database:latest
+    container_name: icv-database
+    image: ghcr.io/marcoschaefert/icv-database:test
     restart: always
     build:
       context: .
       dockerfile: ./db/Dockerfile.db
-      network: host
     ports:
       - "5333:5333"
     environment:
@@ -14,54 +13,48 @@ services:
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD_SECRET}
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - db-data-icv:/var/lib/postgresql/data
     networks:
-      - internal-network
+      - icv-network
 
   icv-redis:
     image: redis:7-alpine
     restart: always
-    container_name: icv-redis
-    # Holds transient upload progress/error state shared across the Gunicorn
-    # workers of icv-backend — no persistence needed.
+    # Holds transient upload progress/error state + cache invalidation epochs
+    # shared across the Gunicorn workers of icv-backend — no persistence needed.
     command: [ "redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru" ]
     networks:
-      - internal-network
+      - icv-network
 
   icv-frontend:
-    image: ghcr.io/marcoschaefert/icv-frontend:latest
+    container_name: icv-frontend
+    image: ghcr.io/marcoschaefert/icv-frontend:test
     environment:
       IS_DOCKER: "true"
       NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE}
       NEXT_PUBLIC_SHOW_DISCLAIMER: ${NEXT_PUBLIC_SHOW_DISCLAIMER}
       NEXT_PUBLIC_SHOW_COV: ${NEXT_PUBLIC_SHOW_COV}
+      NEXT_PUBLIC_SHOW_LEGAL_TEXTS: ${NEXT_PUBLIC_SHOW_LEGAL_TEXTS}
     build:
       context: .
       dockerfile: ./Dockerfile.frontend
       network: host
-    container_name: icv-frontend
     ports:
       - "3000:3000"
     networks:
-      - internal-network
-    # Local dev only: maps icv-database to host machine. Not needed for Kubernetes.
-    extra_hosts:
-      - "icv-database:host-gateway"
+      - icv-network
 
   icv-backend:
-    image: ghcr.io/marcoschaefert/icv-backend:latest
+    container_name: icv-backend
+    image: ghcr.io/marcoschaefert/icv-backend:test
     build:
       context: .
       dockerfile: ./backend/Dockerfile.backend
       network: host
-    container_name: icv-backend
-    # Local dev only: maps icv-database to host machine. Not needed for Kubernetes.
-    extra_hosts:
-      - "icv-database:host-gateway"
     ports:
       - "5222:5222"
     networks:
-      - internal-network
+      - icv-network
     depends_on:
       - icv-database
       - icv-redis
@@ -73,10 +66,12 @@ services:
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-}
 
 volumes:
-  db-data:
+  db-data-icv:
 
 networks:
-  internal-network:
+  icv-network:
+    name: icv-network
     driver: bridge
-    driver_opts:
-      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"
+
+#    driver_opts:
+#      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"

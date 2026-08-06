@@ -119,7 +119,7 @@ export const showCasesList: Record<Locale, ShowcaseItem[]> = {
       description: "Betrachten Sie die historischen Daten der COVID-19-Pandemie in Deutschland",
       backgroundImage: "/showCases/historical_data_covid.png",
       icon: <ReportColumns />,
-      link: "/home/showCases/Historical_Data_COVID",
+      link: "/covidDashboard",
     },
     {
       title: "Historische COVID-Daten Weltweit",

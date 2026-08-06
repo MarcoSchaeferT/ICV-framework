@@ -162,7 +162,11 @@ def populate_column_metadata(relation_name: str, column_names: list[str]):
                             INSERT INTO {table}
                                 (relation_name, column_name, datatype, dimension, description, availability)
                             VALUES (%s, %s, %s, %s, %s, %s)
-                            ON CONFLICT (relation_name, column_name) DO NOTHING
+                            ON CONFLICT (relation_name, column_name) DO UPDATE
+                                SET datatype = EXCLUDED.datatype,
+                                    dimension = EXCLUDED.dimension,
+                                    description = EXCLUDED.description,
+                                    availability = EXCLUDED.availability
                             """).format(table=sql.Identifier(table)),
                             (relation_name, sanitized_col_name, datatype, dimension, description, availability),
                         )

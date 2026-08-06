@@ -4,21 +4,7 @@ import stateMappersGermany, { stateMappersGermanyT } from '@/app/helpers';
 
 
 class CovidDataStates {
-    idbundesland: string;
-    datenstand: string;
-    meldedatum: string;
-    bundesland: string;
-    accucases: number;
-    newcases: number;
-    accucasesperweek: number;
-    newcasesperweek: number;
-    accudeaths: number;
-    newdeaths: number;
-    accudeathsperweek: number;
-    newdeathsperweek: number;
-    accurecovered: number;
-    newrecovered: number;
-    population: number;
+
 
     /*
     private readonly _api_url: string = apiRoutes.FETCH_COMPRESSED_JSON;
@@ -28,30 +14,17 @@ class CovidDataStates {
     */
 
 
-    private readonly _url: string = apiRoutes.fetchDbData({ relationName: "covid_states_dat", feature: "ALL" });
+    private readonly _url: string = apiRoutes.fetchDbData({ relationName: "aktuell_deutschland_sarscov2_infektionen_aggregated", feature: "ALL" });
     private readonly _dataName: string = "CovidDataStates";
 
 
-    constructor() {
-        this.idbundesland = "";
-        this.datenstand = "";
-        this.meldedatum = "";
-        this.bundesland = "";
-        this.accucases = 0;
-        this.newcases = 0;
-        this.accucasesperweek = 0;
-        this.newcasesperweek = 0;
-        this.accudeaths = 0;
-        this.newdeaths = 0;
-        this.accudeathsperweek = 0;
-        this.newdeathsperweek = 0;
-        this.accurecovered = 0;
-        this.newrecovered = 0;
-        this.population = 0;
-    }
 
-    getURL(): string {
-        return this._url;
+    getURL(targetDate?: string): string {
+        return apiRoutes.fetchDbData({
+            relationName: "aktuell_deutschland_sarscov2_infektionen_aggregated",
+            feature: "ALL",
+            targetDate: targetDate
+        });
     }
 
     getTableName(): string {
@@ -60,12 +33,12 @@ class CovidDataStates {
 
     getStateID(rowJSON: any): number {
         let row = JSON.parse(JSON.stringify(rowJSON));
-        return row.original.idbundesland;
+        return row.original.idbundesland ?? row.original.IdBundesland;
     }
 
     public static getStateBundesland(rowJSON: any): string {
         let row = JSON.parse(JSON.stringify(rowJSON));
-        return row.original.bundesland;
+        return row.original.bundesland ?? row.original.Bundesland;
     }
 
     public static mapperFunctions = stateMappersGermany;

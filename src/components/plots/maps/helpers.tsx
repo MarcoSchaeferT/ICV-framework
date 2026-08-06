@@ -372,3 +372,113 @@ export function getGoodReadableRange(dataMin: number, dataMax: number): [number,
     }
     return [dataMin, dataMax];
 }
+
+export interface StandardTooltipRow {
+    label: string;
+    value: string | number;
+}
+
+export interface StandardTooltipProps {
+    value: string | number;
+    unit?: string;
+    description?: string;
+    rows: StandardTooltipRow[];
+    chartId?: string;
+    colorBarHtml?: string;
+}
+
+/**
+ * Generates standardized modern gradient card HTML for map tooltips across the application.
+ */export function renderStandardTooltipHTML({
+    value,
+    unit = "",
+    description,
+    rows,
+    chartId = "tooltip",
+    colorBarHtml = "",
+}: StandardTooltipProps): string {
+    const tableRowsHtml = rows
+        .map(
+            (row, idx) => `
+        <tr class="${idx < rows.length - 1 ? "border-b border-white/20" : ""}">
+            <td class="py-1.5 pr-2 text-left font-normal text-indigo-200">
+                ${row.label}
+            </td>
+            <td class="py-1.5 pl-2 text-right font-medium" style="white-space: normal; word-break: break-word;">
+                ${row.value}
+            </td>
+        </tr>`
+        )
+        .join("");
+
+    const descHtml =
+        description && description !== "N/A"
+            ? `<div class="mt-1 italic text-sm text-indigo-100/90" style="white-space: normal; word-break: break-word;">${description}</div>`
+            : "";
+
+    return `
+        <div id="${chartId}" class="min-w-[220px] max-w-[280px] rounded-xl border border-gray-800 bg-linear-to-br from-indigo-600 via-indigo-700 to-slate-900 p-4 text-white shadow-xl font-sans">
+            <div class="mb-3">
+                <span class="text-3xl font-semibold align-baseline">
+                    ${value}
+                </span>
+                ${unit ? `<span class="text-lg font-medium text-indigo-200 ml-1 align-baseline">${unit}</span>` : ""}
+                ${descHtml}
+            </div>
+
+            ${colorBarHtml}
+
+            <table class="w-full text-sm">
+                <tbody>
+                    ${tableRowsHtml}
+                </tbody>
+            </table>
+        </div>`;
+}
+
+/**
+ * Standardized React Component for map and chart tooltips across the application.
+ */
+export function StandardTooltip({
+    value,
+    unit = "",
+    description,
+    rows,
+    chartId = "tooltip",
+    colorBarHtml,
+}: StandardTooltipProps) {
+    return (
+        <div id={chartId} className="min-w-[220px] max-w-[280px] rounded-xl border border-gray-800 bg-linear-to-br from-indigo-600 via-indigo-700 to-slate-900 p-4 text-white shadow-xl font-sans">
+            <div className="mb-3">
+                <span className="text-3xl font-semibold align-baseline">
+                    {value}
+                </span>
+                {unit ? <span className="text-lg font-medium text-indigo-200 ml-1 align-baseline">{unit}</span> : null}
+                {description && description !== "N/A" ? (
+                    <div className="mt-1 italic text-sm text-indigo-100/90" style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                        {description}
+                    </div>
+                ) : null}
+            </div>
+
+            {colorBarHtml ? (
+                <div dangerouslySetInnerHTML={{ __html: colorBarHtml }} />
+            ) : null}
+
+            <table className="w-full text-sm">
+                <tbody>
+                    {rows.map((row, idx) => (
+                        <tr key={idx} className={idx < rows.length - 1 ? "border-b border-white/20" : ""}>
+                            <td className="py-1.5 pr-2 text-left font-normal text-indigo-200">
+                                {row.label}
+                            </td>
+                            <td className="py-1.5 pl-2 text-right font-medium" style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                                {row.value}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}

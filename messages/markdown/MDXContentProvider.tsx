@@ -73,6 +73,12 @@ import DataFeature_de from './MapUI/dataFeature_de.mdx';
 import DataFeature_en from './MapUI/dataFeature_en.mdx';
 import DataSet_de from './MapUI/dataSet_de.mdx';
 import DataSet_en from './MapUI/dataSet_en.mdx';
+import CalendarTargetDate_de from './MapUI/calendarTargetDate_de.mdx';
+import CalendarTargetDate_en from './MapUI/calendarTargetDate_en.mdx';
+import CalendarTimeRange_de from './MapUI/calendarTimeRange_de.mdx';
+import CalendarTimeRange_en from './MapUI/calendarTimeRange_en.mdx';
+import CountrySelection_de from './MapUI/countrySelection_de.mdx';
+import CountrySelection_en from './MapUI/countrySelection_en.mdx';
 
 /**************************
  ********* Docs All *******
@@ -154,6 +160,9 @@ export interface MDXContentProviderType {
         ColorMap: React.FC;
         DataFeature: React.FC;
         DataSet: React.FC;
+        CalendarTargetDate: React.FC;
+        CalendarTimeRange: React.FC;
+        CountrySelection: React.FC;
     }
     FullDocu:{
         fullDocu: React.FC;
@@ -214,6 +223,9 @@ export const MDXContentProvider: Record<string, MDXContentProviderType> = {
             ColorMap: ColorMap_en,
             DataFeature: DataFeature_en,
             DataSet: DataSet_en,
+            CalendarTargetDate: CalendarTargetDate_en,
+            CalendarTimeRange: CalendarTimeRange_en,
+            CountrySelection: CountrySelection_en,
         },
         FullDocu:{
             fullDocu: FullDocu_en,
@@ -269,6 +281,9 @@ export const MDXContentProvider: Record<string, MDXContentProviderType> = {
             ColorMap: ColorMap_de,
             DataFeature: DataFeature_de,
             DataSet: DataSet_de,
+            CalendarTargetDate: CalendarTargetDate_de,
+            CalendarTimeRange: CalendarTimeRange_de,
+            CountrySelection: CountrySelection_de,
         },
         FullDocu:{
             fullDocu: FullDocu_de,

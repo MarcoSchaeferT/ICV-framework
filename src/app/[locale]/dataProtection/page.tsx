@@ -3,10 +3,17 @@
 import MdxLayout from '@/mdx-layout'
 import { useLocale } from 'next-intl'
 import { MDXContentProvider } from '@messages/markdown/MDXContentProvider'
+import { useUIContext } from '@/components/contexts/UIContext'
+import { notFound } from 'next/navigation'
 
 export default function DataProtectionPage() {
   const locale = useLocale();
-  
+  const { showLegalTexts } = useUIContext();
+
+  if (!showLegalTexts) {
+    notFound();
+  }
+
   const Content = MDXContentProvider[locale].pages.DataProtection.content;
   if (!Content) return null;
 

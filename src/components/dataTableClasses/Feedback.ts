@@ -40,15 +40,6 @@ class FeedbackTable {
     return this._dataName;
   }
 
-  getStateID(rowJSON: any): number {
-    let row = JSON.parse(JSON.stringify(rowJSON));
-    return row.original.idbundesland;
-  }
-
-  public static getStateBundesland(rowJSON: any): string {
-    let row = JSON.parse(JSON.stringify(rowJSON));
-    return row.original.bundesland;
-  }
 };
 
 

@@ -28,6 +28,7 @@ export default function Home() {
   let md = MDXContentProvider[locale];
   let c = useInterfaceContext();
   let dataSet = "covid_states_dat";
+  dataSet = "aktuell_deutschland_sarscov2_infektionen_aggregated";
   let dataURL = apiRoutes.fetchDbData({ relationName: dataSet, feature: "" });
 
   const UI_contextT = useUIContext();
@@ -49,6 +50,7 @@ export default function Home() {
   mapPropsGermany.mapUIsettings.isDatasetSelectionDropdown = false;
   mapPropsGermany.mapUIsettings.isDistanceLegend = true;
   mapPropsGermany.mapUIsettings.isColorMapLegend = true;
+  mapPropsGermany.mapUIsettings.isDatePicker = true;
   mapPropsGermany.mapUIsettings.defaultFeatureName = "accudeaths";
   mapPropsGermany.isProjection_equirectangular = false;
   mapPropsGermany.isStaticAutoFitFullSize = true;
@@ -56,7 +58,19 @@ export default function Home() {
 
  
 
-  let covidDataStatesPpros =  CardPropsClass("Table1","","","");
+  let mapCardProps = CardPropsClass(
+    "Map1",
+    t.rich('mapCard.title', { ...t_richConfig })?.toString() || 'Germany Map View',
+    t.rich('mapCard.description', { ...t_richConfig })?.toString() || '',
+    ""
+  );
+
+  let covidDataStatesPpros = CardPropsClass(
+    "Table1",
+    t.rich('tableCard.title', { ...t_richConfig })?.toString() || 'Federal States Data Table',
+    t.rich('tableCard.description', { ...t_richConfig })?.toString() || '',
+    ""
+  );
 
   // intitialize data table context
   useInterfaceContext();
@@ -103,7 +117,7 @@ export default function Home() {
       }}>
 
         {/*** Grid Cells ***/}
-        <SGridPlotCard rowColSpan={[9,4]}  cardProps={CardPropsClass("Map1","","","")}> <LeafD3MapGermanyComponent props={mapPropsGermany}/> </SGridPlotCard>
+        <SGridPlotCard rowColSpan={[9,4]} cardProps={mapCardProps}> <LeafD3MapGermanyComponent props={mapPropsGermany}/> </SGridPlotCard>
         <SGridPlotCard rowColSpan={[5,8]} cardProps={covidDataStatesPpros}>
           <DataTableComponent
           cardProps={covidDataStatesPpros}
@@ -130,7 +144,8 @@ function DynamicBarChart({ featureRaw, name }: { featureRaw: string, name: strin
   let c = useInterfaceContext();
   const locale = useLocale();
   const t = useTranslations("covid_view_barchart");
-  let dataSet = "covid_states_dat";
+  const tPage = useTranslations("page_covidDashboard");
+  let dataSet = "aktuell_deutschland_sarscov2_infektionen_aggregated";
 
   let feature = featureRaw;
   const [isLoading_Metadata, rawMetaData] = useGetJSONData(apiRoutes.getDatasetsMetadata({ LANGID: locale }));
@@ -138,22 +153,32 @@ function DynamicBarChart({ featureRaw, name }: { featureRaw: string, name: strin
   const metaData = rawMetaData as unknown as metaDataT;
 
   if(dataSet === null || feature === null)   return (
-  <SGridPlotCard rowColSpan={[4,8]} cardProps={CardPropsClass(featureRaw+"Linechart",name,"asas","")}> ERROR</SGridPlotCard>);
+    <SGridPlotCard rowColSpan={[4,8]} cardProps={CardPropsClass(featureRaw+"Barchart", name, "", "")}> ERROR</SGridPlotCard>
+  );
 
-  let dataURL = apiRoutes.fetchDbData({ relationName: dataSet, feature: c.curFeature });
+  let dataURL = apiRoutes.fetchDbData({ relationName: dataSet, feature: c.curFeature, targetDate: c.targetDate });
   let bchartProps = BarchartProps("Barchart", dataURL , "exampleVar");
 
   bchartProps.chartName = feature+"Barchart";
   bchartProps.dataURL = dataURL;
   bchartProps.locale = locale;
   bchartProps.translations = t;
-  //bchartProps.isDummyMode = true;
 
-  let featureDescription = " ("+ metaData[c.curFeature]?.description + ")"|| "";
+  const curFeatureMeta = metaData && c.curFeature ? metaData[c.curFeature] : undefined;
+
+  const headline = c.curFeature 
+    ? (curFeatureMeta?.description ? `${c.curFeature} - ${curFeatureMeta.description}` : c.curFeature)
+    : (tPage.rich('barCard.title', { ...t_richConfig })?.toString() || 'Feature Distribution');
+
+  const description = curFeatureMeta?.dimension 
+    ? `${tPage.rich('barCard.description', { ...t_richConfig })?.toString() || ''} [${curFeatureMeta.dimension}]`.trim()
+    : (tPage.rich('barCard.description', { ...t_richConfig })?.toString() || '');
 
   return (
     <>
-      <SGridPlotCard rowColSpan={[4,8]} cardProps={CardPropsClass((featureRaw+"Barchart") || "NA", c.curFeature|| "NA", featureDescription|| "NA","","")}> <BarchartComponent chartProps={bchartProps}/></SGridPlotCard>
+      <SGridPlotCard rowColSpan={[4,8]} cardProps={CardPropsClass((featureRaw+"Barchart") || "Barchart", headline, description, "")}>
+        <BarchartComponent chartProps={bchartProps}/>
+      </SGridPlotCard>
     </>
   );
 }

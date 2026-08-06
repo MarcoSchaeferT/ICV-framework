@@ -40,7 +40,7 @@ import redis
 # Same Redis instance that backs the shared upload progress/error state
 from backend.upload_state import REDIS_URL
 
-_EPOCH_KEY_PREFIX = "davis:cache:epoch:"
+_EPOCH_KEY_PREFIX = "icv:cache:epoch:"
 # Implicit scope attached to every entry so clear() can flush all workers
 _GLOBAL_SCOPE = "__all__"
 # How long to skip Redis after a failure before probing again

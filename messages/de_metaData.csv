@@ -84,31 +84,32 @@ PointType,string,PointType,Typ des Beobachtungspunkts,1
 Source,string,Quelle,Quelle der Beobachtung,1
 id,int,NA,ID,0
 idbundesland,int,ID,ID des Bundeslandes,0
-datenstand,string,NA,Datum des Datenstandes,0
-meldedatum,string,NA,Meldedatum,0
-bundesland,string,Name,Name des Bundeslandes,0
-accucases,int,,Kumulierte Anzahl der Fälle,1
-newcases,int,,Neue Fälle,1
+datenstand,date,NA,Datum des Datenstandes,1
+meldedatum,date,NA,Meldedatum,0
+bundesland,string,Name,Name des Bundeslandes,1
+accucases,int,,Kumulierte Gesamtanzahl aller Fälle,1
+newcases,int,,Neue Fälle am Tag des Datenstandes,1
 accucasesperweek,int,,Kumulierte Fälle pro Woche,1
 newcasesperweek,int,,Neue Fälle pro Woche,1
-accudeaths,int,,Kumulierte Anzahl der Todesfälle,1
-newdeaths,int,,Neue Todesfälle,1
+accudeaths,int,,Kumulierte Gesamtanzahl aller Todesfälle,1
+newdeaths,int,,Neue Todesfälle am Tag des Datenstandes,1
 accudeathsperweek,int,,Kumulierte Todesfälle pro Woche,1
 newdeathsperweek,int,,Neue Todesfälle pro Woche,1
-accurecovered,int,,Kumulierte Anzahl der Genesenen,1
-newrecovered,int,,Neue Genesene,1
+accurecovered,int,,Kumulierte Gesamtanzahl aller Genesenen,1
+accurecoveredperweek,int,,Kumulierte Genesene pro Woche,1
+newrecovered,int,,Neue Genesene am Tag des Datenstandes,1
 population,int,,Bevölkerungsanzahl,1
 date,date,NA,Datum der Beobachtung,1
 longitude_1,float,NA,Koordinate,0
 iso_3166_1_alpha_3,string,NA,Der 3-Buchstaben-Ländercode,1
-cumulative_confirmed,float,,Kumulative bestätigte Fälle,0
-cumulative_recovered,float,,Kumulative Genesungen,0
-cumulative_deceased,float,,Kumulative Todesfälle,0
-cumulative_tested,float,,Kumulative getestete Fälle,0
-new_confirmed,float,,Bestätigte Fälle,1
-new_recovered,float,,Genesungen,1
-new_deceased,float,,Todesfälle,1
-new_tested,float,,Getestete Fälle,1
+cumulative_confirmed,float,,Kumulierte bestätigte Fälle,1
+cumulative_recovered,float,,Kumulierte Genesungen,1
+cumulative_deceased,float,,Kumulierte Todesfälle,1
+cumulative_tested,float,,Kumulierte getestete Fälle,0
+new_confirmed,float,,Bestätigte Fälle,0
+new_recovered,float,,Genesungen,0
+new_deceased,float,,Todesfälle,0
+new_tested,float,,Getestete Fälle,0
 id,int,id,id,0
 location_key,string,,location key,0
 openstreetmap_id,string,,OpenStreetMap ID,0

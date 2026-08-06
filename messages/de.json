@@ -248,6 +248,8 @@
         "auto_hide_settings": "automatisches Ausblenden der Einstellungen",
         "tooltip": {
             "country": "Land",
+            "state": "Bundesland",
+            "code": "Kürzel",
             "feature": "Merkmal",
             "value": "Wert",
             "latLong": "Lat/Lng"
@@ -277,6 +279,18 @@
     "page_covidDashboard": {
         "mainInfo": {
             "heading": "Historische Daten zu COVID-19 für Deutschland"
+        },
+        "mapCard": {
+            "title": "Kartenansicht Deutschland",
+            "description": "Geografische Visualisierung von COVID-19-Kennzahlen in den deutschen Bundesländern."
+        },
+        "tableCard": {
+            "title": "Datentabelle der Bundesländer",
+            "description": "Detaillierte tabellarische Übersicht der COVID-19-Statistiken auf Landesebene."
+        },
+        "barCard": {
+            "title": "Merkmal-Verteilung",
+            "description": "Vergleich der Werte des ausgewählten Merkmals in den deutschen Bundesländern."
         }
     },
     "page_covidWorldView": {
@@ -339,7 +353,13 @@
         "button_giveFeedback": "Feedback geben"
     },
     "covid_view_barchart": {
-        "federal_state": "Bundesland"
+        "federal_state": "Bundesland",
+        "label": "Kürzel",
+        "feature": "Merkmal",
+        "tooltip": {
+            "country": "Land",
+            "feature": "Merkmal"
+        }
     },
     "sidebarLeft": {
         "heading": "ICV-Einstellungen",

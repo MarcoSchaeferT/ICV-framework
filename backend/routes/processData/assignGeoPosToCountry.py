@@ -33,7 +33,7 @@ def get_db_connection_params() -> dict:
     port = host_port.split(":")[1] if ":" in host_port else "5432"
     
     # Local resolution
-    if os.getenv("IS_DOCKER", "false").lower() != "true" and host == "icv-database":
+    if os.getenv("IS_DOCKER", "false").lower() != "true" and host in ("icv-database", "davis-db"):
         host = "localhost"
     
     return {
@@ -104,6 +104,13 @@ def assign_geo_pos_to_country(table_name: str, skip_existing: bool = True):
             cur.execute(sql.SQL("ALTER TABLE {t} ADD COLUMN IF NOT EXISTS iso_a3 VARCHAR(3)").format(t=sql.Identifier(table_name)))
             cur.execute(sql.SQL("ALTER TABLE {t} ADD COLUMN IF NOT EXISTS admin VARCHAR(255)").format(t=sql.Identifier(table_name)))
             conn.commit()
+
+            # Ensure column metadata entries exist for iso_a3 and admin (using CSV metadata availability)
+            try:
+                from backend.routes.columnMetadata.route_columnMetadata import populate_column_metadata
+                populate_column_metadata(table_name, ["iso_a3", "admin"])
+            except Exception as meta_err:
+                print(f"WARNING: Could not update column metadata for {table_name} (iso_a3, admin): {meta_err}")
 
             condition = "WHERE iso_a3 IS NULL OR iso_a3 = ''" if skip_existing else ""
             

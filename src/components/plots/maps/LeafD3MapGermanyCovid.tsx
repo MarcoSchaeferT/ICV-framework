@@ -17,7 +17,7 @@ import * as d3 from 'd3';
 import {useInterfaceContext} from '@/components/contexts/InterfaceContext';
 import { apiRoutes } from '@/app/api_routes';
 import { PrintDataLoadingErrors, handleLoadDataError } from '@/app/helpers';
-import { useGetJSONData } from '@/app/hooks/useFetchAndCache';
+import { useGetJSONData, clearDataCache } from '@/app/hooks/useFetchAndCache';
 import SizeHook from '@/app/hooks/useResizeObserver';
 import {
     Select,
@@ -32,11 +32,23 @@ import { useLocale ,useTranslations } from "next-intl";
 import { t_richConfig, dbDATA } from '@/app/const_store';
 import { Locale } from '@/i18n/routing';
 import useChartResizer from '@/app/hooks/useChartResizer';
+import { renderStandardTooltipHTML } from './helpers';
 
-import  stateMappersGermany from '@/app/helpers';
+import stateMappersGermany from '@/app/helpers';
 import LeafletMapComponent, {LeafletComponentProps} from './BaseMap';
 import { Settings } from 'iconoir-react';
 import ColorMapLegend from './overlays/ColorMapLegend';
+import { format } from "date-fns";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { HoverCardTooltip } from '@/components/layout/InfoCards';
+import { MDXContentProvider } from '@messages/markdown/MDXContentProvider';
 
 // ─── Shared hooks & utils (extracted from nested component definitions) ───
 import {
@@ -49,6 +61,7 @@ import {
     useCanvasGridLayer,
     useLayerUpdateDebounce,
     useTooltipCleanup,
+    useDynamicSettingsTop,
 } from './hooks';
 import { clampCoordinates, resetTimeout, removeReusedTooltip, getParamsOfURL } from './utils/mapUtils';
 import MapContentChild from './MapContentChild';
@@ -71,6 +84,73 @@ const defaultColorMap = availableColorMapsNames.interpolateViridis;
 // controls if the layer is drawn with canvas or svg
 const isLayerDrawnCanvas = true;
 
+function useDatasetDateBounds(selectedTargetDate?: Date) {
+    const [isLoadingDateBounds, rawDateBounds] = useGetJSONData(
+        apiRoutes.fetchDbData({
+            relationName: "aktuell_deutschland_sarscov2_infektionen",
+            feature: "meldedatum",
+            task: "getMinMax"
+        })
+    );
+
+    const minDateVal = (rawDateBounds?.response as any)?.min_val;
+    const maxDateVal = (rawDateBounds?.response as any)?.max_val;
+
+    const parseDateString = (str?: string) => {
+        if (!str) return undefined;
+        const cleanStr = String(str).substring(0, 10);
+        const parts = cleanStr.split('-');
+        if (parts.length === 3) {
+            const year = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            const day = parseInt(parts[2], 10);
+            if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+                return new Date(year, month, day);
+            }
+        }
+        const d = new Date(str);
+        return isNaN(d.getTime()) ? undefined : d;
+    };
+
+    const minDate = useMemo(() => parseDateString(minDateVal), [minDateVal]);
+    const maxDate = useMemo(() => parseDateString(maxDateVal), [maxDateVal]);
+
+    const startMonth = useMemo(() => {
+        return minDate || new Date(2020, 0, 1);
+    }, [minDate]);
+
+    const endMonth = useMemo(() => {
+        return maxDate || new Date(2023, 0, 1);
+    }, [maxDate]);
+
+    const disabledMatcher = useMemo(() => {
+        const matchers: any[] = [];
+        if (minDate) matchers.push({ before: minDate });
+        if (maxDate) matchers.push({ after: maxDate });
+        return matchers;
+    }, [minDate, maxDate]);
+
+    const weekLookbackRange = useMemo(() => {
+        if (!selectedTargetDate) return undefined;
+        const fromDate = new Date(
+            selectedTargetDate.getFullYear(),
+            selectedTargetDate.getMonth(),
+            selectedTargetDate.getDate() - 6
+        );
+        return { from: fromDate, to: selectedTargetDate };
+    }, [selectedTargetDate]);
+
+    return {
+        isLoadingDateBounds,
+        minDate,
+        maxDate,
+        startMonth,
+        endMonth,
+        disabledMatcher,
+        weekLookbackRange,
+    };
+}
+
 
 
 /**
@@ -91,6 +171,7 @@ export interface LeafD3MapGermanyProps {
         isDatasetSelectionDropdown: boolean;
         isDistanceLegend: boolean;
         isColorMapLegend: boolean;
+        isDatePicker?: boolean;
         defaultFeatureName?: string;
     };
     isApplySelectionsTransition: boolean;
@@ -127,6 +208,7 @@ export function LeafD3MapGermanyProps(
             isDatasetSelectionDropdown: true,
             isDistanceLegend: true,
             isColorMapLegend: true,
+            isDatePicker: false,
             defaultFeatureName: "",
             ...mapUIsettings,
         },
@@ -138,7 +220,7 @@ export function LeafD3MapGermanyProps(
 }
 
 
-const LeafD3MapGermanyComponent = ({props}: {props: LeafD3MapGermanyProps}) => {
+const LeafD3MapGermanyComponentInner = ({props}: {props: LeafD3MapGermanyProps}) => {
   
     let c = useInterfaceContext();
     leafProps.zoom = props.zoom;
@@ -212,6 +294,8 @@ const LeafD3MapGermanyComponent = ({props}: {props: LeafD3MapGermanyProps}) => {
     const [layerOpacity, setLayerOpacity] = useState(1.0);
     const [visData, setVisData] = useState<Map<number, visDataT>>(new Map<number, visDataT>());
     const [selectedFeature, setSelectedFeature] = useState<string>(props.mapUIsettings.defaultFeatureName || "")
+    const [selectedTargetDate, setSelectedTargetDate] = useState<Date | undefined>(undefined);
+    const [isAggregating, setIsAggregating] = useState<boolean>(false);
     console.log("tmp selectedFeature",selectedFeature)
     const curDatasetname = useRef<string>("");
     const curPropertyNames = useRef<string>("");
@@ -225,8 +309,10 @@ const LeafD3MapGermanyComponent = ({props}: {props: LeafD3MapGermanyProps}) => {
     const activeLayerRef = useRef<L.Path | null>(null);
     const gridcellSizeLatLng = useRef<{ lng: number; lat: number }>({ lng: 0, lat: 0 });
      const [isSettingsOpen, setIsSettingsOpen] = useState(true);
+    const { containerRef: settingsContainerRef, settingsTop: settingsButtonTop } = useDynamicSettingsTop();
     
     const locale = useLocale() as Locale;
+    const MDX = MDXContentProvider[locale]?.MapUI || MDXContentProvider["en"].MapUI;
     // data loading 
 
     const [isLoading_mapData, rawMapData] = useGetJSONData(props.mapDataURL);
@@ -234,6 +320,13 @@ const LeafD3MapGermanyComponent = ({props}: {props: LeafD3MapGermanyProps}) => {
     const [isLoadingDatalist, dataList] = useGetJSONData(apiRoutes.GET_LIST_OF_DATASETS)
     const [isLoading_Metadata, rawMetaData] = useGetJSONData(apiRoutes.getDatasetsMetadata({ LANGID: locale }));
     
+    // Date bounds, month limits, and lookback range from dedicated hook
+    const {
+        startMonth,
+        endMonth,
+        disabledMatcher,
+        weekLookbackRange,
+    } = useDatasetDateBounds(selectedTargetDate);
     
     type dataListT = {
         [key: string]: string
@@ -333,9 +426,20 @@ const LeafD3MapGermanyComponent = ({props}: {props: LeafD3MapGermanyProps}) => {
     collectDataLoadingErrors.push(handleLoadDataError(isLoadingDatalist, dataList as unknown as dbDATA));
     collectDataLoadingErrors.push(handleLoadDataError(isLoading_Metadata, rawMetaData as unknown as dbDATA));
     const mapData = rawMapData as unknown as any;
-   
 
-    
+    const getFeatureValForState = useCallback((countryName: string): any => {
+        if (!mosquitoData?.response || !Array.isArray(mosquitoData.response)) return undefined;
+        const trimmed = countryName.trim().toLowerCase();
+        const record = mosquitoData.response.find((r: any) => {
+            if (!r) return false;
+            if (r.bundesland && r.bundesland.trim().toLowerCase() === trimmed) return true;
+            const id = stateMappersGermany.Map__State_to_ID(countryName);
+            const idd = stateMappersGermany.mapper__MapTable__ID_to_ID(id);
+            const expectedIdStr = String(idd).padStart(2, '0');
+            return r.idbundesland === expectedIdStr;
+        });
+        return record?.feature;
+    }, [mosquitoData]);
 
 
     const colNames = useMemo(() => {
@@ -359,6 +463,9 @@ const LeafD3MapGermanyComponent = ({props}: {props: LeafD3MapGermanyProps}) => {
     const L_dataLoading = useLoadingTask('Data');
     const L_contextSync = useLoadingTask('Context Sync');
     const L_debounceLoading = useLoadingTask('Debounce Render');
+    const L_aggregationLoading = useLoadingTask('Aggregating Data');
+
+ 
 
     // Clear loading spinner when all main datasets finish loading
     useEffect(() => {
@@ -465,10 +572,7 @@ function DrawMapPolygons() {
                 geoLayer = L.geoJSON(mapData, {
                 style: (feature) => {
                     const country = feature?.properties?.name || "";
-                    const id = stateMappersGermany.Map__State_to_ID(country);
-                    let idd = stateMappersGermany.mapper__MapTable__ID_to_ID(id);
-                    const curKey = Object.keys(mosquitoData.response)[idd-1];
-                    const curVal = mosquitoData.response[curKey]?.feature;
+                    const curVal = getFeatureValForState(country);
                     return {
                         color: "#000000",
                         fillColor: colorMap(curVal),
@@ -536,12 +640,9 @@ function DrawMapPolygons() {
 
                         if (feature.properties) {
                                 const country = feature.properties ? feature.properties.name : "";
-                                const id = stateMappersGermany.Map__State_to_ID(country);
-                                let idd = stateMappersGermany.mapper__MapTable__ID_to_ID(id);
-                                const curKey = Object.keys(mosquitoData.response)[idd-1];
-                                const curVal = mosquitoData.response[curKey]?.feature;
-                                 let unit = "";
-                                if (metaData[selectedFeature] !== undefined) {
+                                const curVal = getFeatureValForState(country);
+                                let unit = "";
+                                if (metaData && metaData[selectedFeature] !== undefined) {
                                     unit = metaData[selectedFeature].dimension ?? "";
                                 }
 
@@ -551,45 +652,20 @@ function DrawMapPolygons() {
                                     : "N/A";
                                 const countryLabel = country ? country : "Unknown Location";
                                 const featureDescription =
-                                    metaData[selectedFeature] !== undefined ? metaData[selectedFeature].description : "N/A";
+                                    (metaData && metaData[selectedFeature] !== undefined) ? metaData[selectedFeature].description : "";
 
-                                toolTipRef.current.setContent(`
-                                    <div id=${"toolTip" + chart} class="min-w-[220px] max-w-[280px] border-gray-800 border rounded-xl bg-linear-to-br from-indigo-600 via-indigo-700 to-slate-900 p-4 text-white shadow-xl font-sans">
-                                        <div class="mb-2">
-                                            <span class="text-3xl font-semibold align-baseline">
-                                                ${formattedValue}
-                                            </span>
-                                            <span class="text-lg font-medium text-indigo-200 ml-1 align-baseline">
-                                                ${unit || ""}
-                                            </span>
-                                        </div>
-
-                                        <table class="w-full text-sm">
-                                            <tbody>
-                                                <tr class="border-b border-white/20">
-                                                    <td class="py-1.5 pr-2 text-left font-normal text-indigo-200">
-                                                        ${t.rich('tooltip.country', {...t_richConfig})}
-                                                    </td>
-                                                    <td class="py-1.5 pl-2 text-right font-medium" style="white-space: normal; word-break: break-word;">
-                                                        ${countryLabel}
-                                                    </td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="pt-1.5 pb-0 pr-2 text-left font-normal text-indigo-200">
-                                                        ${t.rich('tooltip.feature', {...t_richConfig})}
-                                                    </td>
-                                                    <td class="pt-1.5 pb-0 pl-2 text-right font-medium" style="white-space: normal; word-break: break-word;">
-                                                        ${selectedFeature ? selectedFeature : "N/A"}
-                                                    </td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-
-                                        <p class="m-0 mt-3 pt-3 italic text-sm text-indigo-100/90" style="white-space: normal; word-break: break-word;">
-                                            ${featureDescription}
-                                        </p>
-                                    </div>
-                                    `);
+                                toolTipRef.current.setContent(
+                                    renderStandardTooltipHTML({
+                                        value: formattedValue,
+                                        unit: unit || "",
+                                        description: featureDescription,
+                                        rows: [
+                                            { label: String(t.rich('tooltip.country', {...t_richConfig})), value: countryLabel },
+                                            { label: String(t.rich('tooltip.feature', {...t_richConfig})), value: selectedFeature || "N/A" },
+                                        ],
+                                        chartId: "toolTip" + chart,
+                                    })
+                                );
                             if (map && isMouseInsideRef.current) {
                                 map.openTooltip(toolTipRef.current);
                             }
@@ -618,10 +694,7 @@ function DrawMapPolygons() {
                     layer.on("mouseout", function () {
                         if (feature.properties) {
                               const country = feature?.properties?.name || "";
-                            const id = stateMappersGermany.Map__State_to_ID(country);
-                            let idd = stateMappersGermany.mapper__MapTable__ID_to_ID(id);
-                            const curKey = Object.keys(mosquitoData.response)[idd-1];
-                            const curVal = mosquitoData.response[curKey]?.feature;
+                            const curVal = getFeatureValForState(country);
                             if (curPropertyNames.current !== feature.properties.name) {
                                 (layer as L.Path).setStyle({
                                     fillColor: colorMap(curVal),
@@ -976,9 +1049,7 @@ MapMouseEvents();
                             const feature = (subLayer as any).feature;
                             const country = feature && 'properties' in feature ? feature.properties?.name || "" : "";
                             const id = stateMappersGermany.Map__State_to_ID(country);
-                            let idd = stateMappersGermany.mapper__MapTable__ID_to_ID(id);
-                            const curKey = Object.keys(mosquitoData.response)[idd - 1];
-                            const curVal = mosquitoData.response[curKey]?.feature;
+                            const curVal = getFeatureValForState(country);
                             //console.log("coloring...:", curSelectedStateID.current + "==", id);
                            
                                 if (curSelectedStateID.current == id) {
@@ -1103,12 +1174,11 @@ useCanvasGridLayer({
    // the page
     return (
 
-<LoadingSpinnerProvider>
-<div className="relative size-full" >
-    <div className="absolute top-1 right-1 z-20">
+<div ref={settingsContainerRef} className="@container relative size-full" >
+    <div className="absolute right-14 z-50" style={{ top: `${settingsButtonTop}px` }}>
         <button
             onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-            className="p-1  rounded-full shadow-md hover:bg-gray-600 bg-black "
+            className="p-1 rounded-full shadow-md hover:bg-gray-600 bg-black "
         >
             <Settings className="text-white " />
         </button>
@@ -1161,9 +1231,10 @@ useCanvasGridLayer({
      )}
     {mapUIsettings.isDatasetSelectionDropdown && (
         <div {...UI_elementStyler()}>
-        <label htmlFor="dataset-select">
-        {t.rich('data_set', {...t_richConfig})}:
-        </label>
+        <span className="mb-1 flex items-center justify-between">
+            {t.rich('data_set', {...t_richConfig})}:
+            <span className="ml-2"><HoverCardTooltip MDXContent={MDX.DataSet} /></span>
+        </span>
         {listOfDataSets && 
         <Select defaultValue={Object.keys(listOfDataSets)[0]} onValueChange={(value) => { 
             const dataset = listOfDataSets[value];
@@ -1195,12 +1266,17 @@ useCanvasGridLayer({
     </div>)}
     {mapUIsettings.isFeatureSelectionDropdown && (
         <div {...UI_elementStyler()}>
-        <label htmlFor="dataset-select">
+        <span className="mb-1 flex items-center justify-between">
              {t.rich('feature', {...t_richConfig})}:
-        </label>
+            <span className="ml-2"><HoverCardTooltip MDXContent={MDX.DataFeature} /></span>
+        </span>
         {colNames && metaData && (
        <Select value={selectedFeature} onValueChange={(value) => { 
-            let url = apiRoutes.fetchDbData({ relationName: curDatasetname.current, feature: value });
+            let url = apiRoutes.fetchDbData({
+                relationName: curDatasetname.current,
+                feature: value,
+                targetDate: dataTableContext.targetDate
+            });
             //console.log("setCurFeatureName:", value);
             //console.log("setCurDatasetName:",url);
             setSelectedDataset(url);
@@ -1233,12 +1309,84 @@ useCanvasGridLayer({
     </Select>
     )}
     </div>)}
+    {mapUIsettings.isDatePicker && (
+        <div {...UI_elementStyler()}>
+        <span className="mb-1 flex items-center justify-between">
+             {t.rich('time_range', {...t_richConfig})}:
+            <span className="ml-2"><HoverCardTooltip MDXContent={MDX.CalendarTargetDate} /></span>
+        </span>
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal border-3 border-purple-800 focus-visible:ring-3 focus-visible:ring-purple-800 truncate px-4 rounded text-sm whitespace-nowrap overflow-hidden text-ellipsis mt-1"
+                >
+                    <CalendarIcon className="mr-1.5 w-4 h-4 shrink-0" />
+                    {selectedTargetDate ? format(selectedTargetDate, "PP") : <span>{isAggregating ? "Calculating..." : t.rich('select_time_span', {...t_richConfig})}</span>}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                    mode="single"
+                    selected={selectedTargetDate}
+                    onSelect={async (date) => {
+                        if (!date) return;
+                        setSelectedTargetDate(date);
+                        const formattedDate = format(date, "yyyy-MM-dd");
+                        setIsAggregating(true);
+                        L_aggregationLoading.start();
+                        try {
+                            const res = await fetch(apiRoutes.aggregateRKI({ targetDate: formattedDate }));
+                            if (res.ok) {
+                                // 1. Clear all cached data so components re-fetch fresh results
+                                clearDataCache();
+
+                                // 2. Update target date in shared interface context
+                                contextT.setTargetDate(formattedDate);
+
+                                // 3. Update map data URL with targetDate parameter
+                                let baseUrl = apiRoutes.fetchDbData({
+                                    relationName: curDatasetname.current || "aktuell_deutschland_sarscov2_infektionen_aggregated",
+                                    feature: selectedFeature || "accudeaths",
+                                    targetDate: formattedDate
+                                });
+                                setSelectedDataset(baseUrl);
+                                contextT.setCurDatasetURL(baseUrl);
+                            }
+                        } catch (err) {
+                            console.error("Error aggregating data for targetDate:", err);
+                        } finally {
+                            setIsAggregating(false);
+                            L_aggregationLoading.stop();
+                        }
+                    }}
+                    defaultMonth={selectedTargetDate || endMonth}
+                    captionLayout="dropdown"
+                    numberOfMonths={1}
+                    startMonth={startMonth}
+                    endMonth={endMonth}
+                    disabled={disabledMatcher}
+                    modifiers={{
+                        weekLookback: weekLookbackRange ? [weekLookbackRange] : []
+                    }}
+                    modifiersClassNames={{
+                        weekLookback: "bg-purple-200 text-purple-950 font-semibold dark:bg-purple-800 dark:text-purple-100"
+                    }}
+                    classNames={{
+                        disabled: "opacity-35 line-through text-slate-400 bg-slate-100/60 dark:bg-slate-900/60 cursor-not-allowed pointer-events-none"
+                    }}
+                />
+            </PopoverContent>
+        </Popover>
+        </div>
+    )}
 
     {mapUIsettings.isColorMapSelectionDropdown && ischanged && (
         <div {...UI_elementStyler()}>
-            <label htmlFor="dataset-select">
+            <span className="mb-1 flex items-center justify-between">
                 {t.rich('color_map', {...t_richConfig})}:
-            </label>
+                <span className="ml-2"><HoverCardTooltip MDXContent={MDX.ColorMap} /></span>
+            </span>
             <Select onValueChange={(value) => {
                 setColorMapType(value);
                 contextT.setCurColorMap(value);
@@ -1329,10 +1477,15 @@ useCanvasGridLayer({
     )}
     </div>
 </div>
-</LoadingSpinnerProvider>
     );
 };
 
-// getParamsOfURL is now imported from utils/mapUtils
+const LeafD3MapGermanyComponent = ({props}: {props: LeafD3MapGermanyProps}) => {
+    return (
+        <LoadingSpinnerProvider>
+            <LeafD3MapGermanyComponentInner props={props} />
+        </LoadingSpinnerProvider>
+    );
+};
 
-export default  LeafD3MapGermanyComponent;
+export default LeafD3MapGermanyComponent;

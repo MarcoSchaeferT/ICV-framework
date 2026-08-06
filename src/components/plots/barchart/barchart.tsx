@@ -14,7 +14,7 @@ import { apiRoutes } from '@/app/api_routes';
 import { useLoadingTask, LoadingSpinnerAnimation } from '../maps/utils/loadingSpinner';
 import  CovidDataStates from "@/components/dataTableClasses/CovidDataStates";
 import { t_richConfig, dbDATA } from '@/app/const_store';
-import { getGoodReadableRange } from '../maps/helpers';
+import { getGoodReadableRange, StandardTooltip } from '../maps/helpers';
 
 /**
  * Props class for the BarchartComponent
@@ -85,6 +85,38 @@ type barChartData = {
 }[];
 
 
+/**
+ * Custom tooltip component for Barchart using shared StandardTooltip
+ */
+const CustomBarchartTooltip = ({ active, payload, label, locale, yLabel, xLabel, featureDescription, t }: any) => {
+  if (!active || !payload || !payload.length) return null;
+
+  const dataPoint = payload[0]?.payload || {};
+  const rawVal = payload[0]?.value ?? dataPoint?.feature;
+  const numVal = Number(rawVal);
+  const formattedVal = !isNaN(numVal)
+    ? numVal.toLocaleString(locale || "en", { maximumFractionDigits: 3 })
+    : String(rawVal ?? "N/A");
+
+  const stateName = dataPoint.bundesland || String(label || "");
+  const countryLabel = t && typeof t.rich === "function" ? String(t.rich('tooltip.country', { ...t_richConfig })) : "Bundesland";
+  const featureLabel = t && typeof t.rich === "function" ? String(t.rich('tooltip.feature', { ...t_richConfig })) : "Merkmal";
+
+  const rows = [
+    { label: countryLabel, value: stateName },
+    { label: featureLabel, value: yLabel || "Value" }
+  ];
+
+  return (
+    <StandardTooltip
+      value={formattedVal}
+      description={featureDescription}
+      rows={rows}
+    />
+  );
+};
+
+
 const BarchartComponent = ({chartProps}: {chartProps: BarchartProps}) => {
 
   
@@ -95,7 +127,8 @@ const BarchartComponent = ({chartProps}: {chartProps: BarchartProps}) => {
   
   const isDataNotAvailable = useRef(false);
   const selectedBarId = useRef<number>(-1);
-  const [isSorting, setIsSorting] = useState(false);
+  const [isSorting, setIsSorting] = useState(true);
+  const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
   const [isUpdated, setIsUpdated] = useState(false);
 
   const [isDataLoading, rawData] = useGetJSONData(props.dataURL);
@@ -157,17 +190,20 @@ const BarchartComponent = ({chartProps}: {chartProps: BarchartProps}) => {
       let unsorted_data_length = data_unsorted_per_feature.current?.get()?.length || 0; 
 
       // this condition should be true only if the data has changed, order of the data is not important
-      let data_change_condition = data_unsorted_per_feature !== null && data_unsorted_per_feature.current?.get() !==null  && data.response !== null && isDictSortedDesc(data.response)===false && (data.response as unknown as barChartData).length > 0 && unsorted_data_length > 0  && areDictsEqual(data.response, data_unsorted_per_feature.current?.get()) === false;
+      let data_change_condition = data_unsorted_per_feature !== null && data_unsorted_per_feature.current?.get() !== null && data?.response && isDictSortedDesc(data.response) === false && (data.response as unknown as barChartData).length > 0 && unsorted_data_length > 0 && areDictsEqual(data.response, data_unsorted_per_feature.current?.get()) === false;
 
-      data_unsorted_per_feature.current?.getFeatureName() !== ""
       if (!isDataLoading && !isLoading_Metadata && 
-        (feature_condition || data_change_condition)) {
+        (feature_condition || data_change_condition) && data?.response) {
 
         data_unsorted_per_feature.current?.set(data.response as unknown as barChartData);
-        data_unsorted_per_feature.current?.setFeatureName(feature);      } 
+        data_unsorted_per_feature.current?.setFeatureName(feature);
+      } 
 
       if (isSorting) {
-          return [...(data.response as unknown as barChartData)].sort((a, b) => Number(b.feature) - Number(a.feature));
+          const list = Array.isArray(data?.response) 
+            ? (data.response as unknown as barChartData) 
+            : (data_unsorted_per_feature.current?.get() || []);
+          return [...list].sort((a, b) => Number(b.feature) - Number(a.feature));
       } else {
         const unsortedData = data_unsorted_per_feature.current?.get();
         if (Array.isArray(unsortedData)) {
@@ -231,14 +267,27 @@ const [NminY, NmaxY, ticks] = useMemo(() => {
     } 
     console.log("dataMin", ...procData.map((d) => Number(d.feature)), "dataMax", dataMax);
 
-    let minY = Math.floor(dataMin ) ;
-    let maxY = Math.ceil(dataMax )  ;
+    let minY = Math.floor(dataMin);
+    let maxY = Math.ceil(dataMax);
+    if (minY === maxY) {
+      if (maxY === 0) {
+        maxY = 1;
+      } else {
+        maxY = minY + 1;
+      }
+    }
+
     const ticks = [];
     const range = maxY - minY;
     const stepCount = 4; // Number of steps for the Y-axis
     const step = range / stepCount;
-      // Generate ticks for the Y-axis
-    for (let val = minY; val <=maxY; val += step) {
+
+    if (step <= 0) {
+      return [0, 1, [0, 0.25, 0.5, 0.75, 1]];
+    }
+
+    // Generate ticks for the Y-axis
+    for (let val = minY; val <= maxY + (step / 10); val += step) {
       ticks.push(val); // avoid float imprecision
     }
     const NminY = Math.min(...ticks);
@@ -263,6 +312,12 @@ let [xLabel, yLabel] = useMemo(() => {
   }
 
 }, [isDataLoading, isLoading_Metadata, metaData, feature, t]);
+
+  const featureDescription = useMemo(() => {
+    if (!metaData) return "";
+    const curFeat = contextT.curFeature || feature;
+    return metaData[curFeat]?.description || metaData[feature]?.description || "";
+  }, [metaData, contextT.curFeature, feature]);
 
   // set up tooltip style
   const nameMapping: Record<string, string> = {
@@ -315,7 +370,7 @@ let [xLabel, yLabel] = useMemo(() => {
     <div className="flex flex-col h-full w-full min-h-0 relative"> 
       <LoadingSpinnerAnimation />
       <div className="flex items-center mt-1 ml-8">
-        <button
+        {/*<button
           className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-sm"
           style={{ width: '70px'}}
           onClick={() => {
@@ -339,7 +394,7 @@ let [xLabel, yLabel] = useMemo(() => {
             d="M3 10h18M3 14h12M3 18h6"
           />
         </svg>
-        </button>
+        </button>*/}
         
       </div>
       {/* Chart Section dynamically filling available space */}
@@ -371,7 +426,7 @@ let [xLabel, yLabel] = useMemo(() => {
                   : i+1;
               }
             )}
-            tickFormatter={(tick) => String(CovidDataStates.mapperFunctions.Table__State_to_ID(tick))}
+            tickFormatter={(tick) => CovidDataStates.mapperFunctions.Table__State_to_Abbr(tick)}
             />
           <YAxis
             tick={{ fontSize: 14 }}
@@ -388,28 +443,17 @@ let [xLabel, yLabel] = useMemo(() => {
             domain={[NminY, NmaxY]}
           />
           <Tooltip
-            labelFormatter={(label: any) => {  
-              return (
-                <span style={{ backgroundColor: "white" }}>
-                </span>
-              );
-            }}
-            formatter={(value, name) => {
-          
-              if (name === "bundesland") {
-                  return [
-                    `${String(value)}`
-                  ]
-              }
-              
-              return [
-              `${(Math.round(Number(value) * 1000) / 1000).toLocaleString(locale, { maximumFractionDigits: 3 })}`,
-              nameMapping[String(name)] || String(name)
-            ]}}
-
+            content={<CustomBarchartTooltip locale={locale} yLabel={yLabel} xLabel={xLabel} featureDescription={featureDescription} t={t} />}
+            cursor={{ fill: "rgba(255, 255, 255, 0.08)" }}
           />
          <Bar 
           dataKey="feature"
+          onMouseEnter={(_data: any, index: number) => {
+            setHoveredBarIndex(index);
+          }}
+          onMouseLeave={() => {
+            setHoveredBarIndex(null);
+          }}
           onClick={(data: any, index: number) => {
             const payload = data && (data.payload ?? data);
             let mapID = null;
@@ -425,19 +469,33 @@ let [xLabel, yLabel] = useMemo(() => {
             contextT.setMapSelectionObj
           }}
           shape={(props: any) => {
-            const { x, y, width, height, fill } = props;
+            const { x, y, width, height } = props;
+            const isSelected = selectedBarId.current === props.index;
+            const isHovered = hoveredBarIndex === props.index;
+
+            let fill = "grey";
+            if (isSelected) {
+              fill = "#ffc46c";
+            } else if (isHovered) {
+              fill = "#d1d5db";
+            }
+
+            let stroke = isSelected ? "#ffc46c" : isHovered ? "#9ca3af" : "none";
+            let strokeWidth = isSelected ? 2 : isHovered ? 1.5 : 0;
+
             return (
-            <g>
+            <g className="cursor-pointer">
               <rect
                 x={x}
                 y={y}
                 width={width}
                 height={height}
-                fill={selectedBarId.current === props.index ? "#ffc46c" : "grey"}
-                stroke={selectedBarId.current === props.index ? "#ffc46c" : "grey"}
-                strokeWidth={selectedBarId.current === props.index ? 2 : 0}
+                fill={fill}
+                stroke={stroke}
+                strokeWidth={strokeWidth}
+                style={{ transition: 'fill 0.15s ease, stroke 0.15s ease' }}
               />
-              {/* Add a transparent rectangle to extend clickable hotmox */}
+              {/* Add a transparent rectangle to extend clickable hotbox */}
               <rect
                 x={x}
                 y={0}

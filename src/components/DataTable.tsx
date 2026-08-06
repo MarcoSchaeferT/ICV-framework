@@ -181,7 +181,7 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
 
 
   // data loading
-  const [isLoading_TableData, rawTableData] = useGetJSONData(DataTableObject.getURL());
+  const [isLoading_TableData, rawTableData] = useGetJSONData(DataTableObject.getURL(dataTableCONTEXT.targetDate));
 
   const L_tableLoader = useLoadingTask('Table Data');
   useEffect(() => {
@@ -228,18 +228,26 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
       return columnDefs;
     }
 
-    // *** SAFEGUARD 4: Only access index [0] if we know it exists (checked by hasData) ***
-    Object.keys(safeTableData[0]).forEach((key) => {
+    // *** SAFEGUARD 4: Only access keys if data exists (prefer DB ordinal order in tableData.header) ***
+    const columnKeys = (Array.isArray(tableData.header) && tableData.header.length > 0)
+      ? tableData.header
+      : Object.keys(safeTableData[0]);
+
+    columnKeys.forEach((key) => {
       if (!key.startsWith("_") && !key.includes("geometry") && key !== "id") {
-        columnDefs.push({
-          header: key,
-          accessorKey: key,
-          cell: (info) => info.getValue(),
-        });
+        const colMeta = metaData[key];
+        const isAvailable = colMeta?.availability === "1" || colMeta?.availability === undefined;
+        if (isAvailable) {
+          columnDefs.push({
+            header: key,
+            accessorKey: key,
+            cell: (info) => info.getValue(),
+          });
+        }
       }
     });
     return columnDefs;
-  }, [isLoading_TableData, safeTableData, hasData]);
+  }, [isLoading_TableData, safeTableData, hasData, tableData.header, metaData]);
 
 
 

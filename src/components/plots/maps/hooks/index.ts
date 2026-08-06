@@ -11,3 +11,4 @@ export { useCanvasGridLayer } from './useCanvasGridLayer';
 export { useGridLayer } from './useGridLayer';
 export { useLayerUpdateDebounce } from './useLayerUpdateDebounce';
 export { useTooltipCleanup } from './useTooltipCleanup';
+export { useDynamicSettingsTop } from './useDynamicSettingsTop';

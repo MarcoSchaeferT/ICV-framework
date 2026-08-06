@@ -27,7 +27,7 @@ async def parseCSVdata(file_path: Path) -> Union[ParsedData, dict]:
     filename = file_path.name
     parsedCSVdata = ParsedData()
     try:
-        with open(file_path, mode="r", encoding="utf-8") as csvfile:
+        with open(file_path, mode="r", encoding="utf-8-sig") as csvfile:
             parserObj = csv.DictReader(csvfile)
             column_names = [name for name in parserObj.fieldnames if name] if parserObj.fieldnames is not None else []
 
@@ -61,7 +61,7 @@ def stream_csv_rows(file_path: Path) -> Generator[tuple[dict, int], None, None]:
     """
     try:
         with open(file_path, mode="rb") as rawfile:
-            csvfile = io.TextIOWrapper(rawfile, encoding="utf-8", newline="")
+            csvfile = io.TextIOWrapper(rawfile, encoding="utf-8-sig", newline="")
             parserObj = csv.DictReader(csvfile)
             for row in parserObj:
                 yield row, rawfile.tell()

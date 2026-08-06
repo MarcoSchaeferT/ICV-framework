@@ -1,4 +1,4 @@
-# Gunicorn configuration file for dashboardDAVis backend
+# Gunicorn configuration file for ICV-framework backend
 # https://docs.gunicorn.org/en/stable/settings.html
 
 import multiprocessing

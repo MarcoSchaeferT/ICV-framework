@@ -1,8 +1,11 @@
+"use client";
+
 import React from "react";
 import {Link, routing} from '@/i18n/routing';
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { t_richConfig } from "@/app/const_store";
+import { useUIContext } from "@/components/contexts/UIContext";
 
 
 export function generateStaticParams() {
@@ -11,6 +14,8 @@ export function generateStaticParams() {
 
 const CopyrightFooter = ({ textColor = "#000000" }: { textColor?: string }) => {
   const t = useTranslations("component_copyrightFooter");
+  const { showLegalTexts } = useUIContext();
+
   return (
      <footer className="border-t mt-16 max-w-full mx-auto">
         <div className="container mx-auto px-4 py-8">
@@ -19,7 +24,7 @@ const CopyrightFooter = ({ textColor = "#000000" }: { textColor?: string }) => {
               <div className="text-sm max-w-[260px]">
                {t.rich('copyright', { ...t_richConfig })}
                <br />
-              <Link href="https://github.com/MarcoSchaeferT/dashboardDAVis/blob/master/LICENSE" className="text-sm hover:underline">
+              <Link href="https://github.com/MarcoSchaeferT/ICV-framework/blob/main/LICENSE" className="text-sm hover:underline">
                 LICENCE
               </Link>
                {t.rich('copyrightRest', { ...t_richConfig })}
@@ -57,17 +62,21 @@ const CopyrightFooter = ({ textColor = "#000000" }: { textColor?: string }) => {
                 {t.rich('furtherInfo', { ...t_richConfig })}
               </Link>
               
-              <Link href="https://github.com/MarcoSchaeferT/dashboardDAVis" className="flex items-center gap-2 hover:underline">
+              <Link href="https://github.com/MarcoSchaeferT/ICV-framework" className="flex items-center gap-2 hover:underline">
                 GitHub
               </Link>
 
-              <Link href="/dataProtection" className="text-md hover:underline">
-                {t.rich('dataProtection', { ...t_richConfig })}
-              </Link>
+              {showLegalTexts && (
+                <>
+                  <Link href="/dataProtection" className="text-md hover:underline">
+                    {t.rich('dataProtection', { ...t_richConfig })}
+                  </Link>
 
-              <Link href="/impressum" className="text-md hover:underline">
-                {t.rich('impressum', { ...t_richConfig })}
-              </Link>
+                  <Link href="/impressum" className="text-md hover:underline">
+                    {t.rich('impressum', { ...t_richConfig })}
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -26,15 +26,15 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 # Redis keys — upload_id is a UUID, so the per-upload keys cannot collide
 # with the file-lock namespace below.
-_FILE_LOCK_PREFIX = "davis:upload:processing:"
+_FILE_LOCK_PREFIX = "icv:upload:processing:"
 
 
 def _progress_key(upload_id: str) -> str:
-    return f"davis:upload:{upload_id}:progress"
+    return f"icv:upload:{upload_id}:progress"
 
 
 def _error_key(upload_id: str) -> str:
-    return f"davis:upload:{upload_id}:error"
+    return f"icv:upload:{upload_id}:error"
 
 
 # Progress/error state is transient — expire keys so stale values never

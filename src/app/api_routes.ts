@@ -48,6 +48,15 @@ class apiRoutes {
     // assign countries to dataset
     public static readonly ASSIGN_COUNTRIES_TO_DATASET: string = `${apiRoutes.API_URL}/processData/assignCountries`;
 
+    /** Aggregate RKI dataset for a given target date. */
+    static aggregateRKI(params: {
+        sourceTable?: string;
+        targetTable?: string;
+        targetDate?: string;
+    }): string {
+        return buildUrl(`${apiRoutes.API_URL}/processData/aggregateRKI`, params);
+    }
+
     // ── Parameterised endpoints (typed function signatures) ───────────────
 
     /** Poll combined upload status (progress + error) for one upload. */
@@ -83,6 +92,7 @@ class apiRoutes {
         task?: string;
         startDate?: string;
         endDate?: string;
+        targetDate?: string;
         aggregation_level?: number;
     }): string {
         return buildUrl(`${apiRoutes.API_URL}/getDataFromDB`, params);

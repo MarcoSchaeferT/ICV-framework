@@ -64,6 +64,7 @@ let md = MDXContentProvider[locale];
   p1.mapInteractions = {
     disableMouse: false,
     disableScroll: false,
+    disableClick: true
   };
   p1.mapDataSets = {
     isGridData: true,
@@ -73,43 +74,6 @@ let md = MDXContentProvider[locale];
   p1.mapStyles.strokeWidth = 2; 
   
 
-  let mapPropsWorld2 = LeafD3MapLayerProps();
-  let p2 = mapPropsWorld2
-  p2.chartName = 'map_World2';
-  p2.dataURL = apiRoutes.FETCH_MAP_DATA.WORLD_MAP;
-  p2.center = [52.0, 10.1];
-  p2.zoom = 6.0;
-  p2.mapUIsettings.areSettingsOpen = true;
-  p2.mapUIsettings.isLongitudeSlider = false;
-  p2.mapUIsettings.isLatitudeSlider = false;
-  p2.mapUIsettings.isZoomSlider = false;
-  p2.mapUIsettings.isColorMapSelectionDropdown = false;
-  p2.mapUIsettings.isFeatureSelectionDropdown = false;
-  p2.mapUIsettings.isDatasetSelectionDropdown = false;
-  p2.mapUIsettings.isDistanceLegend = true;
-  p2.mapUIsettings.isColorMapLegend = true;
-  p2.mapUIsettings.isCountrySelectionDropdownMapBased = true;
-  p2.mapUIsettings.isCountrySelectionDropdown = false;
-  p2.mapUIsettings.isDatePicker = false;
-  p2.isStaticAutoFitFullSize = false;
-  p2.isProjection_equirectangular = false;
-  p2.mapUIsettings.isPresenceDataChecked = true;
-  p2.mapUIsettings.presenceDataColor = "rgb(2, 246, 250)";
-  p2.mapUIsettings.filterStringForAvailableDatasetInclude = "probability";
-  p2.mapUIsettings.defaultDatasetName = "";
-  p2.mapUIsettings.defaultFeatureName = "prob_1";
-  p2.isApplyContextData = false;
-  p2.mapUIsettings.defaultDatasetName =   p1.mapUIsettings.defaultDatasetName ;
-  p2.mapInteractions = {
-    disableMouse: true,
-    disableScroll: true,
-  };
- p2.mapDataSets = {
-    isGridData: true,
-    isPresenceData: true,
-    isSequenceMetaData: false,
-  };
-  p2.mapStyles.strokeWidth = 3; 
 
   let mainInfoHeading = t('mainInfo.heading');
 
@@ -167,7 +131,6 @@ let md = MDXContentProvider[locale];
             }}>
           {/*** Grid Cells ***/}
           <SGridPlotCard rowColSpan={[9,6]}  cardProps={d3MapCardProps_overview}><LeafD3MapLayerComponent props={worldMapProsp}/></SGridPlotCard>
-          {/*<SGridPlotCard rowColSpan={[9,3]}  cardProps={d3MapCardProps2_overveiwDetail}><LeafD3MapLayerComponent props={mapPropsWorld2}/></SGridPlotCard>*/}
         </div>
       </InterfaceContextProvider>
       </main>

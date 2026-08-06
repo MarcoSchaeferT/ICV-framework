@@ -63,7 +63,8 @@ let md = MDXContentProvider[locale];
   p1.mapUIsettings.defaultDonutSize = 50;
   p1.mapInteractions = {
     disableMouse: true,
-    disableScroll: true
+    disableScroll: true,
+    disableClick: true
   };
   
 

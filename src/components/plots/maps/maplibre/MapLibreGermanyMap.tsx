@@ -45,6 +45,8 @@ import stateMappersGermany from '@/app/helpers';
 import { Settings } from 'iconoir-react';
 import ColorMapLegend from '../overlays/ColorMapLegend';
 import MapLibreBase from './MapLibreBase';
+import { HoverCardTooltip } from '@/components/layout/InfoCards';
+import { MDXContentProvider } from '@messages/markdown/MDXContentProvider';
 import type { Map as MapLibreMap, GeoJSONSource, MapMouseEvent, MapLayerMouseEvent } from 'maplibre-gl';
 
 // ─── MapLibre hooks ───
@@ -57,6 +59,7 @@ import {
     useGridDataParser,
     useLayerUpdateDebounce,
 } from './hooks';
+import { useDynamicSettingsTop } from '../hooks';
 import { clampCoordinates, resetTimeout, getParamsOfURL } from '../utils/mapUtils';
 import { RANGE_LAT, RANGE_LONG, MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, CALCER } from '../constants';
 
@@ -140,6 +143,7 @@ const MapLibreGermanyMap = ({ props }: { props: MapLibreGermanyMapProps }) => {
 
     const t = useTranslations("component_D3MapLayerComponent");
     const locale = useLocale() as Locale;
+    const MDX = MDXContentProvider[locale]?.MapUI || MDXContentProvider["en"].MapUI;
 
     const chart = props.chartName;
     const mapUIsettings = { ...props.mapUIsettings };
@@ -170,6 +174,7 @@ const MapLibreGermanyMap = ({ props }: { props: MapLibreGermanyMapProps }) => {
     const isHoverCountry = useRef<boolean>(false);
     const gridcellSizeLatLng = useRef<{ lng: number; lat: number }>({ lng: 0, lat: 0 });
     const [isSettingsOpen, setIsSettingsOpen] = useState(true);
+    const { containerRef: settingsContainerRef, settingsTop: settingsButtonTop } = useDynamicSettingsTop();
     const hoveredFeatureId = useRef<number | null>(null);
 
     // ─── MapLibre map ref ───
@@ -430,10 +435,11 @@ const MapLibreGermanyMap = ({ props }: { props: MapLibreGermanyMapProps }) => {
         const colorStops: any[] = [];
         dataWithIds.features.forEach((feature: any, index: number) => {
             const country = feature.properties?.name || "";
-            const id = stateMappersGermany.Map__State_to_ID(country);
-            const idd = stateMappersGermany.mapper__MapTable__ID_to_ID(id);
-            const curKey = Object.keys(mosquitoData.response)[idd - 1];
-            const curVal = mosquitoData.response[curKey]?.feature;
+            const trimmed = country.trim().toLowerCase();
+            const record = Array.isArray(mosquitoData.response)
+                ? mosquitoData.response.find((r: any) => r && r.bundesland && r.bundesland.trim().toLowerCase() === trimmed)
+                : undefined;
+            const curVal = record?.feature;
             const color = colorMap(curVal) || '#cccccc';
             colorStops.push(index, color);
         });
@@ -785,8 +791,8 @@ const MapLibreGermanyMap = ({ props }: { props: MapLibreGermanyMapProps }) => {
     // ══════════════════════════════════════════════════════════════
     return (
         <LoadingSpinnerProvider>
-            <div className="relative size-full">
-            <div className="absolute top-1 right-1 z-20">
+            <div ref={settingsContainerRef} className="@container relative size-full">
+            <div className="absolute right-14 z-50" style={{ top: `${settingsButtonTop}px` }}>
                 <button
                     onClick={() => setIsSettingsOpen(!isSettingsOpen)}
                     className="p-1 rounded-full shadow-md hover:bg-gray-600 bg-black"
@@ -822,7 +828,10 @@ const MapLibreGermanyMap = ({ props }: { props: MapLibreGermanyMapProps }) => {
                     )}
                     {mapUIsettings.isDatasetSelectionDropdown && (
                         <div {...UI_elementStyler()}>
-                            <label htmlFor="dataset-select">{t.rich('data_set', { ...t_richConfig })}:</label>
+                            <span className="mb-1 flex items-center justify-between">
+                                {t.rich('data_set', { ...t_richConfig })}:
+                                <span className="ml-2"><HoverCardTooltip MDXContent={MDX.DataSet} /></span>
+                            </span>
                             {listOfDataSets &&
                                 <Select defaultValue={Object.keys(listOfDataSets)[0]} onValueChange={(value) => {
                                     const dataset = listOfDataSets[value];
@@ -849,7 +858,10 @@ const MapLibreGermanyMap = ({ props }: { props: MapLibreGermanyMapProps }) => {
                     )}
                     {mapUIsettings.isFeatureSelectionDropdown && (
                         <div {...UI_elementStyler()}>
-                            <label htmlFor="dataset-select">{t.rich('feature', { ...t_richConfig })}:</label>
+                            <span className="mb-1 flex items-center justify-between">
+                                {t.rich('feature', { ...t_richConfig })}:
+                                <span className="ml-2"><HoverCardTooltip MDXContent={MDX.DataFeature} /></span>
+                            </span>
                             {colNames && metaData && (
                                 <Select value={selectedFeature} onValueChange={(value) => {
                                     const url = apiRoutes.fetchDbData({ relationName: curDatasetname.current, feature: value });
@@ -883,7 +895,10 @@ const MapLibreGermanyMap = ({ props }: { props: MapLibreGermanyMapProps }) => {
                     )}
                     {mapUIsettings.isColorMapSelectionDropdown && ischanged && (
                         <div {...UI_elementStyler()}>
-                            <label htmlFor="dataset-select">{t.rich('color_map', { ...t_richConfig })}:</label>
+                            <span className="mb-1 flex items-center justify-between">
+                                {t.rich('color_map', { ...t_richConfig })}:
+                                <span className="ml-2"><HoverCardTooltip MDXContent={MDX.ColorMap} /></span>
+                            </span>
                             <Select onValueChange={(value) => {
                                 setColorMapType(value);
                                 contextT.setCurColorMap(value);

@@ -86,6 +86,41 @@ export const dictStates_TableGermany: { [key: string]: number } =
     "Thüringen": 16
 };
 
+export const dictStates_AbbrGermany: { [key: string]: string } = 
+{
+    "Baden-Württemberg": "BWG",
+    "Bayern": "BAY",
+    "Berlin": "BER",
+    "Brandenburg": "BBG",
+    "Bremen": "BRE",
+    "Hamburg": "HAM",
+    "Hessen": "HES",
+    "Mecklenburg-Vorpommern": "MVP",
+    "Niedersachsen": "NDS",
+    "Nordrhein-Westfalen": "NRW",
+    "Rheinland-Pfalz": "RLP",
+    "Saarland": "SAR",
+    "Sachsen-Anhalt": "SAN",
+    "Sachsen": "SAC",
+    "Schleswig-Holstein": "SHL",
+    "Thüringen": "THU"
+};
+
+export const GERMAN_STATE_ALIASES: Record<string, string> = {
+    bavaria: "Bayern",
+    hesse: "Hessen",
+    hessen: "Hessen",
+    "lower saxony": "Niedersachsen",
+    "north rhine-westphalia": "Nordrhein-Westfalen",
+    "rhineland-palatinate": "Rheinland-Pfalz",
+    saxony: "Sachsen",
+    "saxony-anhalt": "Sachsen-Anhalt",
+    thuringia: "Thüringen",
+    "baden-wuerttemberg": "Baden-Württemberg",
+    "baden-wurtemberg": "Baden-Württemberg",
+    "mecklenburg-western pomerania": "Mecklenburg-Vorpommern",
+};
+
 
 export const country_names: [string, string][] = [['AFG', 'Afghanistan'], ['AGO', 'Angola'], ['ALB', 'Albania'], ['ARE', 'United Arab Emirates'], ['ARG', 'Argentina'], ['ARM', 'Armenia'], ['AUS', 'Australia'], ['AUT', 'Austria'], ['AZE', 'Azerbaijan'], ['BDI', 'Burundi'], ['BEL', 'Belgium'], ['BEN', 'Benin'], ['BFA', 'Burkina Faso'], ['BGD', 'Bangladesh'], ['BGR', 'Bulgaria'], ['BHS', 'Bahamas'], ['BIH', 'Bosnia and Herzegovina'], ['BLR', 'Belarus'], ['BLZ', 'Belize'], ['BOL', 'Bolivia'], ['BRA', 'Brazil'], ['BRN', 'Brunei'], ['BTN', 'Bhutan'], ['BWA', 'Botswana'], ['CAF', 'Central African Republic'], ['CAN', 'Canada'], ['CHE', 'Switzerland'], ['CHL', 'Chile'], ['CHN', 'China'], ['CIV', 'Ivory Coast'], ['CMR', 'Cameroon'], ['COD', 'Democratic Republic of the Congo'], ['COG', 'Republic of the Congo'], ['COL', 'Colombia'], ['CRI', 'Costa Rica'], ['CUB', 'Cuba'], ['CYP', 'Cyprus'], ['CZE', 'Czech Republic'], ['DEU', 'Germany'], ['DJI', 'Djibouti'], ['DNK', 'Denmark'], ['DOM', 'Dominican Republic'], ['DZA', 'Algeria'], ['ECU', 'Ecuador'], ['EGY', 'Egypt'], ['ERI', 'Eritrea'], ['ESH', 'Western Sahara'], ['ESP', 'Spain'], ['EST', 'Estonia'], ['ETH', 'Ethiopia'], ['FIN', 'Finland'], ['FJI', 'Fiji'], ['FLK', 'Falkland Islands'], ['FRA', 'France'], ['GAB', 'Gabon'], ['GBR', 'United Kingdom'], ['GEO', 'Georgia'], ['GHA', 'Ghana'], ['GIN', 'Guinea'], ['GMB', 'Gambia'], ['GNB', 'Guinea-Bissau'], ['GNQ', 'Equatorial Guinea'], ['GRC', 'Greece'], ['GRL', 'Greenland'], ['GTM', 'Guatemala'], ['GUY', 'Guyana'], ['HND', 'Honduras'], ['HRV', 'Croatia'], ['HTI', 'Haiti'], ['HUN', 'Hungary'], ['IDN', 'Indonesia'], ['IND', 'India'], ['IRL', 'Ireland'], ['IRN', 'Iran'], ['IRQ', 'Iraq'], ['ISL', 'Iceland'], ['ISR', 'Israel'], ['ITA', 'Italy'], ['JAM', 'Jamaica'], ['JOR', 'Jordan'], ['JPN', 'Japan'], ['KAZ', 'Kazakhstan'], ['KEN', 'Kenya'], ['KGZ', 'Kyrgyzstan'], ['KHM', 'Cambodia'], ['KOR', 'South Korea'], ['KWT', 'Kuwait'], ['LAO', 'Laos'], ['LBN', 'Lebanon'], ['LBR', 'Liberia'], ['LBY', 'Libya'], ['LKA', 'Sri Lanka'], ['LSO', 'Lesotho'], ['LTU', 'Lithuania'], ['LUX', 'Luxembourg'], ['LVA', 'Latvia'], ['MAR', 'Morocco'], ['MDA', 'Moldova'], ['MDG', 'Madagascar'], ['MEX', 'Mexico'], ['MKD', 'Macedonia'], ['MLI', 'Mali'], ['MLT', 'Malta'], ['MMR', 'Myanmar'], ['MNE', 'Montenegro'], ['MNG', 'Mongolia'], ['MOZ', 'Mozambique'], ['MRT', 'Mauritania'], ['MWI', 'Malawi'], ['MYS', 'Malaysia'], ['NAM', 'Namibia'], ['NCL', 'New Caledonia'], ['NER', 'Niger'], ['NGA', 'Nigeria'], ['NIC', 'Nicaragua'], ['NLD', 'Netherlands'], ['NOR', 'Norway'], ['NPL', 'Nepal'], ['NZL', 'New Zealand'], ['OMN', 'Oman'], ['PAK', 'Pakistan'], ['PAN', 'Panama'], ['PER', 'Peru'], ['PHL', 'Philippines'], ['PNG', 'Papua New Guinea'], ['POL', 'Poland'], ['PRI', 'Puerto Rico'], ['PRK', 'North Korea'], ['PRT', 'Portugal'], ['PRY', 'Paraguay'], ['PSE', 'Palestine'], ['QAT', 'Qatar'], ['ROU', 'Romania'], ['RUS', 'Russia'], ['RWA', 'Rwanda'], ['SAU', 'Saudi Arabia'], ['SDN', 'Sudan'], ['SEN', 'Senegal'], ['SLB', 'Solomon Islands'], ['SLE', 'Sierra Leone'], ['SLV', 'El Salvador'], ['SOM', 'Somalia'], ['SRB', 'Serbia'], ['SSD', 'South Sudan'], ['SUR', 'Suriname'], ['SVK', 'Slovakia'], ['SVN', 'Slovenia'], ['SWE', 'Sweden'], ['SWZ', 'Swaziland'], ['SYR', 'Syria'], ['TCD', 'Chad'], ['TGO', 'Togo'], ['THA', 'Thailand'], ['TJK', 'Tajikistan'], ['TKM', 'Turkmenistan'], ['TLS', 'East Timor'], ['TTO', 'Trinidad and Tobago'], ['TUN', 'Tunisia'], ['TUR', 'Turkey'], ['TWN', 'Taiwan'], ['TZA', 'Tanzania'], ['UGA', 'Uganda'], ['UKR', 'Ukraine'], ['URY', 'Uruguay'], ['USA', 'United States of America'], ['UZB', 'Uzbekistan'], ['VEN', 'Venezuela'], ['VIR', 'United States Virgin Islands'], ['VNM', 'Vietnam'], ['VUT', 'Vanuatu'], ['YEM', 'Yemen'], ['ZAF', 'South Africa'], ['ZMB', 'Zambia'], ['ZWE', 'Zimbabwe']];
 

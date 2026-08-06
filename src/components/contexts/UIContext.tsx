@@ -29,6 +29,8 @@ export interface UIContextI {
     setDemoMode: React.Dispatch<React.SetStateAction<boolean>>;
     showCov: boolean;
     setShowCov: React.Dispatch<React.SetStateAction<boolean>>;
+    showLegalTexts: boolean;
+    setShowLegalTexts: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export interface SidebarSelectionI {
@@ -56,6 +58,7 @@ function UIContextProvider({children}: any) {
     const [isDemoModeDialogOpen, setIsDemoModeDialogOpen] = useState<boolean>(false);
     const [demoMode, setDemoMode] = useState<boolean>(false);
     const [showCov, setShowCov] = useState<boolean>(false);
+    const [showLegalTexts, setShowLegalTexts] = useState<boolean>(true);
 
     // Fetch demo mode on mount
     React.useEffect(() => {
@@ -69,7 +72,14 @@ function UIContextProvider({children}: any) {
         fetch('/api/showCov')
             .then(res => res.json())
             .then(data => setShowCov(data.showCov))
-            .catch(err => console.error('Failed to fetch demo mode:', err));
+            .catch(err => console.error('Failed to fetch showCov:', err));
+    }, []);
+
+     React.useEffect(() => {
+        fetch('/api/showLegalTexts')
+            .then(res => res.json())
+            .then(data => setShowLegalTexts(data.showLegalTexts))
+            .catch(err => console.error('Failed to fetch legal texts status:', err));
     }, []);
 
    const contextValue = {
@@ -94,7 +104,8 @@ function UIContextProvider({children}: any) {
             updateHash,
             isDemoModeDialogOpen, setIsDemoModeDialogOpen,
             demoMode, setDemoMode,
-            showCov, setShowCov
+            showCov, setShowCov,
+            showLegalTexts, setShowLegalTexts
            }}>
             {children}
          </UIContext.Provider>
