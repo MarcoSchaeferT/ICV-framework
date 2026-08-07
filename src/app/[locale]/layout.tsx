@@ -53,7 +53,7 @@ export default async function LocaleLayout({ children }: LocaleLayoutProps) {
     <html lang={locale} >
       <body className={`${inter.className} overflow-y-scroll overflow-x-clip bg-surface-default`} suppressHydrationWarning={true}>
       <Script
-          async
+          async 
           src="http://89.168.106.64:8081/js/pa-BarnYORUkFdXEbz1Bijao.js"
           strategy="afterInteractive"
         />

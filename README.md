@@ -8,6 +8,13 @@ Open-source, composable web framework for creating release-ready public health e
 
 </div>
 
+> [!NOTE]
+> Please consider using the [`test`](https://github.com/MarcoSchaeferT/ICV-framework/tree/test) branch: while active development takes place in a separate repository, the `test` branch is used for intermediate releases, is kept fully functional, and contains a significantly updated and improved version of the framework.
+
+
+
+
+
 <table style="width:100%;">
     <tr>
         <td align="center">React</td>
