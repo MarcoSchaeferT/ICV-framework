@@ -1,157 +1,262 @@
-
-"use client"
-import { Pie, PieChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
+import React, { useMemo, useEffect } from 'react';
+import { Pie, PieChart, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
 import dummyData from '../dummyData';
-
-import {PrintDataLoadingErrors, handleLoadDataError } from '@/app/helpers';
-import {useGetJSONData} from '@/app/hooks/useFetchAndCache';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { use, useEffect, useMemo, useRef, useState } from 'react';
-import { useInterfaceContext, interfaceContextI } from '@/components/contexts/InterfaceContext';
-import { getGridCellIndex, getGridCellDims, polygonParser,getGeometryCenter } from '../maps/helpers';
-import {
-  metaDataT,
-  alignFeature_to_Metadata,
-} from '../MetaDataHandler';
-import { apiRoutes } from '@/app/api_routes';
-import { useLocale ,useTranslations } from "next-intl";
-import { Locale } from '@/i18n/routing';
-import { t_richConfig, monthNames, dbDATA } from '@/app/const_store';
-import { getGoodReadableRange } from '../maps/helpers';
+import { useGetJSONData } from '@/app/hooks/useFetchAndCache';
+import { useLoadingTask } from '../maps/utils/loadingSpinner';
+import { useInterfaceContext } from '@/components/contexts/InterfaceContext';
+import { categoricalColors2 } from '@/app/const_store';
+import GenericCartesianChart from '../generic/GenericCartesianChart';
 
 /**
- * Props class for the LinechartComponent.
- * 
+ * Configuration contract for `PieChartComponent`.
+ *
  * @remarks
- * This class encapsulates all the properties required to render a bar chart using the BarchartComponent.
- * It includes configuration for the chart name, data source URL, localization, translations.
- * 
- * @property chartName - The name of the chart to be displayed.
- * @property dataURL - The URL from which to fetch the chart data. Can be a string.
- * @property locale - The locale to use for translations and formatting (e.g., "en", "de"). Defaults to "en".
- * @property translations - An object containing translation strings or functions, typically created using a translation hook. e.g.: useTranslations("covid_view_barchart")
- * @property isDummyMode - for demonstration purposes: loads dummy data for the chart if set to true.
- * 
+ * The categorical pie chart presents discrete frequency or ratio distributions.
+ * When `isDummyMode` is `true`, it renders demonstration data with built-in color maps and tooltips.
+ * When `dataURL` is specified and `isDummyMode` is `false`, it queries the database through `useGetJSONData`
+ * and registers task execution with `useLoadingTask` for coordinated card spinner rendering.
+ *
  * @example
- * ```
- * const props = LinechartProps(
- *   "COVID-19 Cases",
- *   apiRoutes.GET_DATASETS_METADATA,
- *   "de",
- *   useTranslations("covid_view_linechart")
- * );
- * <>
- *  <PieChartComponent chartProps={props} />
- * </<>
+ * ```tsx
+ * const props: PieChartProps = {
+ *   chartName: "dengue-serotype-distribution",
+ *   data: [
+ *     { name: "DENV-1", value: 128 },
+ *     { name: "DENV-2", value: 94 },
+ *     { name: "DENV-3", value: 37 },
+ *   ],
+ *   locale: "en",
+ *   isDummyMode: false,
+ * };
  * ```
  */
 export interface PieChartProps {
+    /** Stable chart/container identifier. */
     chartName: string;
-    data: { name: string; value: number; }[];
+    /** Encoded backend database API URL. @default "" */
+    dataURL?: string;
+    /** Target feature name for data parsing. @default "" */
+    feature?: string;
+    /** Discrete category labels and numeric counts. @default [] */
+    data?: { name: string; value: number; }[];
+    /** Locale used for value formatting. @default "en" */
     locale?: string;
+    /** `next-intl` translator for chart labels and tooltips. */
     translations?: any;
+    /** Uses bundled demonstration data. @default false */
     isDummyMode?: boolean;
+    /** Selects the reusable row-oriented chart adapter used by layout templates. */
+    dataMode?: "linked" | "generic";
+    /** Maximum number of generic dataset rows rendered before truncation. */
+    rowLimit?: number | null;
 }
 
+/**
+ * Creates a complete categorical pie-chart configuration object with defaults.
+ *
+ * @param chartName - Stable chart/container identifier.
+ * @param data - Category labels and numeric values to visualize.
+ * @param locale - Locale for number and label formatting.
+ * @param translations - `next-intl` translator instance for the chart namespace.
+ * @param isDummyMode - Whether to render bundled demonstration data.
+ * @param dataURL - Encoded database API URL.
+ * @param feature - Target feature identifier for extraction.
+ * @returns Configuration object accepted by `PieChartComponent`.
+ *
+ * @default data []
+ * @default locale "en"
+ * @default translations {}
+ * @default isDummyMode false
+ * @default dataURL ""
+ * @default feature ""
+ *
+ * @example
+ * ```tsx
+ * const chartConfig = PieChartProps(
+ *   "serotype-piechart",
+ *   [{ name: "DENV-1", value: 120 }, { name: "DENV-2", value: 85 }],
+ *   "en",
+ *   {},
+ *   true
+ * );
+ * ```
+ */
 export function PieChartProps(
     chartName: string,
     data: { name: string; value: number; }[] = [],
     locale = "en",
     translations: any = {},
-    isDummyMode = false
+    isDummyMode = false,
+    dataURL = "",
+    feature = "",
+    dataMode: "linked" | "generic" = "linked",
+    rowLimit?: number | null,
 ): PieChartProps {
     return {
         chartName,
         data,
         locale,
         translations,
-        isDummyMode
+        isDummyMode,
+        dataURL,
+        feature,
+        dataMode,
+        rowLimit,
     };
 }
 
+/** Categorical palette imported from const_store for slice styling. */
+const COLORS = categoricalColors2 && categoricalColors2.length > 0 ? categoricalColors2 : ['#4ecdc4', '#a8b8e8', '#5ac800', '#e040fb', '#40c4ff', '#7c4dff', '#ff80ab'];
 
 
+/**
+ * Categorical pie-chart visual component built with Recharts and responsive containers.
+ *
+ * @param props - Configuration properties containing dataset URLs, static records, or dummy mode flags.
+ * @returns Responsive SVG pie chart element synchronized with dashboard loading tasks.
+ *
+ * @remarks
+ * In accordance with ICV architectural rules, async network calls use `useGetJSONData` for LRU caching
+ * and deduplication. Loading states register with `useLoadingTask` so `SGridPlotCard` wrappers display active spinners.
+ *
+ * @example
+ * ```tsx
+ * const props = PieChartProps("pie-1", [], "en", {}, true);
+ * return <PieChartComponent ChartProps={props} />;
+ * ```
+ */
+const LinkedPieChartComponent = ({ ChartProps }: { ChartProps: PieChartProps }) => {
+  const props = ChartProps;
+  useInterfaceContext();
 
-const PieChartComponent = ({ChartProps}: {ChartProps: PieChartProps}) => {
+  const dataURL = props.dataURL || "";
+  const [isDataLoading, fetchedRawData] = useGetJSONData(props.isDummyMode ? "" : dataURL);
+  const L_piechartData = useLoadingTask(props.chartName || 'PieChart Data');
 
-  let t = ChartProps.translations;
+  useEffect(() => {
+    if (!props.isDummyMode && dataURL) {
+      if (isDataLoading) {
+        L_piechartData.start();
+      } else {
+        L_piechartData.stop();
+      }
+    }
+  }, [isDataLoading, props.isDummyMode, dataURL, L_piechartData]);
 
+  const chartData = useMemo(() => {
+    if (props.isDummyMode) {
+      return dummyData.map((item: any) => ({
+        name: item.name || 'Category',
+        value: typeof item.uv === 'number' ? item.uv : (item.value || 0),
+      }));
+    }
 
-  let props = ChartProps;
-  let c = useInterfaceContext();
+    if (props.data && props.data.length > 0) {
+      return props.data;
+    }
 
-  const isDataNotAvailable = useRef(false);
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+    if (fetchedRawData && (fetchedRawData as any).response) {
+      const resp = (fetchedRawData as any).response;
+      if (Array.isArray(resp)) {
+        return resp.map((row: any, idx: number) => ({
+          name: row.name || row.bundesland || `Item ${idx + 1}`,
+          value: Number(row.feature || row.value || 0),
+        }));
+      }
+    }
+
+    return [];
+  }, [props.isDummyMode, props.data, fetchedRawData]);
 
   if (props.isDummyMode) {
-      return (
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart width={400} height={400}>
-          <Tooltip />
-            <Pie data={dummyData} dataKey="uv" cx="50%" cy="50%" outerRadius={60} fill="#8884d8" />
-            <Pie data={dummyData} dataKey="amt" cx="50%" cy="50%" innerRadius={70} outerRadius={90} fill="#82ca9d" label />
-          </PieChart>
-      </ResponsiveContainer>
-    );
-  }else{ // not dummy mode
     return (
-      <div className="flex flex-col h-full w-full min-h-0"> 
-        {/* Header Section */}
-
-        {/* Chart Title */}
-        {/* Chart Section dynamically filling available space */}
-        <div className="flex-1 min-h-0 ">
-        {isDataNotAvailable.current && (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-red-500">No data available</div>
-            </div>
-            )}
-            {!isDataNotAvailable.current && (
+      <div className="flex flex-col h-full w-full min-h-0">
+        <div className="flex-1 min-h-0">
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart
-            style={{ border: "none" }}
-            
-            >
-          <Pie
-            data={props.data}
-            dataKey="value"
-            cx="50%"
-            cy="50%"
-            innerRadius="70%"
-            outerRadius="90%"
-            label
-          >
-            {props.data.map((entry, index) => (
-              <Cell key={`cell-${entry.name}`} fill={COLORS[index % COLORS.length]} />
-            ))}
-          </Pie>
-
+            <PieChart margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
+              <Pie
+                data={chartData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="48%"
+                innerRadius="45%"
+                outerRadius="75%"
+                paddingAngle={3}
+                label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
               <Tooltip
-                labelFormatter={(label: any) => String(label)}
-                formatter={(value: any, name: any) => [
-                  `${(Math.round(Number(value) * 1000) / 1000).toLocaleString("de", { maximumFractionDigits: 3 })}` ,
-                  String(name)
+                formatter={(val: any, name: any) => [
+                  typeof val === 'number' ? val.toLocaleString() : val,
+                  String(name),
                 ]}
               />
+              <Legend verticalAlign="bottom" height={32} iconType="circle" />
             </PieChart>
           </ResponsiveContainer>
-          )}
         </div>
       </div>
     );
   }
-}
 
+  const isDataNotAvailable = chartData.length === 0 && !isDataLoading;
 
+  return (
+    <div className="flex flex-col h-full w-full min-h-0">
+      <div className="flex-1 min-h-0">
+        {isDataNotAvailable ? (
+          <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+            No data available
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
+              <Pie
+                data={chartData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="48%"
+                innerRadius="45%"
+                outerRadius="75%"
+                paddingAngle={3}
+                label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip
+                formatter={(val: any) => [
+                  typeof val === 'number' ? val.toLocaleString() : val,
+                  'Value',
+                ]}
+              />
+              <Legend verticalAlign="bottom" height={32} iconType="circle" />
+            </PieChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </div>
+  );
+};
 
+const PieChartComponent = ({ ChartProps }: { ChartProps: PieChartProps }) => {
+  if (ChartProps.dataMode === "generic") {
+    return (
+      <GenericCartesianChart
+        chartName={ChartProps.chartName}
+        kind="pie"
+        rowLimit={ChartProps.rowLimit}
+      />
+    );
+  }
 
+  return <LinkedPieChartComponent ChartProps={ChartProps} />;
+};
 
 export default PieChartComponent;

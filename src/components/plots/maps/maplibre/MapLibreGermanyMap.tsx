@@ -1,14 +1,14 @@
 /**
- * MapLibreGermanyMap – MapLibre GL JS port of LeafD3MapGermanyCovid.
+ * Experimental MapLibre GL JS WebGL port of `LeafD3MapGermanyCovid`.
  *
- * Replaces Leaflet MapContainer + L.geoJSON + Canvas grid overlay with:
- * - MapLibre GL JS map instance (WebGL-rendered)
- * - MapLibre `fill` + `line` layers for Germany state polygons
- * - MapLibre `fill` layer for grid data (via useMapLibreGridLayer)
- * - React Portal tooltip (via useMapLibreTooltip)
+ * @remarks
+ * **Engine Constraint Note:**
+ * In ICV framework architectural standards, Leaflet (`L.Map`, `L.GridLayer`) is the authoritative primary spatial engine.
+ * `MapLibreGermanyMap` serves as a secondary WebGL proof-of-concept.
  *
- * Preserves the existing UI controls (sliders, selects, etc.) and
- * InterfaceContext state synchronization.
+ * @see {@link LeafD3MapLayerComponent} for the primary production Leaflet spatial map component.
+ * @see {@link LeafD3MapGermanyComponent} for the primary Germany regional map component.
+ * @see {@link useInterfaceContext} for multi-view state context synchronization.
  */
 'use client';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -783,7 +783,7 @@ const MapLibreGermanyMap = ({ props }: { props: MapLibreGermanyMapProps }) => {
     const barWidth = 10;
 
     function UI_elementStyler() {
-        return { className: `text-sm m-1 p-1 border row-span-2 col-span-6 bg-white/75 z-10 rounded-lg shadow-md` };
+        return { className: `text-sm m-1 p-1 border row-span-2 col-span-6 bg-white/75 z-10 rounded-lg shadow-md pointer-events-auto` };
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -804,7 +804,7 @@ const MapLibreGermanyMap = ({ props }: { props: MapLibreGermanyMapProps }) => {
             <PrintDataLoadingErrors listOfErrors={collectDataLoadingErrors} />
             <SizeHook element={element} sizeRef={sizeRef} setSize={setSizes} />
             {isSettingsOpen && (
-                <div className="absolute w-full mt-2 ml-1 pr-2 grid grid-cols-12 md:grid-cols-12">
+                <div className="absolute w-full mt-2 ml-1 pr-2 grid grid-cols-12 md:grid-cols-12 pointer-events-none z-30">
                     {mapUIsettings.isLatitudeSlider && (
                         <div {...UI_elementStyler()}>
                             {t.rich('latitude', { ...t_richConfig })}: {Math.round(latitude * rounder) / rounder}

@@ -22,6 +22,7 @@ import { useUIContext } from '@/components/contexts/UIContext';
 
 const isSWAPY = true;
 
+/** Returns the general development sandbox for supported frontend components. */
 export default function Home() {
 
  const UI_contextT = useUIContext();

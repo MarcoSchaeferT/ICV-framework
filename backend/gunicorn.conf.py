@@ -54,8 +54,14 @@ limit_request_fields = 200
 # ---------------------------------------------------------------------------
 # Keep-alive
 # ---------------------------------------------------------------------------
-# Keep connections alive for reuse (Next.js proxy → backend)
-keepalive = 5
+# Keep upstream connections alive longer than the Next.js proxy connection
+# pool, so it cannot reuse a socket just as Gunicorn closes it.
+_env_keepalive = os.getenv("GUNICORN_KEEPALIVE")
+keepalive = (
+    int(_env_keepalive)
+    if _env_keepalive and _env_keepalive.isdigit()
+    else 75
+)
 
 # ---------------------------------------------------------------------------
 # Preload app

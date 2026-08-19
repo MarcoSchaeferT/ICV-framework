@@ -16,9 +16,11 @@ import {
 } from "iconoir-react";
 import { routing} from '@/i18n/routing';
 import ShowcaseGrid from './home/ShowCases';
+import LayoutTemplatesGrid from './home/LayoutTemplates';
 import Image from 'next/image';
 import SettingButton from './home/SettingsButton';
 
+/** Returns one statically generated landing-page parameter for every supported locale. */
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({locale}));
 }
@@ -26,6 +28,12 @@ export function generateStaticParams() {
 
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 
+/**
+ * Renders the localized ICV landing page and dashboard showcase navigation.
+ *
+ * @param props - Asynchronous locale route parameter.
+ * @returns The server-rendered localized home page.
+ */
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const resolvedParams = await params;
   setRequestLocale(resolvedParams.locale);
@@ -81,7 +89,7 @@ return (
       <div className="flex justify-center w-full">
         <section
           id="features"
-          className="container w-[80%] space-y-6 rounded-xl bg-slate-50 dark:bg-transparent flex flex-col items-center"
+          className="container w-[80%] space-y-6 rounded-xl bg-slate-50 dark:bg-transparent flex flex-col items-center pb-12"
         >
           <div className=""></div>
             <h2 className="font-heading text-4xl leading-[1.1] sm:text-3xl md:text-4xl rounded-lg px-4 pt-2 ">
@@ -89,19 +97,11 @@ return (
             </h2>
           <ShowcaseGrid />
           <div className="h-6"></div>
-          {/* <Features /> */}
-         {/*}
-          <div className="mx-auto text-center md:max-w-232">
-            <p className="leading-normal sm:text-lg sm:leading-7"></p>
-            {subpage_features.rich('bottomText', {...t_richConfig})}{" "}
-            <Link href='/about' className='text-cyan-700 pr-1'>
-              {subpage_features.rich('bottomTextAbout', {...t_richConfig})}
-            </Link>
-            {subpage_features.rich('bottomTextOr', {...t_richConfig})}{" "}
-            <Link href='https://marcoschaefert.github.io/davisDocu/' className='text-cyan-700'>
-              AVis Docs
-            </Link>
-          </div>*/}
+          <h2 className="font-heading text-4xl leading-[1.1] sm:text-3xl md:text-4xl rounded-lg px-4 pt-2 ">
+            Layout Templates
+          </h2>
+          <LayoutTemplatesGrid />
+          <div className="h-6"></div>
         </section>
       </div>
     </div>

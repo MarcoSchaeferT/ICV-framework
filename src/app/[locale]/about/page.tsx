@@ -22,6 +22,7 @@ import {MdxLayoutAbout} from '@/mdx-layout'
 import {MDXContentProvider} from '@messages/markdown/MDXContentProvider'
 
 
+/** Returns the localized project description, credits, and feedback surface. */
 export default function Component() {
 
   // States

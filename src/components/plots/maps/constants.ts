@@ -2,17 +2,27 @@
 import * as d3 from 'd3';
 
 
-// ─── Map constants (shared between both map components) ───
+/** Maximum longitude range bound in degrees ($\pm 180^\circ$) */
 export const RANGE_LONG = 180;
+/** Maximum latitude range bound in degrees ($\pm 90^\circ$) */
 export const RANGE_LAT = 90;
+/** Maximum Leaflet zoom level limit */
 export const MAX_ZOOM = 13;
-export const MIN_ZOOM = 0.1;
+/** Minimum Leaflet zoom level limit (supports negative zooms for small minimap containers) */
+export const MIN_ZOOM = -1;
+/** Zoom step increment value */
 export const ZOOM_STEP = 0.01;
+/** Precision decimal places count for coordinate comparisons */
 export const NUMBERS_AFTER_COMMA = 3;
+/**
+ * Coordinate precision scaling factor ($10^{\text{NUMBERS\_AFTER\_COMMA}} = 1000$).
+ *
+ * Used by {@link useMapPosition} to eliminate floating-point coordinate feedback loops.
+ */
 export const CALCER = Math.pow(10, NUMBERS_AFTER_COMMA);
 
 
-// color scales
+/** Complete dictionary of all available D3 sequential, diverging, and cyclical color map interpolators */
 export const availableColorMapsAll = {
     "interpolateBlues": d3.interpolateBlues,
     "interpolateBrBG": d3.interpolateBrBG,
@@ -54,6 +64,14 @@ export const availableColorMapsAll = {
     "interpolateYlOrRd": d3.interpolateYlOrRd
 };
 
+/**
+ * Curated palette dictionary of primary D3 color interpolators for ICV visualizations.
+ *
+ * Includes perceptually uniform (Viridis, Inferno, Cividis), sequential (Blues, Greens), and colorblind-safe diverging (RdBu) palettes.
+ *
+ * @see {@link ColorMapLegend} for legend rendering.
+ * @see {@link useGridLayer} for tile canvas coloring.
+ */
 export const availableColorMaps = {
     "interpolateBlues": d3.interpolateBlues,
     "interpolateCividis": d3.interpolateCividis,
@@ -63,6 +81,7 @@ export const availableColorMaps = {
     "interpolateViridis": d3.interpolateViridis,
 };
 
+/** Key string mapping for available D3 color map names */
 export const availableColorMapsNames = {
     interpolateBlues: "interpolateBlues",
     interpolateCividis: "interpolateCividis",

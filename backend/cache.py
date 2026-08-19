@@ -22,7 +22,7 @@ which at worst causes a spurious cache miss — never stale data.
 
 Limits (whichever is hit first triggers LRU eviction):
   - Max entries : CACHE_MAX_ENTRIES (default 256)
-  - Max size    : CACHE_MAX_GB (default 3.0 GB)
+  - Max size    : CACHE_TOTAL_MB / Gunicorn workers (default 512 MB total)
   - TTL         : 24 hours
 
 Thread-safe via a threading.Lock.
@@ -32,6 +32,7 @@ import sys
 import os
 import time
 import threading
+import multiprocessing
 from collections import OrderedDict
 from typing import Any, Iterable, Optional
 
@@ -81,8 +82,20 @@ def _deep_getsizeof(obj: Any, _seen: Optional[set] = None) -> int:
 # Cache configuration defaults from environment variables
 # ---------------------------------------------------------------------------
 
-DEFAULT_CACHE_MAX_GB = float(os.getenv("CACHE_MAX_GB", "3.0"))
-DEFAULT_CACHE_MAX_BYTES = int(DEFAULT_CACHE_MAX_GB * 1024 ** 3)
+def _configured_worker_count() -> int:
+    configured = os.getenv("GUNICORN_WORKERS", "").strip()
+    if configured.isdigit() and int(configured) > 0:
+        return int(configured)
+    return min(2 * multiprocessing.cpu_count() + 1, 4)
+
+
+_legacy_max_gb = os.getenv("CACHE_MAX_GB")
+DEFAULT_CACHE_TOTAL_MB = float(os.getenv("CACHE_TOTAL_MB", "512"))
+DEFAULT_CACHE_MAX_BYTES = (
+    int(float(_legacy_max_gb) * 1024 ** 3)
+    if _legacy_max_gb
+    else int(DEFAULT_CACHE_TOTAL_MB * 1024 ** 2 / _configured_worker_count())
+)
 DEFAULT_CACHE_MAX_ENTRIES = int(os.getenv("CACHE_MAX_ENTRIES", "256"))
 
 
@@ -244,15 +257,24 @@ class ResponseCache:
             self._hits += 1
         return value
 
-    def set(self, key: str, value: Any, scopes: Iterable[str] = ()) -> None:
+    def set(
+        self,
+        key: str,
+        value: Any,
+        scopes: Iterable[str] = (),
+        size_bytes: Optional[int] = None,
+    ) -> None:
         """Store *value* under *key*, evicting stale / LRU entries as needed.
 
         *scopes* are the relation names the value depends on; invalidating
         any of them (from any worker) makes this entry stale.
+
+        ``size_bytes`` lets callers that already serialized a response avoid
+        the expensive recursive object-graph walk.
         """
         entry_scopes = (_GLOBAL_SCOPE, *scopes)
         epochs = self._current_epochs(entry_scopes)
-        size = _deep_getsizeof(value)
+        size = max(0, int(size_bytes)) if size_bytes is not None else _deep_getsizeof(value)
         with self._lock:
             # If key already cached, evict old entry first
             if key in self._store:
@@ -321,6 +343,8 @@ class ResponseCache:
                 "size_bytes": self._current_bytes,
                 "size_mb": round(self._current_bytes / (1024 ** 2), 2),
                 "max_size_gb": round(self._max_bytes / (1024 ** 3), 2),
+                "max_size_mb": round(self._max_bytes / (1024 ** 2), 2),
+                "configured_total_mb": DEFAULT_CACHE_TOTAL_MB,
                 "ttl_seconds": self._ttl,
                 "epoch_evictions": self._epoch_evictions,
             }

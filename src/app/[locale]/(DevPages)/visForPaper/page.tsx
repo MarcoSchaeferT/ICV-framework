@@ -31,6 +31,7 @@ import {
 
 const isSWAPY = true;
 
+/** Returns the publication-oriented composition of supported ICV visualization components. */
 export default function Home() {
 
   const locale = useLocale();

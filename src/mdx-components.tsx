@@ -5,6 +5,12 @@ import { useLocale } from 'next-intl';
 import { Locale } from './i18n/routing';
 import alertTypeTranslations from '@messages/markdown/markdownAlertTypes';
  
+/**
+ * Extracts a GitHub-style alert marker such as `[!NOTE]` from MDX blockquote children.
+ *
+ * @param children - Rendered blockquote children produced by the MDX compiler.
+ * @returns Lowercase alert type, or an empty string for a regular blockquote.
+ */
 const getAlertType = (children: React.ReactNode): string => {
   // Extract alert type from first paragraph child if present, e.g. "Note:", "Warning:", etc.
   if (!children) return '';
@@ -42,6 +48,7 @@ const getAlertType = (children: React.ReactNode): string => {
 };
 
 
+/** Shared MDX element overrides used by localized end-user and developer documentation. */
 const baseComponents: MDXComponents = {
   //
   // @ts-ignore: MDXComponents allows lowercase 'blockquote' for custom mapping
@@ -112,6 +119,15 @@ const baseComponents: MDXComponents = {
 
 };
  
+/**
+ * Supplies application-specific element renderers to compiled MDX content.
+ *
+ * @returns MDX component map with locale-aware links and translated GitHub-style alerts.
+ *
+ * @remarks
+ * The hook is part of the Next.js MDX integration contract. Keeping custom links here ensures internal documentation
+ * navigation remains locale-aware while external links retain normal anchor behavior.
+ */
 export function useMDXComponents(): MDXComponents {
   const components = {
     a: customMDXlink,

@@ -10,12 +10,37 @@ import SizeHook from '@/app/hooks/useResizeObserver';
 import useChartResizer from '@/app/hooks/useChartResizer';
 
 
+/**
+ * Minimal configuration contract for the reference D3 chart implementation.
+ *
+ * @example
+ * ```ts
+ * const config: ExampleChartProps = {
+ *   chartName: "albopictus-observation-count",
+ *   dataURL: "/api/getDataFromDB?relationName=mosquito_observations&feature=count",
+ *   exampleVar: "albopictus",
+ * };
+ * ```
+ */
 export interface ExampleChartProps {
+    /** Stable chart/container identifier. */
     chartName: string;
+    /** Backend data URL consumed through `useGetJSONData`. */
     dataURL: string;
+    /** Optional extension value for a derived chart implementation. */
     exampleVar?: any;
 }
 
+/**
+ * Creates a complete reference D3 chart configuration.
+ *
+ * @param chartName - Stable chart/container identifier.
+ * @param dataURL - Backend data URL.
+ * @param exampleVar - Optional extension value.
+ * @returns Configuration accepted by the reference component.
+ * @default dataURL ""
+ * @default exampleVar null
+ */
 export function ExampleChartProps(
     chartName: string,
     dataURL = "",
@@ -107,4 +132,5 @@ const D3ExampleChartComponent = ({chartProps}: {chartProps: ExampleChartProps}) 
 
 };
 
+/** Default export for the resizable D3 chart implementation template. */
 export default  D3ExampleChartComponent;

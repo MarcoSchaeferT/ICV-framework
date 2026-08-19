@@ -4,6 +4,7 @@ import {SquareChevronDown, SquareChevronUp} from "lucide-react"
 import { useTranslations } from 'next-intl';
 
 
+/** DOM anchor identifier targeted by a smooth-scroll control. */
 interface ScrollToTopButtonProps {
   scrollToAnchor: string;
 }
@@ -46,4 +47,5 @@ const t = useTranslations("component_scrollToButton");
   );
 };
 
+/** Public smooth-scroll controls for navigating between dashboard sections. */
 export { ScrollToButtonUp, ScrollToButtonDown };

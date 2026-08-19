@@ -13,10 +13,26 @@ parameters:
   - name: feature
     in: query
     description: Name of the feature (column) to fetch. Use `*` at the end for feature scan (e.g., 'species*'). Use 'ALL' to fetch all columns.
-    required: true
+    required: false
     schema:
       type: string
       example: "latitude"
+  - name: features
+    in: query
+    description: Comma-separated column names for a bounded, row-oriented multi-column response. Takes precedence over `feature` when supplied.
+    required: false
+    schema:
+      type: string
+      example: "date,temperature"
+  - name: limit
+    in: query
+    description: Maximum rows returned for a `features` request. Defaults to 100, is capped at 10000, and accepts -1 for explicit unbounded debug mode.
+    required: false
+    schema:
+      type: integer
+      minimum: -1
+      maximum: 10000
+      example: 100
   - name: filterBy
     in: query
     description: Column name(s) to filter the data by. Multiple values can be provided.
@@ -87,6 +103,13 @@ responses:
               type: string
               nullable: true
               description: Error message if any occurred during query
+            isTruncated:
+              type: boolean
+              description: Whether a multi-column response contains only the first `rowLimit` rows.
+            rowLimit:
+              type: integer
+              nullable: true
+              description: Applied row limit for a multi-column request.
   400:
     description: Validation error in the request parameters.
     content:

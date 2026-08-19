@@ -6,6 +6,7 @@ import { consts } from "@/app/const_store";
 import { Button } from "@/components/ui/button"
 import config from "../../../../../tailwind.config";
 
+/** Returns the development reference page for application theme tokens and contrast checks. */
 export default async function Home(): Promise<JSX.Element> {
     
     function flattenColors (colorObj: any)  {

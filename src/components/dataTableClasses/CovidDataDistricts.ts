@@ -1,5 +1,12 @@
 import { apiRoutes } from '@/app/api_routes';
 
+/**
+ * Dataset adapter describing legacy RKI district records and their compressed-data endpoint.
+ *
+ * @remarks
+ * `DataTableComponent` reflects enumerable instance properties into columns and calls `getURL`/`getTableName` for the
+ * data contract. New database-backed adapters should prefer `apiRoutes.fetchDbData`.
+ */
 class CovidDataDistricts {
     Bundesland: string;
     Datenstand: string;
@@ -50,4 +57,5 @@ class CovidDataDistricts {
     }
 };
 
+/** Default export for the district-level COVID-19 table adapter. */
 export default CovidDataDistricts;

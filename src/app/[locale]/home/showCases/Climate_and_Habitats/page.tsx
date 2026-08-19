@@ -29,6 +29,7 @@ import { Locale } from '@/i18n/routing';
 
 const isSWAPY = true;
 
+/** Returns the linked climate, habitat-model, and observation-data showcase dashboard. */
 export default function Home() {
   
   const locale = useLocale() as Locale;

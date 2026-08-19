@@ -1,0 +1,117 @@
+generator client_py {
+  provider             = "prisma-client-py"
+  interface            = "asyncio"
+  recursive_type_depth = "5"
+}
+
+generator client_js {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Test {
+  id                Int      @id @default(autoincrement())
+  Bundesland        String
+  Datenstand        String
+  IdLandkreis       String
+  Landkreis         String
+  Meldedatum        String
+  accuCases         Int
+  accuCasesPerWeek  Int
+  accuDeaths        Int
+  accuDeathsPerWeek Int
+  accuRecovered     Int
+  newCases          Int
+  newCasesPerWeek   Int
+  newDeaths         Int
+  newDeathsPerWeek  Int
+  newRecovered      Int
+  population        Int
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+}
+
+model epidemiology_geography_df_1_2_w_geometry_csv {
+  id                   Int       @id @default(autoincrement())
+  location_key         String?   @db.VarChar
+  openstreetmap_id     String?   @db.VarChar
+  latitude             Float?    @db.Real
+  longitude            Float?    @db.Real
+  elevation_m          String?   @db.VarChar
+  area_sq_km           String?   @db.VarChar
+  area_rural_sq_km     String?   @db.VarChar
+  area_urban_sq_km     String?   @db.VarChar
+  date                 DateTime? @db.Date
+  new_confirmed        String?   @db.VarChar
+  new_deceased         String?   @db.VarChar
+  new_recovered        String?   @db.VarChar
+  new_tested           String?   @db.VarChar
+  cumulative_confirmed Float?    @db.Real
+  cumulative_deceased  String?   @db.VarChar
+  cumulative_recovered String?   @db.VarChar
+  cumulative_tested    String?   @db.VarChar
+  place_id             String?   @db.VarChar
+  wikidata_id          String?   @db.VarChar
+  datacommons_id       String?   @db.VarChar
+  country_code         String?   @db.VarChar
+  country_name         String?   @db.VarChar
+  subregion1_code      String?   @db.VarChar
+  subregion1_name      String?   @db.VarChar
+  subregion2_code      String?   @db.VarChar
+  subregion2_name      String?   @db.VarChar
+  locality_code        String?   @db.VarChar
+  locality_name        String?   @db.VarChar
+  iso_3166_1_alpha_2   String?   @db.VarChar
+  iso_3166_1_alpha_3   String?   @db.VarChar
+  aggregation_level    String?   @db.VarChar
+  geometry             String?   @db.VarChar
+}
+
+model epidemiology_geography_whole_df_w_geometry_csv {
+  id                   Int       @id @default(autoincrement())
+  location_key         String?   @db.VarChar
+  openstreetmap_id     String?   @db.VarChar
+  latitude             Float?    @db.Real
+  longitude            Float?    @db.Real
+  elevation_m          String?   @db.VarChar
+  area_sq_km           String?   @db.VarChar
+  area_rural_sq_km     String?   @db.VarChar
+  area_urban_sq_km     String?   @db.VarChar
+  date                 DateTime? @db.Date
+  new_confirmed        String?   @db.VarChar
+  new_deceased         String?   @db.VarChar
+  new_recovered        String?   @db.VarChar
+  new_tested           String?   @db.VarChar
+  cumulative_confirmed Float?    @db.Real
+  cumulative_deceased  String?   @db.VarChar
+  cumulative_recovered String?   @db.VarChar
+  cumulative_tested    String?   @db.VarChar
+  place_id             String?   @db.VarChar
+  wikidata_id          String?   @db.VarChar
+  datacommons_id       String?   @db.VarChar
+  country_code         String?   @db.VarChar
+  country_name         String?   @db.VarChar
+  subregion1_code      String?   @db.VarChar
+  subregion1_name      String?   @db.VarChar
+  subregion2_code      String?   @db.VarChar
+  subregion2_name      String?   @db.VarChar
+  locality_code        String?   @db.VarChar
+  locality_name        String?   @db.VarChar
+  iso_3166_1_alpha_2   String?   @db.VarChar
+  iso_3166_1_alpha_3   String?   @db.VarChar
+  aggregation_level    String?   @db.VarChar
+  geometry             String?   @db.VarChar
+}

@@ -10,6 +10,7 @@ import shutil
 
 # custom modules
 from .uploadFileToDB import uploadFileToDB
+from backend.upload_request import UPLOAD_DIR_ENV_KEY
 from backend.upload_state import upload_state
 
 # Blueprint configuration
@@ -42,38 +43,44 @@ def _get_bg_loop() -> asyncio.AbstractEventLoop:
 async def setFilesToDB():
   from backend.index import dataPaths 
   if request.method == "POST":
-    print(request.files)
-    if "files" not in request.files:
-      return jsonify({"ERROR": "No files part in the request"}), 400
-    files = request.files.getlist("files")
-    if not files:
-      return jsonify({"ERROR": "No selected files"}), 400
-    
-    # Create a unique directory for this upload batch to avoid race conditions
+    # Configure the final work directory before request.files triggers
+    # multipart parsing, so file parts are streamed there directly.
     upload_id = str(uuid.uuid4())
     upload_dir = Path(dataPaths.data_sets_save_location) / upload_id
     os.makedirs(upload_dir, exist_ok=True)
+    request.environ[UPLOAD_DIR_ENV_KEY] = str(upload_dir)
     print(f"Created upload directory: {upload_dir}")
+
+    print(request.files)
+    if "files" not in request.files:
+      shutil.rmtree(upload_dir, ignore_errors=True)
+      return jsonify({"ERROR": "No files part in the request"}), 400
+    files = request.files.getlist("files")
+    if not files:
+      shutil.rmtree(upload_dir, ignore_errors=True)
+      return jsonify({"ERROR": "No selected files"}), 400
     
-    # Save ALL files to the unique upload directory
+    # Multipart parsing has already streamed every file into upload_dir.
     saved_files = []
     for file in files:
       if not file.filename or file.filename == "":
         continue
       if file:
-        filename = file.filename
-        file_path = upload_dir / filename
         try:
-          # This copy out of the multipart spool happens BEFORE the response,
-          # while the proxy's idle timeout is ticking — use a large buffer so
-          # multi-GB files finish well within proxyTimeout (next.config.mjs).
-          file.save(file_path, buffer_size=16 * 1024 * 1024)
+          stream_name = getattr(file.stream, "name", None)
+          if not isinstance(stream_name, (str, os.PathLike)):
+            raise ValueError("Upload stream has no filesystem destination")
+          file_path = Path(stream_name).resolve()
+          if file_path.parent != upload_dir.resolve():
+            raise ValueError("Upload stream is outside its work directory")
+          file.stream.flush()
+          file.close()
           saved_files.append(file_path)
-          print(f"Saved file: {file_path}")
+          print(f"Streamed file: {file_path}")
         except Exception as e:
           # Clean up on error
           shutil.rmtree(upload_dir, ignore_errors=True)
-          return jsonify({"ERROR": "Error saving file: " + str(e)}), 500
+          return jsonify({"ERROR": "Error finalizing file: " + str(e)}), 500
     
     if not saved_files:
       shutil.rmtree(upload_dir, ignore_errors=True)
@@ -104,6 +111,7 @@ async def setFilesToDB():
         # Progress 100 means the WHOLE batch is done (per-file inserts cap
         # at 99), so a multi-file upload can't signal completion early.
         upload_state.set_progress(upload_id, 100)
+        upload_state.set_phase(upload_id, "complete")
       finally:
         # Clean up the upload directory after processing (success or failure)
         shutil.rmtree(upload_dir, ignore_errors=True)

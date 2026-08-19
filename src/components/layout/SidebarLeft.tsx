@@ -12,12 +12,23 @@ import { t_richConfig } from '@/app/const_store';
 import {Link} from '@/i18n/routing';
 import Image from "next/image";
 import Checkbox_isSwapy from './SwapyHandle'
+/** Optional external state and style hooks retained by the disease sidebar. */
 interface DiseaseSidebarProps {
   isOpen?: boolean
   onToggle?: () => void
   className?: string
 }
 
+/**
+ * Renders the collapsible transmission-path and disease selector.
+ *
+ * @param props - Optional styling and legacy toggle callbacks.
+ * @returns A fixed sidebar synchronized with `UIContext.sidebarSelection`.
+ *
+ * @remarks
+ * Deployment feature flags may remove COVID-related choices. Selection changes update shell navigation only; linked
+ * visualization state continues to use `InterfaceContext`.
+ */
 export function DiseaseSidebar({ className }: DiseaseSidebarProps) {
 
   const locale = useLocale();

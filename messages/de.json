@@ -15,7 +15,9 @@
             "progressButton": "Wird hochgeladen...",
             "progressWorkingOn": "wird bearbeitet",
             "progressProcessed": "verarbeitet",
-            "progressDBIntegration": "db integration..."
+            "progressDBIntegration": "DB-Integration...",
+            "progressCountryAssignment": "Länderzuordnung...",
+            "progressStatusUnavailable": "Der Upload-Status konnte nach mehreren Versuchen nicht abgerufen werden. Die Verarbeitung kann auf dem Server weiterhin laufen."
         }
     },
     "page_docs": {
@@ -168,6 +170,17 @@
                 "mainInfo": {
                     "heading": "Visualisierung von Unsicherheiten"
                 },
+                "coefficientMap": "Globale Variationskoeffizienten-Karte",
+                "temporalUncertaintyPlot": "Temporale Unsicherheit",
+                "calibrationPlot": "Probabilistische Kalibrierungskurve"
+            },
+            "page_ENSO_Suitability": {
+                "mainInfo": {
+                    "heading": "ENSO-Eignung"
+                },
+                "forecastMap": "Vorhersagekarte (Forecast)",
+                "referenceMap": "Referenzkarte (Reference)",
+                "climateFactorsPlot": "Klimafaktoren & Prognose-Plausibilitätsprüfung",
                 "coefficientMap": "Globale Variationskoeffizienten-Karte",
                 "temporalUncertaintyPlot": "Temporale Unsicherheit",
                 "calibrationPlot": "Probabilistische Kalibrierungskurve"

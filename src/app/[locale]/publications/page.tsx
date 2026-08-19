@@ -3,6 +3,7 @@ import { PublicationsList } from '@/components/PublicationsList'
 import { Link } from "@/i18n/routing";
 
 
+/** Returns the localized, filterable ICV publication catalog page. */
 export default function Home() {
 
 

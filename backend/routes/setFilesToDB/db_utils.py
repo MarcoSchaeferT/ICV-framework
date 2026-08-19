@@ -1,8 +1,9 @@
 import os
+import uuid
 import psycopg
 from psycopg import errors as psycopg_errors, sql
 from contextlib import contextmanager
-from typing import Optional, Union
+from typing import Callable, Optional, Sequence, Union
 
 
 SQL_DATATYPES = {
@@ -39,7 +40,7 @@ def get_db_connection_params() -> dict:
     
     # When running locally (not in Docker), resolve icv-database to localhost
     is_docker = os.getenv("IS_DOCKER", "false").lower() == "true"
-    if not is_docker and host in ("icv-database", "davis-db"):
+    if not is_docker and host == "icv-database":
         host = "localhost"
     
     return {
@@ -62,15 +63,28 @@ def get_db_connection():
 
 
 async def query_raw(query: Union[str, sql.SQL, sql.Composed], params: Optional[Union[tuple, dict]] = None) -> list[dict]:
-    """Execute a raw query and return results as list of dicts"""
+    """Execute a SELECT through a server-side cursor and return dictionaries.
+
+    A named cursor prevents libpq from buffering the complete result before
+    Python starts consuming it.  The returned list intentionally preserves the
+    existing API contract, while peak driver memory stays bounded by
+    ``fetch_size``.
+    """
     conn_params = get_db_connection_params()
     try:
         with psycopg.connect(**conn_params) as conn:
-            with conn.cursor() as cur:
+            cursor_name = f"icv_stream_{uuid.uuid4().hex}"
+            with conn.cursor(name=cursor_name) as cur:
                 cur.execute(query, params)
                 if cur.description:
                     columns = [desc[0] for desc in cur.description]
-                    return [dict(zip(columns, row)) for row in cur.fetchall()]
+                    records: list[dict] = []
+                    while True:
+                        rows = cur.fetchmany(10_000)
+                        if not rows:
+                            break
+                        records.extend(dict(zip(columns, row)) for row in rows)
+                    return records
                 return []
     except psycopg_errors.UndefinedTable as e:
         # Re-raise so callers can distinguish "table missing" from "table empty"
@@ -79,6 +93,46 @@ async def query_raw(query: Union[str, sql.SQL, sql.Composed], params: Optional[U
     except psycopg_errors.Error as e:
         # Other database errors
         print(f"Database error in query_raw: {e}")
+        raise
+
+
+async def query_columnar(
+    query: Union[str, sql.SQL, sql.Composed],
+    column_names: Sequence[str],
+    params: Optional[Union[tuple, dict]] = None,
+    fetch_size: int = 10_000,
+    row_mapper: Optional[Callable[[tuple], Sequence]] = None,
+) -> dict[str, list]:
+    """Stream a SELECT into column arrays without per-row dictionaries.
+
+    This is the preferred path for large visualization datasets.  It avoids
+    both ``fetchall()`` and hundreds of thousands of Python dictionaries while
+    retaining a compact JSON-friendly result.
+    """
+    conn_params = get_db_connection_params()
+    result = {name: [] for name in column_names}
+    try:
+        with psycopg.connect(**conn_params) as conn:
+            cursor_name = f"icv_columns_{uuid.uuid4().hex}"
+            with conn.cursor(name=cursor_name) as cur:
+                cur.execute(query, params)
+                if not cur.description:
+                    return result
+
+                while True:
+                    rows = cur.fetchmany(fetch_size)
+                    if not rows:
+                        break
+                    for raw_row in rows:
+                        row = row_mapper(raw_row) if row_mapper else raw_row
+                        for index, name in enumerate(column_names):
+                            result[name].append(row[index])
+                return result
+    except psycopg_errors.UndefinedTable as e:
+        print(f"Table does not exist: {e}")
+        raise
+    except psycopg_errors.Error as e:
+        print(f"Database error in query_columnar: {e}")
         raise
 
 

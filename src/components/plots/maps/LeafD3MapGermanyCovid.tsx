@@ -154,14 +154,53 @@ function useDatasetDateBounds(selectedTargetDate?: Date) {
 
 
 /**
- * Class representing the properties for a D3 map with layer.
+ * Configuration properties interface for the Germany COVID-19 regional map component (`LeafD3MapGermanyComponent`).
+ *
+ * Configures spatial map bounds (center `[9.7, 52]`), administrative state boundaries (`GERMANY_MAP_STATES`),
+ * epidemiological feature selections, and temporal date filters.
+ *
+ * @see {@link LeafD3MapGermanyProps} (factory function)
+ * @see {@link LeafD3MapGermanyComponent} for primary map component.
+ * @see {@link useInterfaceContext} for multi-view state context synchronization.
+ * @see {@link useGetJSONData} for API payload fetching.
+ *
+ * @example
+ * ```tsx
+ * const germanyConfig: LeafD3MapGermanyProps = {
+ *   chartName: "germany-covid-map",
+ *   mapDataURL: apiRoutes.FETCH_MAP_DATA.GERMANY_MAP_STATES,
+ *   dataURL: "/api/db/getDataFromDB?dataset=germany_covid_cases",
+ *   center: [9.7, 52],
+ *   zoom: 2,
+ *   mapUIsettings: {
+ *     isLongitudeSlider: false,
+ *     isLatitudeSlider: false,
+ *     isZoomSlider: false,
+ *     isColorMapSelectionDropdown: true,
+ *     isFeatureSelectionDropdown: true,
+ *     isDatasetSelectionDropdown: false,
+ *     isDistanceLegend: true,
+ *     isColorMapLegend: true,
+ *     isDatePicker: true,
+ *     defaultFeatureName: "cases_per_100k",
+ *   },
+ *   isApplySelectionsTransition: true,
+ *   isStaticAutoFitFullSize: false,
+ * };
+ * ```
  */
 export interface LeafD3MapGermanyProps {
+    /** Unique DOM ID for the chart container element */
     chartName: string;
+    /** GeoJSON URL or FeatureCollection object for German state boundaries */
     mapDataURL: any;
+    /** Dataset URL endpoint for regional COVID-19 metrics */
     dataURL: any;
+    /** Viewport center coordinates `[longitude, latitude]` */
     center: [number, number];
+    /** Viewport zoom level */
     zoom: number;
+    /** UI settings toggle object */
     mapUIsettings: {
         isLongitudeSlider: boolean;
         isLatitudeSlider: boolean;
@@ -180,6 +219,30 @@ export interface LeafD3MapGermanyProps {
     isSetIntialContextDataFromComponent?: boolean;
 }
 
+/**
+ * Creates a complete configuration for the Germany COVID-19 Leaflet/D3 map.
+ *
+ * @param chartName - Stable DOM identifier for the map.
+ * @param mapDataURL - German state-boundary GeoJSON endpoint.
+ * @param dataURL - Epidemiological dataset endpoint.
+ * @param mapUIsettings - Partial overrides for map-control visibility and default feature.
+ * @param center - Initial `[longitude, latitude]` center used by the component contract.
+ * @param zoom - Initial Leaflet zoom.
+ * @param mapBaseColor - Legacy base-color argument retained for compatibility.
+ * @param isStaticAutoFitFullSize - Fits static rendering to the complete available container.
+ * @param isApplySelectionsAndTransitions - Applies linked selections and animated map transitions.
+ * @param isProjection_equirectangular - Uses EPSG:4326 rather than Web Mercator.
+ * @param isSetContextData - Seeds linked-view context values from this map.
+ * @returns A configuration accepted by `LeafD3MapGermanyComponent`.
+ *
+ * @default chartName "D3mapLayer"
+ * @default center [9.7, 52]
+ * @default zoom 2
+ * @default isStaticAutoFitFullSize false
+ * @default isApplySelectionsAndTransitions false
+ * @default isProjection_equirectangular false
+ * @default isSetContextData false
+ */
 export function LeafD3MapGermanyProps(
     chartName = "D3mapLayer",
     mapDataURL = apiRoutes.FETCH_MAP_DATA.GERMANY_MAP_STATES,
@@ -275,9 +338,15 @@ const LeafD3MapGermanyComponentInner = ({props}: {props: LeafD3MapGermanyProps})
     
    const mapUIsettings = { ...props.mapUIsettings };
 
+    /** Render-ready German administrative geometry and active epidemiological value. */
     type visDataT = {
-        geometry: [number, number][];
+        geometry?: [number, number][];
+        topLeft?: [number, number];
+        bounds?: [number, number, number, number];
+        corners?: [number, number, number, number, number, number, number, number];
         feature: number;
+        visDatIdx?: number;
+        rowID?: number;
     }
 
 
@@ -328,9 +397,11 @@ const LeafD3MapGermanyComponentInner = ({props}: {props: LeafD3MapGermanyProps})
         weekLookbackRange,
     } = useDatasetDateBounds(selectedTargetDate);
     
+    /** Available database relations keyed by their backend-provided label. */
     type dataListT = {
         [key: string]: string
     }
+    /** Minimal geometry/feature row consumed by the legacy map parsing block. */
     type MosquitoDataRowT = {
         geometry: string
         feature: string
@@ -481,13 +552,13 @@ const LeafD3MapGermanyComponentInner = ({props}: {props: LeafD3MapGermanyProps})
     }, [isLoading_mapData, isLoading_MosquitoData, isLoadingDatalist, isLoading_Metadata, L_dataLoading, L_contextSync]);
 
     // ─── Shared hook: parse raw polygon data → Map<gridCellIndex, VisDataT> ───
-    const { gridData: parsedGridData, parseErrors } = useGridDataParser({
+    const { gridData: parsedGridData, parseErrors, cellSize: parsedGridCellSize } = useGridDataParser({
         isLoading: isLoading_MosquitoData,
         rawData: mosquitoData,
         gridcellSizeRef: gridcellSizeLatLng,
     });
 
-    useMemo(() => {
+    useEffect(() => {
         if (parsedGridData.size > 0) {
             setVisData(parsedGridData);
         }
@@ -530,6 +601,7 @@ useLayerUpdateDebounce({
     startLoading: L_debounceLoading.start,
     stopLoading: L_debounceLoading.stop,
     setIsUpdate: setisUpdate,
+    interactionMap: map,
     onDebounceComplete: () => {
         if (map && L && props.isStaticAutoFitFullSize && mapData && !mapData.error && mapData.type) {
             const geoLayer = L.geoJSON(mapData);
@@ -570,7 +642,7 @@ function DrawMapPolygons() {
         try {
             if (mapData && !mapData.error && mapData.type) {
                 geoLayer = L.geoJSON(mapData, {
-                style: (feature) => {
+                style: (feature: any) => {
                     const country = feature?.properties?.name || "";
                     const curVal = getFeatureValForState(country);
                     return {
@@ -844,18 +916,35 @@ function MapMouseEvents() {
                     }
                 }
                if (isLoading_MosquitoData) return;
+                              const gridCellDims = {
+                                  lat: gridcellSizeLatLng.current.lat,
+                                  lng: gridcellSizeLatLng.current.lng,
+                              };
+                              if (
+                                  !Number.isFinite(gridCellDims.lat) || gridCellDims.lat <= 0 ||
+                                  !Number.isFinite(gridCellDims.lng) || gridCellDims.lng <= 0 ||
+                                  !Number.isFinite(event.latlng.lat) || !Number.isFinite(event.latlng.lng)
+                              ) return;
                               let mapVal = visData.entries().next();
                               if (!mapVal || mapVal.done) return; // Ensure visData is not empty
               
                               const [firstKey, firstVisData] = mapVal.value;
+                              const firstTopLeft = firstVisData.corners
+                                  ? [
+                                      Math.max(firstVisData.corners[0], firstVisData.corners[2], firstVisData.corners[4], firstVisData.corners[6]),
+                                      Math.min(firstVisData.corners[1], firstVisData.corners[3], firstVisData.corners[5], firstVisData.corners[7]),
+                                  ] as [number, number]
+                                  : firstVisData.bounds
+                                      ? [firstVisData.bounds[0], firstVisData.bounds[2]] as [number, number]
+                                      : firstVisData.topLeft || firstVisData.geometry?.[0];
+                              if (!firstTopLeft || !firstTopLeft.every(Number.isFinite)) return;
                               let gridOffset = getGridOffset(
-                                  firstVisData.geometry[0][0],
-                                  firstVisData.geometry[0][1],
+                                  firstTopLeft[0],
+                                  firstTopLeft[1],
                                   gridcellSizeLatLng.current.lat,
                                   gridcellSizeLatLng.current.lng
                               );
                               let coords = {lat: event.latlng.lat, lng: event.latlng.lng};
-                              let gridCellDims = {lat:gridcellSizeLatLng.current.lat, lng: gridcellSizeLatLng.current.lng};
                               let curSnapped = snapToGrid(coords, gridCellDims, gridOffset);
               
                               // Compute the top-left corner of the current grid cell
@@ -863,6 +952,7 @@ function MapMouseEvents() {
               
                               let gridLat = rPoint.lat;
                               let gridLng = rPoint.lng;
+                              if (!Number.isFinite(gridLat) || !Number.isFinite(gridLng)) return;
               
                               // avoid unnecessary updates
                               if (curGridCell.current[0] === gridLat && curGridCell.current[1] === gridLng) {
@@ -1145,6 +1235,7 @@ useCanvasGridLayer({
     isLoading: isLoading_MosquitoData || !isLayerDrawnCanvas,
     hasError: mosquitoData.error != null,
     gridData: visData,
+    cellSize: parsedGridCellSize,
     dimensions,
     colorMap,
     layerOpacity,
@@ -1168,7 +1259,7 @@ useCanvasGridLayer({
     const  rounder = Math.pow(10, roundTo);
 
     function UI_elementStyler() {
-        return { className: `text-sm m-1 p-1 border row-span-2 col-span-6 bg-white/75 z-10 rounded-lg shadow-md`};
+        return { className: `text-sm m-1 p-1 border row-span-2 col-span-6 bg-white/75 z-10 rounded-lg shadow-md pointer-events-auto`};
    }
 
    // the page
@@ -1187,7 +1278,7 @@ useCanvasGridLayer({
     <PrintDataLoadingErrors listOfErrors={collectDataLoadingErrors}/>
     <SizeHook element={element} sizeRef={sizeRef} setSize={setSizes}/>
     {isSettingsOpen && (
-    <div className={`absolute w-full mt-2 ml-1 pr-2 grid grid-cols-12 md:grid-cols-12`}>
+    <div className={`absolute w-full mt-2 ml-1 pr-2 grid grid-cols-12 md:grid-cols-12 pointer-events-none z-30`}>
     
      {mapUIsettings.isLatitudeSlider && (
          <div {...UI_elementStyler()}>
@@ -1488,4 +1579,5 @@ const LeafD3MapGermanyComponent = ({props}: {props: LeafD3MapGermanyProps}) => {
     );
 };
 
+/** Default export for the supported Germany COVID-19 Leaflet/D3 map. */
 export default LeafD3MapGermanyComponent;

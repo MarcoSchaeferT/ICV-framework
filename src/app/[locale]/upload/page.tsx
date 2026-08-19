@@ -8,6 +8,7 @@ import { MDXContentProvider } from "@messages/markdown/MDXContentProvider";
 import { Link } from "@/i18n/routing";
 import { TableRows } from "iconoir-react";
 
+/** Returns the localized dataset-ingestion page and upload requirements. */
 export default function UplaodPage() {
 
     const t = useTranslations("page_upload");

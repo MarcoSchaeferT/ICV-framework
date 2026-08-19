@@ -4,10 +4,18 @@ import * as GEOjson from 'geojson';
 
 
 /**
- * Computes the minimum and maximum values of a specified feature from the given data array.
+ * Computes the minimum and maximum feature numerical values across a dataset array.
  *
- * @param data - An array of objects containing the feature to be evaluated.
- * @returns A tuple containing the minimum and maximum values of the specified feature.
+ * @param data - Array of dataset objects containing numerical `feature` properties.
+ * @returns A tuple `[min, max]` representing numerical bounds.
+ *
+ * @see {@link ColorMapLegend} for color scale domain calculation.
+ *
+ * @example
+ * ```ts
+ * const [min, max] = getMinMaxFeature([{ feature: 0.12 }, { feature: 0.89 }]);
+ * // Returns [0.12, 0.89]
+ * ```
  */
 export function getMinMaxFeature(data: { feature: number }[]): [number, number] {
     if (!data || !Array.isArray(data) || data.length === 0) return [0, 0];
@@ -26,6 +34,15 @@ export function getMinMaxFeature(data: { feature: number }[]): [number, number] 
     return [min, max];
 }
 
+/**
+ * Calculates spatial grid snapping offset coordinates relative to a zero-origin angular grid.
+ *
+ * @param latGeometryTopLeft - Latitude coordinate of top-left geometry corner in degrees.
+ * @param lngGeometryTopLeft - Longitude coordinate of top-left geometry corner in degrees.
+ * @param gridSizeDegreesLat - Grid cell height in latitude degrees.
+ * @param gridSizeDegreesLng - Grid cell width in longitude degrees.
+ * @returns Angular offset object `{ lat, lng }`.
+ */
 export function getGridOffset(latGeometryTopLeft: number, lngGeometryTopLeft: number, gridSizeDegreesLat: number, gridSizeDegreesLng: number) : {lat:number, lng:number} {
     // snap coordinates to grid
     const lat = latGeometryTopLeft;
@@ -36,6 +53,14 @@ export function getGridOffset(latGeometryTopLeft: number, lngGeometryTopLeft: nu
     return {lat: lat - gridLat, lng: lng - gridLng};
 }
 
+/**
+ * Snaps latitude and longitude coordinates to top-left corner bounds of a spatial grid cell.
+ *
+ * @param coords - Target coordinate pair `{ lat, lng }`.
+ * @param gridCellDims - Grid cell dimensions `{ lat, lng }`.
+ * @param gridOffset - Optional offset displacement `{ lat, lng }`.
+ * @returns Object containing `topLeft` snapped coordinate pair.
+ */
 export function snapToGrid(coords:{lat: number, lng: number}, gridCellDims:{lat:number, lng: number}, gridOffset?:{lat:number, lng: number}) : {topLeft: {lat: number, lng: number}} {
 
     if(gridOffset == undefined) {
@@ -54,6 +79,26 @@ export function snapToGrid(coords:{lat: number, lng: number}, gridCellDims:{lat:
     return {topLeft};
 }
 
+/**
+ * Computes a unique 2D spatial grid cell integer index key for fast map lookup and 2.0-degree spatial bucket indexing.
+ *
+ * Maps continuous 2D coordinates ($\text{lat} \in [-90, +90], \text{lng} \in [-180, +180]$) into discrete integer cell keys ($a \cdot \text{rowCnt} + b$).
+ *
+ * @param coords - Geographical point coordinates `{ lat, lng }`.
+ * @param gridCellDims - Angular cell width and height `{ lat, lng }`.
+ * @returns Unique integer grid cell index key.
+ *
+ * @remarks
+ * Used by spatial spatial bucket indexing inside {@link useGridLayer} to accelerate tile collision queries ($O(1)$ lookup).
+ *
+ * @see {@link useGridDataParser} for populating spatial cell maps.
+ * @see {@link useGridLayer} for tile canvas rendering using cell index lookups.
+ *
+ * @example
+ * ```ts
+ * const cellIdx = getGridCellIndex({ lat: 52.52, lng: 13.405 }, { lat: 0.25, lng: 0.25 });
+ * ```
+ */
 export function getGridCellIndex(coords:{lat: number, lng: number}, gridCellDims:{lat:number, lng: number}) {
     
     // snap coordinates to grid
@@ -68,6 +113,13 @@ export function getGridCellIndex(coords:{lat: number, lng: number}, gridCellDims
     return gridCell;
 }
 
+/**
+ * Rounds latitude and longitude coordinates to a specified decimal precision.
+ *
+ * @param point - Geographical coordinate point `{ lat, lng }`.
+ * @param roundTo - Decimal places precision. @default 3
+ * @returns Rounded coordinate point `{ lat, lng }`.
+ */
 export function roundLatLng(point: { lat: number; lng: number }, roundTo: number = 3): { lat: number; lng: number } {
 
     const rounder = Math.pow(10, roundTo);
@@ -79,6 +131,21 @@ export function roundLatLng(point: { lat: number; lng: number }, roundTo: number
     return rPoint;
 }
 
+/**
+ * Parses WKT (Well-Known Text) `"POLYGON ((...))"` strings into arrays of latitude/longitude coordinate pairs.
+ *
+ * Swaps standard WGS84 (EPSG:4326) `[lng, lat]` order to Leaflet-compatible `[lat, lng]` pairs.
+ *
+ * @param polygonString - WKT polygon string representation from database payload.
+ * @returns Array of 5 closed `[latitude, longitude]` coordinate tuples.
+ *
+ * @see {@link useGridDataParser} for spatial dataset parsing.
+ *
+ * @example
+ * ```ts
+ * const coords = polygonParser("POLYGON ((13.40 52.52, 13.65 52.52, 13.65 52.77, 13.40 52.77, 13.40 52.52))");
+ * ```
+ */
 export function polygonParser(polygonString: string): [number, number][] {
     
     if(polygonString == undefined){ return [[0,0],[0,0],[0,0],[0,0],[0,0]]; }
@@ -99,6 +166,12 @@ export function polygonParser(polygonString: string): [number, number][] {
     return coordinates;
 }
 
+/**
+ * Parses WKT `"POINT (...)"` strings into a single `[latitude, longitude]` tuple.
+ *
+ * @param polygonString - WKT point string.
+ * @returns `[latitude, longitude]` tuple.
+ */
 export function pointParser(polygonString: string): [number, number] {
     
     if(polygonString == undefined){ return [0,0]; }
@@ -119,6 +192,14 @@ export function pointParser(polygonString: string): [number, number] {
     return coordinates[0];
 }
 
+/**
+ * Computes angular cell height ($\Delta\text{lat}$) and width ($\Delta\text{lng}$) in degrees from a polygon boundary rectangle.
+ *
+ * @param geoRect - Closed array of boundary coordinate tuples.
+ * @returns Object `{ gridDimLat, gridDimLng }` in degrees.
+ *
+ * @see {@link useGridDataParser}
+ */
 export function getGridCellDims(geoRect: [number, number][]): { gridDimLat: number; gridDimLng: number } {
     if (geoRect.length === 0) {
         return { gridDimLat: 0, gridDimLng: 0 };
@@ -133,7 +214,12 @@ export function getGridCellDims(geoRect: [number, number][]): { gridDimLat: numb
     return { gridDimLat, gridDimLng };
 }
 
-
+/**
+ * Calculates geographical centroid coordinates `[lat, lng]` of a polygon coordinate array.
+ *
+ * @param geometry - Array of `[lat, lng]` tuples.
+ * @returns `[avgLat, avgLng]` centroid coordinate pair.
+ */
 export function getGeometryCenter (geometry: [number, number][]) {
 
     // extract all latitudes and longitudes from the geometry
@@ -148,6 +234,15 @@ export function getGeometryCenter (geometry: [number, number][]) {
     return [avgLat, avgLng];
 };
 
+/**
+ * Resolves center coordinates `{ lat, lng }` of an administrative country feature from a GeoJSON FeatureCollection.
+ *
+ * Uses property matching, fuzzy alias normalization (`normalizeCountryName`), and geometric centroid fallback calculation.
+ *
+ * @param mapData - World GeoJSON FeatureCollection instance.
+ * @param countryName - ISO code or country name string to locate.
+ * @returns Center point `{ lat, lng }`.
+ */
 export function getCountryCenterFromMapData(mapData: GEOjson.FeatureCollection, countryName: string ): { lat: number, lng: number } {
     let curCenter = { lat: 0, lng: 0 };
     if (!countryName) return curCenter;
@@ -283,6 +378,14 @@ function normalizeCountryName(name: any): string {
     return normalized;
 }
 
+/**
+ * Calculates high-contrast text color (black or white) for a background color to satisfy WCAG AA contrast standards.
+ *
+ * Uses WCAG 2.0 relative luminance formula ($\text{Luminance} = 0.2126 R + 0.7152 G + 0.0722 B$). Returns black for light backgrounds ($\text{luminance} > 0.6$) and white for dark backgrounds.
+ *
+ * @param bgColor - D3 RGB or HSL color object.
+ * @returns High-contrast D3 RGB color object (`#000000` or `#ffffff`).
+ */
 export function getContrastTextColorForBgColor(bgColor: d3.RGBColor | d3.HSLColor | null): d3.RGBColor {
     let textColor: d3.RGBColor;
     textColor = d3.rgb(255, 255, 255); // default to white
@@ -297,6 +400,12 @@ export function getContrastTextColorForBgColor(bgColor: d3.RGBColor | d3.HSLColo
     return textColor;
 }
 
+/**
+ * Generates an ocean masking polygon FeatureCollection by subtracting landmass feature polygons from a world bounding box.
+ *
+ * @param mapData - Landmass GeoJSON FeatureCollection.
+ * @returns Mask FeatureCollection containing inverted ocean polygons.
+ */
 export function getOceanMaskGeoJSON(mapData: GEOjson.FeatureCollection): GEOjson.FeatureCollection {
     // 1. Create a world bounding box polygon that covers the full extent
     const worldOuterRing = [
@@ -347,14 +456,13 @@ export function getOceanMaskGeoJSON(mapData: GEOjson.FeatureCollection): GEOjson
 
 
 /**
- * Calculates a "good" readable range for axis scaling based on the provided minimum and maximum data values.
- * The function rounds the minimum down and the maximum up to the nearest order of magnitude,
- * making axis labels more human-friendly (e.g., 1235 -> 1000, 9876 -> 10000).
- * If the resulting range is too small, it uses the next lower order of magnitude for better readability.
+ * Calculates human-readable axis range bounds `[min, max]` by rounding to powers of 10.
  *
- * @param dataMin - The minimum value in the data set.
- * @param dataMax - The maximum value in the data set.
- * @returns A tuple containing the adjusted minimum and maximum values for axis scaling.
+ * @param dataMin - Raw dataset minimum value.
+ * @param dataMax - Raw dataset maximum value.
+ * @returns Human-friendly axis scale range tuple `[adjustedMin, adjustedMax]`.
+ *
+ * @see {@link ColorMapLegend} for legend scale tick generation.
  */
 export function getGoodReadableRange(dataMin: number, dataMax: number): [number, number] {
   if (dataMin !== dataMax) {
@@ -373,30 +481,95 @@ export function getGoodReadableRange(dataMin: number, dataMax: number): [number,
     return [dataMin, dataMax];
 }
 
+/**
+ * Row item structure for standardized tooltip tables.
+ *
+ * @example
+ * ```ts
+ * const speciesRow: StandardTooltipRow = { label: "Species", value: "Aedes albopictus" };
+ * ```
+ */
 export interface StandardTooltipRow {
+    /** Label string describing the attribute */
     label: string;
+    /** Attribute value (numerical or string) */
     value: string | number;
 }
 
-export interface StandardTooltipProps {
+/** Optional second metric rendered below the primary tooltip value. */
+export interface StandardTooltipSection {
+    /** Short heading identifying the metric or selected field. */
+    label?: string;
+    /** Inspected numerical or string value. */
     value: string | number;
+    /** Physical dimension unit string. */
     unit?: string;
+    /** Human-readable metadata description. */
     description?: string;
+}
+
+/**
+ * Properties for standard HTML and React map tooltip renderers.
+ *
+ * @example
+ * ```ts
+ * const tooltip: StandardTooltipProps = {
+ *   value: 0.73,
+ *   unit: "probability",
+ *   description: "Modeled habitat suitability",
+ *   rows: [{ label: "Species", value: "Aedes albopictus" }],
+ *   chartId: "albopictus-habitat-tooltip",
+ * };
+ * ```
+ */
+export interface StandardTooltipProps {
+    /** Use reduced width, spacing, and typography for compact chart cards. */
+    compact?: boolean;
+    /** Short heading identifying the primary metric or selected field. */
+    valueLabel?: string;
+    /** Inspected primary numerical or string feature value */
+    value: string | number;
+    /** Physical dimension unit string (e.g. "°C", "mm", "%") */
+    unit?: string;
+    /** Variable description text */
+    description?: string;
+    /** Array of attribute rows matching {@link StandardTooltipRow} */
     rows: StandardTooltipRow[];
+    /** Optional metric displayed below the primary value using identical styling. */
+    secondarySection?: StandardTooltipSection;
+    /** DOM container element ID */
     chartId?: string;
+    /** Optional HTML snippet for color bar previews */
     colorBarHtml?: string;
 }
 
 /**
- * Generates standardized modern gradient card HTML for map tooltips across the application.
- */export function renderStandardTooltipHTML({
+ * Generates standardized HTML string for map Leaflet tooltips.
+ *
+ * @param props - Configuration matching {@link StandardTooltipProps}.
+ * @returns HTML string representation.
+ */
+export function renderStandardTooltipHTML({
+    compact = false,
+    valueLabel,
     value,
     unit = "",
     description,
     rows,
+    secondarySection,
     chartId = "tooltip",
     colorBarHtml = "",
 }: StandardTooltipProps): string {
+    const containerClasses = compact
+        ? "min-w-[170px] max-w-[230px] rounded-lg border border-gray-800 bg-linear-to-br from-indigo-600 via-indigo-700 to-slate-900 p-3 text-white shadow-lg font-sans"
+        : "min-w-[220px] max-w-[280px] rounded-xl border border-gray-800 bg-linear-to-br from-indigo-600 via-indigo-700 to-slate-900 p-4 text-white shadow-xl font-sans";
+    const valueClasses = compact ? "text-xl font-semibold align-baseline" : "text-3xl font-semibold align-baseline";
+    const unitClasses = compact
+        ? "text-sm font-medium text-indigo-200 ml-1 align-baseline"
+        : "text-lg font-medium text-indigo-200 ml-1 align-baseline";
+    const descriptionClasses = compact
+        ? "mt-0.5 italic text-xs text-indigo-100/90"
+        : "mt-1 italic text-sm text-indigo-100/90";
     const tableRowsHtml = rows
         .map(
             (row, idx) => `
@@ -413,59 +586,120 @@ export interface StandardTooltipProps {
 
     const descHtml =
         description && description !== "N/A"
-            ? `<div class="mt-1 italic text-sm text-indigo-100/90" style="white-space: normal; word-break: break-word;">${description}</div>`
+            ? `<div class="${descriptionClasses}" style="white-space: normal; word-break: break-word;">${description}</div>`
             : "";
 
+    const secondaryDescHtml =
+        secondarySection?.description && secondarySection.description !== "N/A"
+            ? `<div class="${descriptionClasses}" style="white-space: normal; word-break: break-word;">${secondarySection.description}</div>`
+            : "";
+
+    const secondarySectionHtml = secondarySection
+        ? `<div class="${compact ? "mb-2 border-t border-white/20 pt-2" : "mb-3 border-t border-white/20 pt-3"}">
+                ${secondarySection.label ? `<div class="mb-1 text-xs font-medium uppercase tracking-wide text-indigo-200">${secondarySection.label}</div>` : ""}
+                <span class="${valueClasses}">${secondarySection.value}</span>
+                ${secondarySection.unit ? `<span class="${unitClasses}">${secondarySection.unit}</span>` : ""}
+                ${secondaryDescHtml}
+           </div>`
+        : "";
+
     return `
-        <div id="${chartId}" class="min-w-[220px] max-w-[280px] rounded-xl border border-gray-800 bg-linear-to-br from-indigo-600 via-indigo-700 to-slate-900 p-4 text-white shadow-xl font-sans">
-            <div class="mb-3">
-                <span class="text-3xl font-semibold align-baseline">
+        <div id="${chartId}" class="${containerClasses}">
+            <div class="${compact ? "mb-2" : "mb-3"}">
+                ${valueLabel ? `<div class="mb-1 text-xs font-medium uppercase tracking-wide text-indigo-200">${valueLabel}</div>` : ""}
+                <span class="${valueClasses}">
                     ${value}
                 </span>
-                ${unit ? `<span class="text-lg font-medium text-indigo-200 ml-1 align-baseline">${unit}</span>` : ""}
+                ${unit ? `<span class="${unitClasses}">${unit}</span>` : ""}
                 ${descHtml}
             </div>
 
+            ${secondarySectionHtml}
+
             ${colorBarHtml}
 
-            <table class="w-full text-sm">
+            ${rows.length > 0 ? `<table class="w-full text-sm">
                 <tbody>
                     ${tableRowsHtml}
                 </tbody>
-            </table>
+            </table>` : ""}
         </div>`;
 }
 
 /**
- * Standardized React Component for map and chart tooltips across the application.
+ * Standardized React component for map tooltips.
+ *
+ * @param props - Configuration matching {@link StandardTooltipProps}.
  */
 export function StandardTooltip({
+    compact = false,
+    valueLabel,
     value,
     unit = "",
     description,
     rows,
+    secondarySection,
     chartId = "tooltip",
     colorBarHtml,
 }: StandardTooltipProps) {
+    const containerClasses = compact
+        ? "min-w-[170px] max-w-[230px] rounded-lg border border-gray-800 bg-linear-to-br from-indigo-600 via-indigo-700 to-slate-900 p-3 text-white shadow-lg font-sans"
+        : "min-w-[220px] max-w-[280px] rounded-xl border border-gray-800 bg-linear-to-br from-indigo-600 via-indigo-700 to-slate-900 p-4 text-white shadow-xl font-sans";
+    const valueClasses = compact ? "text-xl font-semibold align-baseline" : "text-3xl font-semibold align-baseline";
+    const unitClasses = compact
+        ? "text-sm font-medium text-indigo-200 ml-1 align-baseline"
+        : "text-lg font-medium text-indigo-200 ml-1 align-baseline";
+    const descriptionClasses = compact
+        ? "mt-0.5 italic text-xs text-indigo-100/90"
+        : "mt-1 italic text-sm text-indigo-100/90";
+
     return (
-        <div id={chartId} className="min-w-[220px] max-w-[280px] rounded-xl border border-gray-800 bg-linear-to-br from-indigo-600 via-indigo-700 to-slate-900 p-4 text-white shadow-xl font-sans">
-            <div className="mb-3">
-                <span className="text-3xl font-semibold align-baseline">
+        <div id={chartId} className={containerClasses}>
+            <div className={compact ? "mb-2" : "mb-3"}>
+                {valueLabel ? (
+                    <div className="mb-1 text-xs font-medium uppercase tracking-wide text-indigo-200">
+                        {valueLabel}
+                    </div>
+                ) : null}
+                <span className={valueClasses}>
                     {value}
                 </span>
-                {unit ? <span className="text-lg font-medium text-indigo-200 ml-1 align-baseline">{unit}</span> : null}
+                {unit ? <span className={unitClasses}>{unit}</span> : null}
                 {description && description !== "N/A" ? (
-                    <div className="mt-1 italic text-sm text-indigo-100/90" style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                    <div className={descriptionClasses} style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
                         {description}
                     </div>
                 ) : null}
             </div>
 
+            {secondarySection ? (
+                <div className={compact ? "mb-2 border-t border-white/20 pt-2" : "mb-3 border-t border-white/20 pt-3"}>
+                    {secondarySection.label ? (
+                        <div className="mb-1 text-xs font-medium uppercase tracking-wide text-indigo-200">
+                            {secondarySection.label}
+                        </div>
+                    ) : null}
+                    <span className={valueClasses}>
+                        {secondarySection.value}
+                    </span>
+                    {secondarySection.unit ? (
+                        <span className={unitClasses}>
+                            {secondarySection.unit}
+                        </span>
+                    ) : null}
+                    {secondarySection.description && secondarySection.description !== "N/A" ? (
+                        <div className={descriptionClasses} style={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
+                            {secondarySection.description}
+                        </div>
+                    ) : null}
+                </div>
+            ) : null}
+
             {colorBarHtml ? (
                 <div dangerouslySetInnerHTML={{ __html: colorBarHtml }} />
             ) : null}
 
-            <table className="w-full text-sm">
+            {rows.length > 0 ? <table className="w-full text-sm">
                 <tbody>
                     {rows.map((row, idx) => (
                         <tr key={idx} className={idx < rows.length - 1 ? "border-b border-white/20" : ""}>
@@ -478,7 +712,8 @@ export function StandardTooltip({
                         </tr>
                     ))}
                 </tbody>
-            </table>
+            </table> : null}
         </div>
     );
 }
+

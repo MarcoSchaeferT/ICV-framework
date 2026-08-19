@@ -4,12 +4,30 @@ import * as d3 from 'd3';
 import * as GEOjson from 'geojson';
 import { t_richConfig } from '@/app/const_store';
 
-// ─── PolylineTooltip ────────────────────────────────────────────────────────
-
+/**
+ * Properties for the {@link PolylineTooltip} connector component.
+ *
+ * @example
+ * ```ts
+ * const connector: PolylineTooltipProps = {
+ *   points: [[420, 180], [448, 160], [490, 160]],
+ * };
+ * ```
+ */
 export type PolylineTooltipProps = {
+    /** Array of three `[x, y]` SVG pixel coordinate pairs defining the leader line elbow */
     points: [number, number][];
 };
 
+/**
+ * Renders an SVG polyline leader line connecting a donut slice centroid to its floating tooltip card.
+ *
+ * @param props - Configuration containing three local coordinate points.
+ *
+ * @remarks
+ * `pointerEvents: "none"` is set on the container `div` and SVG `<polyline>` to prevent leader lines
+ * from blocking map hover or click interactions.
+ */
 export const PolylineTooltip: React.FC<PolylineTooltipProps> = ({
     points = [[0, 0], [0, 0], [0, 0]],
 }) => {
@@ -69,8 +87,14 @@ export const PolylineTooltip: React.FC<PolylineTooltipProps> = ({
 };
 
 
-// ─── getLabelPolyline ────────────────────────────────────────────────────────
-
+/**
+ * Calculates a three-point elbow polyline (`[A, B, C]`) for pie slice leader annotations.
+ *
+ * @param arcData - D3 PieArcDatum defining slice start and end angles.
+ * @param basePieSize - Base diameter of the donut chart in pixels.
+ * @param thickness - Ring thickness of the donut chart in pixels.
+ * @returns Array of three `[x, y]` relative coordinate offsets `[posA, posB, posC]`.
+ */
 export function getLabelPolyline(arcData: d3.PieArcDatum<number>, basePieSize: number, thickness: number) {
     const labelRadius = basePieSize / 2 + thickness / 2; // distance from pie center
     const startRadius = basePieSize / 2 - thickness / 2; // distance from pie center to start of arc
@@ -85,53 +109,97 @@ export function getLabelPolyline(arcData: d3.PieArcDatum<number>, basePieSize: n
 }
 
 
+/**
+ * Properties for the {@link DonutTooltip} component.
+ *
+ * @example
+ * ```ts
+ * const tooltip: DonutTooltipProps = {
+ *   arcData: { data: 94, value: 94, index: 1, startAngle: 0, endAngle: Math.PI, padAngle: 0 },
+ *   d: { lat: 52.52, lng: 13.405, id: "Germany" },
+ *   countryCounts: { Germany: { count: 221 } },
+ *   locale: "en",
+ *   HexHighlightCol: "#4ecdc4",
+ *   basePieSize: 40,
+ *   thickness: 10,
+ *   label: "DENV-2",
+ *   isVisible: true,
+ * };
+ * ```
+ */
 export interface DonutTooltipProps {
-    /** The Leaflet map instance used for coordinate conversions. */
+    /** Leaflet map instance used for lat/lng to container pixel projection conversions */
     map?: any;
     
-    /** The full dataset being visualized on the map. */
+    /** World GeoJSON feature collection used to resolve localized country names */
     mapData?: any;
     
-    /** The D3 pie arc data object for the hovered slice. */
+    /** D3 pie arc datum for the hovered donut slice */
     arcData: d3.PieArcDatum<number> | any;
     
-    /** The data point (geographic feature) associated with the pie chart. Contains lat, lng, and id. */
+    /** Geographic feature datum associated with the pie chart containing lat, lng, and country ID */
     d: any;
     
-    /** The fill color of the hovered pie slice. */
+    /** Hex or CSS fill color string of the hovered pie slice */
     renderColor?: string;
     
-    /** Dictionary mapping feature IDs to their total counts. */
+    /** Dictionary mapping country identifiers to total sequence observation counts */
     countryCounts: Record<string | number, any>;
     
-    /** The locale string for number formatting. */
+    /** BCP-47 locale string for localized formatting (e.g. "en", "de") */
     locale: string;
     
-    /** Highlight color for the tooltip border or background. */
+    /** Hex color string used to highlight counts text */
     HexHighlightCol: string;
     
-    /** The base outer diameter/size of the pie chart in pixels. */
+    /** Base outer diameter of the pie chart in pixels */
     basePieSize: number;
     
-    /** The thickness of the donut ring in pixels. */
+    /** Donut ring thickness in pixels */
     thickness: number;
     
-    /** The label text for the hovered slice (e.g., the serotype name). */
+    /** Label string for the hovered category (e.g. Dengue serotype "DENV-1") */
     label?: string;
     
-    /** The translation function from next-intl. */
+    /** `next-intl` translation function */
     t?: any;
     
-    /** The current filter selection state (e.g., "ALL"). */
+    /** Current category filter state string */
     selection?: string;
     
-    /** Whether the tooltip should be rendered. */
+    /** Tooltip visibility flag */
     isVisible?: boolean;
 }
 
 /**
- * Tooltip component rendered when hovering over a donut/pie slice on the map.
- * Shows counts, percentage, serotype label, and translated country name.
+ * Interactive callout tooltip displayed when hovering over country centroid donut chart slices.
+ *
+ * Displays sample counts, percentage distributions, serotype classifications, localized country names,
+ * and an SVG elbow polyline connector anchored to the pie slice centroid.
+ *
+ * @param props - Configuration properties defined in {@link DonutTooltipProps}.
+ *
+ * @remarks
+ * `pointerEvents: "none"` is applied to prevent tooltip cards from intercepting map mousemove events,
+ * avoiding rapid flickering during slice hover interactions.
+ *
+ * @example
+ * ```tsx
+ * <DonutTooltip
+ *   map={mapInstance}
+ *   mapData={worldGeoJson}
+ *   arcData={hoveredArc}
+ *   d={{ lat: 14.0, lng: 100.0, id: "Thailand" }}
+ *   renderColor="#ef1717"
+ *   countryCounts={{ Thailand: { count: 1250 } }}
+ *   locale="en"
+ *   HexHighlightCol="#f87171"
+ *   basePieSize={50}
+ *   thickness={12}
+ *   label="DENV-1"
+ *   isVisible={true}
+ * />
+ * ```
  */
 export function DonutTooltip({ 
     map, 
@@ -286,3 +354,4 @@ export function DonutTooltip({
         </>
     );
 }
+

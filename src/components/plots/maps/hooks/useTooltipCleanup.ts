@@ -14,6 +14,7 @@
 import { useEffect, useRef } from 'react';
 import { removeReusedTooltip } from '../utils/mapUtils';
 
+/** Leaflet references and linked-state callback required by `useTooltipCleanup`. */
 interface UseTooltipCleanupParams {
     /** Leaflet map instance */
     map: L.Map | null;
@@ -25,11 +26,32 @@ interface UseTooltipCleanupParams {
     onMouseLeave?: () => void;
 }
 
+/** Mutable pointer-presence state returned without triggering React renders. */
 interface UseTooltipCleanupReturn {
     /** true when the cursor is inside the map container */
     isMouseInsideRef: React.MutableRefObject<boolean>;
 }
 
+/**
+ * Binds pointer enter/leave cleanup for the single tooltip reused by a Leaflet map.
+ *
+ * @param params - Leaflet map/module references, reusable tooltip ref, and optional linked-state cleanup callback.
+ * @returns A mutable ref indicating whether the pointer is currently inside the map container.
+ *
+ * @remarks
+ * Tooltip panes are made pointer-transparent so they cannot block panning, zooming, or cell inspection. All DOM event
+ * listeners are removed when dependencies change or the map unmounts.
+ *
+ * @example
+ * ```tsx
+ * const { isMouseInsideRef } = useTooltipCleanup({
+ *   map: mapRef.current,
+ *   L,
+ *   toolTipRef,
+ *   onMouseLeave: () => context.setSelectedCountry(""),
+ * });
+ * ```
+ */
 export function useTooltipCleanup({
     map,
     L,

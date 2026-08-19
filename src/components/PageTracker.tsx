@@ -3,6 +3,14 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
+/**
+ * Records one anonymized route visit per navigation using a session-scoped identifier.
+ *
+ * @returns No visible output.
+ *
+ * @remarks
+ * Tracking failures are non-blocking. The generated identifier is stored in `sessionStorage`, not a persistent cookie.
+ */
 export default function PageTracker() {
   const pathname = usePathname();
 

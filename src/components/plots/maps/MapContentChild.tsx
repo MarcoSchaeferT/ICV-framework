@@ -1,12 +1,3 @@
-/**
- * MapContentChild – Extracted from the nested `MapContent()` in both map components.
- *
- * This component must be rendered as a child of <MapContainer> (via react-leaflet)
- * because it calls useMap() to access the map instance.
- *
- * Wrapped with React.memo since the props rarely change and re-mounting
- * a Leaflet child is expensive.
- */
 'use client';
 import React, { useEffect } from 'react';
 import { useMap } from 'react-leaflet';
@@ -17,26 +8,101 @@ const ScaleControl = dynamic(
     { ssr: false }
 );
 
-// ─── Germany variant props ───
-interface MapContentGermanyProps {
+/**
+ * Germany map variant properties for {@link MapContentChild}.
+ *
+ * @example
+ * ```tsx
+ * const props: MapContentGermanyProps = {
+ *   variant: "germany",
+ *   mapRef,
+ *   toolTipRef,
+ *   L,
+ *   isDistanceLegend: true,
+ * };
+ * ```
+ */
+export interface MapContentGermanyProps {
+    /** Map view variant indicator */
     variant: 'germany';
+    /** Mutable ref storing the initialized Leaflet map instance */
     mapRef: React.MutableRefObject<L.Map | null>;
+    /** Mutable ref storing the reused tooltip instance */
     toolTipRef: React.MutableRefObject<any>;
+    /** Imported Leaflet module instance */
     L: typeof import('leaflet') | null;
+    /** Toggle visibility of the Leaflet scale control bar */
     isDistanceLegend: boolean;
 }
 
-// ─── World variant props ───
-interface MapContentWorldProps {
+/**
+ * World map variant properties for {@link MapContentChild}.
+ *
+ * @example
+ * ```tsx
+ * const props: MapContentWorldProps = {
+ *   variant: "world",
+ *   mapRef,
+ *   toolTipRef,
+ *   L,
+ *   isDistanceLegend: true,
+ * };
+ * ```
+ */
+export interface MapContentWorldProps {
+    /** Map view variant indicator */
     variant: 'world';
+    /** Mutable ref storing the initialized Leaflet map instance */
     mapRef: React.MutableRefObject<L.Map | null>;
+    /** Mutable ref storing the reused tooltip instance */
     toolTipRef: React.MutableRefObject<any>;
+    /** Imported Leaflet module instance */
     L: typeof import('leaflet') | null;
+    /** Toggle visibility of the Leaflet scale control bar */
     isDistanceLegend: boolean;
 }
 
+/**
+ * Discriminated union type for {@link MapContentChild} props.
+ *
+ * @example
+ * ```ts
+ * const variant: MapContentChildProps = {
+ *   variant: "world",
+ *   mapRef,
+ *   toolTipRef,
+ *   L,
+ *   isDistanceLegend: false,
+ * };
+ * ```
+ */
 export type MapContentChildProps = MapContentGermanyProps | MapContentWorldProps;
 
+/**
+ * Inner Leaflet map content child executing React-Leaflet `useMap()` context bindings.
+ *
+ * Configures variant-specific interaction constraints (e.g. disabling dragging/scroll-zoom for static Germany overview maps),
+ * creates custom Leaflet tooltip DOM panes (`z-index: 9999`), and binds the map reference.
+ *
+ * @param props - Variant configuration object matching {@link MapContentChildProps}.
+ *
+ * @remarks
+ * `useMap()` must be executed within the React Context hierarchy of `<MapContainer>`.
+ * Wrapping `MapContentChild` with `React.memo` prevents unnecessary unmounting and expensive Leaflet pane reconstructions when parent props change.
+ *
+ * @example
+ * ```tsx
+ * <MapContainer center={[52.52, 13.405]} zoom={6}>
+ *   <MapContentChild
+ *     variant="world"
+ *     mapRef={mapRef}
+ *     toolTipRef={toolTipRef}
+ *     L={L}
+ *     isDistanceLegend={true}
+ *   />
+ * </MapContainer>
+ * ```
+ */
 const MapContentChild: React.FC<MapContentChildProps> = React.memo(
     ({ variant, mapRef, toolTipRef, L, isDistanceLegend }) => {
         const map = useMap();
@@ -91,4 +157,6 @@ const MapContentChild: React.FC<MapContentChildProps> = React.memo(
 
 MapContentChild.displayName = 'MapContentChild';
 
+/** Default export for the memoized React-Leaflet context bridge. */
 export default MapContentChild;
+

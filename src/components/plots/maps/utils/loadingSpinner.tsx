@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 
+/** Internal loading-task registry shared by one dashboard card. */
 type LoadingContextType = {
   isLoading: boolean;
   activeTasks: string[];
@@ -9,6 +10,15 @@ type LoadingContextType = {
 
 const LoadingContext = createContext<LoadingContextType | undefined>(undefined);
 
+/**
+ * Provides a deduplicated loading-task registry to one visualization subtree.
+ *
+ * @param props - Map, chart, or table children that register asynchronous work.
+ * @returns A loading context provider wrapping the children.
+ *
+ * @remarks
+ * `SGridPlotCard` creates a provider per card so independent visualizations do not display each other's task state.
+ */
 export const LoadingSpinnerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Using a Set or Array to track active unique task IDs
   const [activeTasks, setActiveTasks] = useState<string[]>([]);
@@ -39,6 +49,24 @@ export const LoadingSpinnerProvider: React.FC<{ children: React.ReactNode }> = (
 };
 
 // Custom hook to automatically handle mounting/unmounting safety
+/**
+ * Registers a named asynchronous operation with the nearest loading provider.
+ *
+ * @param taskId - Stable human-readable task identifier such as `"Grid Layer"` or `"Metadata"`.
+ * @param autoTrigger - Starts the task when mounted. @default false
+ * @returns Stable `start` and `stop` callbacks for the task.
+ *
+ * @remarks
+ * Cleanup always calls `stop`, preventing an unmounted visualization from leaving the card spinner permanently active.
+ *
+ * @example
+ * ```tsx
+ * const metadataTask = useLoadingTask("Mosquito metadata");
+ * useEffect(() => {
+ *   isLoadingMetadata ? metadataTask.start() : metadataTask.stop();
+ * }, [isLoadingMetadata, metadataTask]);
+ * ```
+ */
 export const useLoadingTask = (taskId: string, autoTrigger = false) => {
   const context = useContext(LoadingContext);
   if (!context) throw new Error('useLoadingTask must be used within a LoadingProvider');
@@ -61,6 +89,11 @@ export const useLoadingTask = (taskId: string, autoTrigger = false) => {
   return { start, stop };
 };
 
+/**
+ * Reads aggregate loading state for the nearest visualization card.
+ *
+ * @returns Whether work is active and the unique active task identifiers.
+ */
 export const useGlobalLoadingStatus = () => {
   const context = useContext(LoadingContext);
   if (!context) throw new Error('useGlobalLoadingStatus must be used within a LoadingProvider');
@@ -68,6 +101,11 @@ export const useGlobalLoadingStatus = () => {
 };
 
 // loading animation for map updates
+/**
+ * Renders the standard card-level loading overlay for all active registered tasks.
+ *
+ * @returns A pointer-transparent loading overlay, or `null` when no task is active.
+ */
 export function LoadingSpinnerAnimation() {
     const { isLoading, activeTasks } = useGlobalLoadingStatus();
 

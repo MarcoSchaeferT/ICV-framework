@@ -57,7 +57,7 @@ Epidemiological Metrics & Processing Overview:
 
 Usage Example:
 --------------
->>> from backend.routes.processData.aggregateRKIdata.import aggregate_rki_data
+>>> from backend.routes.processData.aggregateRKIdata import aggregate_rki_data
 >>> result = aggregate_rki_data(
 ...     source_table="aktuell_deutschland_sarscov2_infektionen",
 ...     target_table="aktuell_deutschland_sarscov2_infektionen_aggregated",

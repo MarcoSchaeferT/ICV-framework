@@ -22,6 +22,11 @@ import { Locale } from '@/i18n/routing';
 
 const isSWAPY = true;
 
+/**
+ * Renders the supported Germany COVID-19 dashboard using linked Leaflet, table, and bar-chart views.
+ *
+ * @returns Localized epidemiological dashboard content.
+ */
 export default function Home() {
   const t = useTranslations("page_covidDashboard");
   const locale = useLocale() as Locale;

@@ -1,0 +1,13 @@
+{
+    "WillLuke.nextjs.addTypesOnSave": true,
+    "WillLuke.nextjs.hasPrompted": true,
+    "python.pythonPath": "${workspaceFolder}/backend/.venv/bin/python",
+    "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python",
+    "python.venvPath": "${workspaceFolder}/backend/.venv",
+    "python.envFile": "${workspaceFolder}/.env",
+    "python-envs.pythonProjects": [],
+    "files.associations": {
+        "*mdx": "*.md"
+    },
+    "workbench.colorTheme": "Dark Modern",
+}

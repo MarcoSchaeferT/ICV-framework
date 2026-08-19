@@ -14,6 +14,12 @@ import { useLocale, useTranslations } from "next-intl";
 
 
 
+/**
+ * Renders localized MDX explaining the data and purpose of a dashboard component.
+ *
+ * @param props - Optional MDX body/footer and icon color.
+ * @returns An information icon with a full documentation hover card.
+ */
 export const HoverCardComponentInfo: React.FC<{ MDXContent?: React.FC; Footer?: React.FC, color?: string }> = ({
   MDXContent = "",
   Footer = "",
@@ -71,6 +77,12 @@ export const HoverCardComponentInfo: React.FC<{ MDXContent?: React.FC; Footer?: 
   );
 };
 
+/**
+ * Renders localized MDX explaining the interactions supported by a dashboard component.
+ *
+ * @param props - Optional MDX body and footer components.
+ * @returns An interaction icon with a documentation hover card.
+ */
 export const HoverCardInteractionInfo: React.FC<{ MDXContent?: React.FC; Footer?: React.FC; }> = ({
   MDXContent = "",
   Footer = "",
@@ -125,6 +137,12 @@ export const HoverCardInteractionInfo: React.FC<{ MDXContent?: React.FC; Footer?
 };
 
 
+/**
+ * Renders compact localized MDX help suitable for controls and visualization overlays.
+ *
+ * @param props - Optional MDX body and icon color.
+ * @returns An information icon with a high-contrast tooltip card.
+ */
 export const HoverCardTooltip: React.FC<{ MDXContent?: React.FC; color?: string }> = ({
   MDXContent = "",
   color = "#b1b1b1",

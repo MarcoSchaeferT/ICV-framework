@@ -3,17 +3,20 @@
 import { useState, useEffect } from "react";
 import { apiRoutes } from "@/app/api_routes";
 
+/** Returns the development utility for assigning dataset geometries to country boundaries. */
 export default function AssignCountriesPage() {
   const [tableName, setTableName] = useState("");
   const [reprocessAll, setReprocessAll] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  /** Candidate database relation and whether it already contains ISO alpha-3 assignments. */
   interface TableInfo {
     name: string;
     hasIsoA3: boolean;
   }
 
+  /** Progress record for one queued country-assignment operation. */
   interface QueueItem {
     name: string;
     status: "pending" | "processing" | "completed" | "error";

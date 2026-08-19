@@ -15,7 +15,9 @@
             "progressButton": "Uploading...",
             "progressWorkingOn": "Working on",
             "progressProcessed": "processed",
-            "progressDBIntegration": "db integration..."
+            "progressDBIntegration": "db integration...",
+            "progressCountryAssignment": "country assignment...",
+            "progressStatusUnavailable": "The upload status could not be retrieved after several attempts. Processing may still be running on the server."
         }
     },
     "page_docs": {
@@ -168,6 +170,17 @@
                 "mainInfo": {
                     "heading": "Uncertainty Visualization"
                 },
+                "coefficientMap": "Global Coefficient of Variation Map",
+                "temporalUncertaintyPlot": "Temporal Uncertainty",
+                "calibrationPlot": "Probabilistic Calibration Plot"
+            },
+            "page_ENSO_Suitability": {
+                "mainInfo": {
+                    "heading": "ENSO Suitability"
+                },
+                "forecastMap": "Forecast Map",
+                "referenceMap": "Reference Map",
+                "climateFactorsPlot": "Climatic Factors & Forecast Sanity Check",
                 "coefficientMap": "Global Coefficient of Variation Map",
                 "temporalUncertaintyPlot": "Temporal Uncertainty",
                 "calibrationPlot": "Probabilistic Calibration Plot"

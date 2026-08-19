@@ -11,6 +11,11 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { useTranslations } from 'next-intl'
 
 
+/**
+ * Renders and client-side filters the maintained ICV publication catalog.
+ *
+ * @returns Localized filter controls and publication cards sorted by date or title.
+ */
 export function PublicationsList() {
   const [sortBy, setSortBy] = useState<'date' | 'title'>('date')
   const [filterType, setFilterType] = useState<PublicationI['type'] | 'all'>('all')

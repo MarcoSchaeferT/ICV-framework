@@ -20,6 +20,12 @@ import { useLoadingTask, LoadingSpinnerAnimation } from '@/components/plots/maps
 
 const isSWAPY = true;
 
+/**
+ * Returns the cell-linked Uncertainty Quantification visualization showcase.
+ *
+ * @remarks
+ * Cell selection in the Leaflet map drives backend-generated SVG uncertainty and calibration overlays.
+ */
 export default function Home() {
 
 const t = useTranslations("page_home.ShowCases.page_Uncertainty_Vis");
@@ -73,12 +79,21 @@ let MDX = MDXContentProvider[locale];
     disableScroll: false
   };
 
-  let generalCardPorps = CardPropsClass("xai_1", t("temporalUncertaintyPlot"), "","")
-  let generalCardPorps2 = CardPropsClass("xai_2", t("calibrationPlot"), "","")
+  const getTranslation = (key: string, fallback: string) => {
+    try {
+      if (t.has(key as any)) {
+        return t.rich(key as any, { ...t_richConfig })?.toString() || fallback;
+      }
+    } catch {
+      // Fallback if key is not yet loaded in next-intl dev cache
+    }
+    return fallback;
+  };
 
- 
+  let generalCardPorps = CardPropsClass("xai_1", getTranslation('temporalUncertaintyPlot', 'Temporal Uncertainty'), "","")
+  let generalCardPorps2 = CardPropsClass("xai_2", getTranslation('calibrationPlot', 'Probabilistic Calibration Plot'), "","")
 
-  let mainInfoHeading = t('mainInfo.heading');
+  let mainInfoHeading = getTranslation('mainInfo.heading', 'Uncertainty Visualization');
 
   // intitialize data table context
   useInterfaceContext();
@@ -112,8 +127,9 @@ let MDX = MDXContentProvider[locale];
   );
 
 
-    let d3MapCardProps_overview = CardPropsClass(t("coefficientMap"),
-      t("coefficientMap"),"","");
+    let d3MapCardProps_overview = CardPropsClass(
+      getTranslation('coefficientMap', 'Global Coefficient of Variation Map'),
+      getTranslation('coefficientMap', 'Global Coefficient of Variation Map'),"","");
       d3MapCardProps_overview.infoCard = {content: MDX.DummyContent, footer: undefined};
       d3MapCardProps_overview.infoCardInteraction = {content: MDX.DummyContent, footer: undefined};
 

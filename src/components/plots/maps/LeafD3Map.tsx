@@ -66,6 +66,7 @@ import ColorMapLegend from './overlays/ColorMapLegend';
 import LatLngZoomLegend from './overlays/LatLngZoomLegend';
 import { DonutTooltip, PolylineTooltip, getLabelPolyline } from './overlays/DonutTooltip';
 import {MDXContentProvider} from '@messages/markdown/MDXContentProvider';
+import type { MapGridResponseV1 } from './types';
 
 // Icons
 import {Settings,
@@ -105,6 +106,24 @@ import { metadata } from '@/app/[locale]/layout';
 let leafProps = LeafletComponentProps("LeafletMap1", apiRoutes.FETCH_MAP_DATA.WORLD_MAP, "exampleVar");
 leafProps.center = [-20, 25.8];
 leafProps.zoom = 1.5;
+
+type FetchDbDataParams = Parameters<typeof apiRoutes.fetchDbData>[0];
+
+function buildMapDatasetURL(params: FetchDbDataParams, compactGrid: boolean): string {
+    return apiRoutes.fetchDbData({
+        ...params,
+        responseFormat: compactGrid ? 'map-grid-v1' : undefined,
+    });
+}
+
+function getRelationNameFromDatasetURL(url: string): string {
+    if (!url) return "";
+    try {
+        return new URL(url, "http://localhost").searchParams.get("relationName") || "";
+    } catch {
+        return "";
+    }
+}
 
 /**
  * Duration in milliseconds for the animated `flyTo` transition when the map
@@ -637,7 +656,12 @@ export function LeafD3MapLayerProps(
             defaultFeatureColorMap: "",
             defaultLayerOpacity: 0.85,
             ...mapUIsettings,
-            defaultDatasetURL: mapUIsettings.defaultDatasetName ? apiRoutes.fetchDbData({ relationName: mapUIsettings.defaultDatasetName, feature: mapUIsettings.defaultFeatureName || "" }) : "",
+            defaultDatasetURL: mapUIsettings.defaultDatasetName
+                ? buildMapDatasetURL(
+                    { relationName: mapUIsettings.defaultDatasetName, feature: mapUIsettings.defaultFeatureName || "" },
+                    mapDataSets.isGridData !== false && !mapUIsettings.inCovidDataView,
+                )
+                : "",
         },
         mapInteractions: {
             disableMouse: false,
@@ -876,7 +900,24 @@ const baseStyle: Leaflet.PathOptions = {
     let chart:string = props.chartName;
 
      
-   const mapUIsettings = { ...props.mapUIsettings };
+    const mapUIsettings = { ...props.mapUIsettings };
+    const useCompactGridResponse = props.mapDataSets.isGridData && !mapUIsettings.inCovidDataView;
+    const resolvedDefaultDatasetURL = mapUIsettings.defaultDatasetURL || (
+        mapUIsettings.defaultDatasetName
+            ? buildMapDatasetURL({
+                relationName: mapUIsettings.defaultDatasetName,
+                feature: mapUIsettings.defaultFeatureName,
+                aggregation_level: mapUIsettings.isCountryLevelData ? 0 : mapUIsettings.isSubregionLevelData ? 1 : undefined,
+                startDate: mapUIsettings.inCovidDataView && contextT.dateRange?.from && contextT.dateRange?.to
+                    ? format(contextT.dateRange.from, "yyyy-MM-dd")
+                    : undefined,
+                endDate: mapUIsettings.inCovidDataView && contextT.dateRange?.from && contextT.dateRange?.to
+                    ? format(contextT.dateRange.to, "yyyy-MM-dd")
+                    : undefined,
+            }, useCompactGridResponse)
+            : ""
+    );
+    mapUIsettings.defaultDatasetURL = resolvedDefaultDatasetURL;
 
     // *** Types *** //
 
@@ -892,7 +933,13 @@ const baseStyle: Leaflet.PathOptions = {
      */
     type visDataT = {
         /** Polygon vertices as `[lat, lng]` tuples. */
-        geometry: [number, number][];
+        geometry?: [number, number][];
+        /** Compact north-west anchor for uniform grid cells. */
+        topLeft?: [number, number];
+        /** Exact projection-aware bounds `[north, south, west, east]`. */
+        bounds?: [number, number, number, number];
+        /** Four source corners as flat `[lat0,lng0,...,lat3,lng3]`. */
+        corners?: [number, number, number, number, number, number, number, number];
         /** Numeric feature value for this cell (e.g. habitat-suitability probability). */
         feature: number;
         /** Index within the parsed visual-data `Map`. */
@@ -981,6 +1028,12 @@ const baseStyle: Leaflet.PathOptions = {
         features: CapitalFeature[];
     }
 
+    const inheritedDatasetURL = props.isApplyContextData ? contextT.curDatasetURL : "";
+    const initialDatasetURL = inheritedDatasetURL || resolvedDefaultDatasetURL;
+    const initialFeature = (props.isApplyContextData ? contextT.curFeature : "") || props.mapUIsettings.defaultFeatureName || "";
+    const initialColorMap = (props.isApplyContextData ? contextT.curColorMap : "") || props.mapUIsettings.defaultFeatureColorMap || defaultColorMap;
+    const initialRelationName = getRelationNameFromDatasetURL(initialDatasetURL) || props.mapUIsettings.defaultDatasetName || "";
+
     const [[latitude, longitude, zoom], setCoordinates] = useState<[number, number, number]>(
         [leafProps.center?.[0] ?? 0, leafProps.center?.[1] ?? 0, leafProps.zoom ?? 1]
     );
@@ -991,19 +1044,21 @@ const baseStyle: Leaflet.PathOptions = {
     const coordsRef = useRef([latitude, longitude, zoom]);
     coordsRef.current = [latitude, longitude, zoom];
     const [isUpdate, setisUpdate] = useState(false);
-    const [curColorMapType, setColorMapType] = useState<string>(props.mapUIsettings.defaultFeatureColorMap || defaultColorMap);
-    const [layerOpacity, setLayerOpacity] = useState(props.mapUIsettings.defaultLayerOpacity || contextT.curLayerOpacity);
+    const [curColorMapType, setColorMapType] = useState<string>(initialColorMap);
+    const [layerOpacity, setLayerOpacity] = useState(
+        props.isApplyContextData ? contextT.curLayerOpacity : props.mapUIsettings.defaultLayerOpacity || contextT.curLayerOpacity
+    );
     const [selectedFilter, setSelectedFilter] = useState<string>("")
     const [dateRange, setDateRange] = useState<{ from: Date | undefined; to?: Date | undefined; } | undefined>(contextT.dateRange);
-    const [selectedFeature, setSelectedFeature] = useState<string>(props.mapUIsettings.defaultFeatureName || "");
+    const [selectedFeature, setSelectedFeature] = useState<string>(initialFeature);
     const [selectedCountry, setSelectedCountry] = useState<string>("");
     const [isSettingsOpen, setIsSettingsOpen] = useState(true);
     const [isSettingsOpenFixed, setIsSettingsOpenFixed] = useState(props.mapUIsettings.areSettingsOpen ?? true);
     const { containerRef: settingsContainerRef, settingsTop: settingsButtonTop } = useDynamicSettingsTop();
     const curMouseEvent = useRef<string>("null");
     const screenDistanceOneKM = useRef<number>(0);
-    const curDatasetname = useRef<string>(props.mapUIsettings.defaultDatasetName || "");
-    const [selectedDatasetKey, setSelectedDatasetKey] = useState<string>(props.mapUIsettings.defaultDatasetName || "");
+    const curDatasetname = useRef<string>(initialRelationName);
+    const [selectedDatasetKey, setSelectedDatasetKey] = useState<string>(initialRelationName);
     const curPropertyNames = useRef<string>("");
     const hoverCountry = useRef<string>("0");
     const toolTipRef = useRef<any>(null);
@@ -1024,52 +1079,8 @@ const baseStyle: Leaflet.PathOptions = {
         return matchers;
     }, [min_date, max_date]);
 
-    // set default dataset URL
-    if (props.mapUIsettings.defaultDatasetURL === "" && props.mapUIsettings.defaultDatasetName !== "") {
-        props.mapUIsettings.defaultDatasetURL = apiRoutes.fetchDbData({
-            relationName: props.mapUIsettings.defaultDatasetName,
-            feature: props.mapUIsettings.defaultFeatureName,
-            aggregation_level: props.mapUIsettings.isCountryLevelData ? 0 : props.mapUIsettings.isSubregionLevelData ? 1 : undefined,
-            startDate: props.mapUIsettings.inCovidDataView && (contextT.dateRange?.from && contextT.dateRange?.to) ? format(contextT.dateRange.from, "yyyy-MM-dd") : undefined,
-            endDate: props.mapUIsettings.inCovidDataView && (contextT.dateRange?.from && contextT.dateRange?.to) ? format(contextT.dateRange.to, "yyyy-MM-dd") : undefined,
-        });
-    } else {
-        props.mapUIsettings.defaultDatasetURL = "";
-    }
-
     // mosquito data (grid data)
-    const [selectedDatasetURL, setSelectedDataset] = useState<string>(props.mapUIsettings.defaultDatasetURL);
-
-    // Fetch dynamic min/max dates when dataset changes
-    useEffect(() => {
-        const fetchMinMax = async () => {
-            const dataset = curDatasetname.current;
-            if (!dataset) return;
-            
-            const url = apiRoutes.fetchDbData({
-                relationName: dataset,
-                feature: "date",
-                task: "getMinMax"
-            });
-            
-            try {
-                const response = await fetch(url);
-                const data = await response.json();
-                if (data && data.response && data.response.min_val && data.response.max_val) {
-                    const parsedMin = new Date(data.response.min_val);
-                    const parsedMax = new Date(data.response.max_val);
-                    const cutoffMax = new Date("2022-02-14");
-                    if (!isNaN(parsedMin.getTime())) setMinDate(parsedMin);
-                    if (!isNaN(parsedMax.getTime())) {
-                        setMaxDate(parsedMax > cutoffMax ? cutoffMax : parsedMax);
-                    }
-                }
-            } catch (error) {
-                console.error("Error fetching dynamic dates:", error);
-            }
-        };
-        fetchMinMax();
-    }, [selectedDatasetURL]);
+    const [selectedDatasetURL, setSelectedDataset] = useState<string>(initialDatasetURL);
 
     // ── Loading task hooks (replace old isLoadingSpinner ref) ──
     const L_dataLoading = useLoadingTask('Data');
@@ -1092,7 +1103,10 @@ const baseStyle: Leaflet.PathOptions = {
     const [isLoading_mapData, rawMapData] = useGetJSONData(props.mapDataURL);
     const [isLoadingDatalist, dataList] = useGetJSONData(apiRoutes.GET_LIST_OF_DATASETS)
     const [isLoading_Metadata, rawMetaData] = useGetJSONData(apiRoutes.getDatasetsMetadata({ LANGID: locale }));
-    const [isLoadingCapitals, rawCapitalsData] = useGetJSONData(apiRoutes.FETCH_MAP_DATA.CAPITALS);
+    const [isLoadingCapitals, rawCapitalsData] = useGetJSONData(
+        apiRoutes.FETCH_MAP_DATA.CAPITALS,
+        props.mapDataSets.isCityNames,
+    );
 
 
      // column names from database
@@ -1103,6 +1117,32 @@ const baseStyle: Leaflet.PathOptions = {
         return "";
     }, [props.mapUIsettings.defaultDatasetName]);
     const [isLoading_ColumnNames, rawColumnNames] = useGetJSONData(columnNamesURL, props.mapDataSets.isGridData || props.mapUIsettings.inCovidDataView);
+
+    const dateColumn = useMemo(() => {
+        if (!mapUIsettings.isDatePicker || !Array.isArray(rawColumnNames)) return "";
+        if (rawColumnNames.includes("date")) return "date";
+        if (rawColumnNames.includes("datenstand")) return "datenstand";
+        return "";
+    }, [mapUIsettings.isDatePicker, rawColumnNames]);
+    const minMaxDateURL = useMemo(() => {
+        if (!dateColumn || !curDatasetname.current) return "";
+        return apiRoutes.fetchDbData({
+            relationName: curDatasetname.current,
+            feature: dateColumn,
+            task: "getMinMax",
+        });
+    }, [dateColumn, selectedDatasetURL]);
+    const [, rawMinMaxDate] = useGetJSONData(minMaxDateURL, Boolean(minMaxDateURL));
+
+    useEffect(() => {
+        const values = (rawMinMaxDate as dbDATA | undefined)?.response;
+        if (!values?.min_val || !values?.max_val) return;
+        const parsedMin = new Date(values.min_val);
+        const parsedMax = new Date(values.max_val);
+        const cutoffMax = new Date("2022-02-14");
+        if (!isNaN(parsedMin.getTime())) setMinDate(parsedMin);
+        if (!isNaN(parsedMax.getTime())) setMaxDate(parsedMax > cutoffMax ? cutoffMax : parsedMax);
+    }, [rawMinMaxDate]);
 
     // Wait for column names and metadata to load and set default feature name if not already set
     useEffect(() => {
@@ -1135,7 +1175,11 @@ const baseStyle: Leaflet.PathOptions = {
 
     
 
-    const [isLoading_MosquitoData, rawMosquitoData] = useGetJSONData(selectedDatasetURL, props.mapDataSets.isGridData || props.mapUIsettings.inCovidDataView);
+    // COVID layers are rendered from the date- and aggregation-filtered
+    // presence request below. Fetching selectedDatasetURL here as well used to
+    // download and parse the complete epidemiology table even though the
+    // result was never drawn as a grid.
+    const [isLoading_MosquitoData, rawMosquitoData] = useGetJSONData(selectedDatasetURL, props.mapDataSets.isGridData);
     
    
     
@@ -1151,12 +1195,13 @@ const baseStyle: Leaflet.PathOptions = {
     const [isPresData, setIsPresData] = useState(props.mapUIsettings.isPresenceDataChecked || mapUIsettings.inCovidDataView || false);
     const [presData, setPresData] = useState<{geometry: [number, number], feature: string, latLng?: [number, number], country_name?: string, subregion_name?: string;}[]>([]);
     const defaultPresenceDataURL = mapUIsettings.inCovidDataView
-        ? props.mapUIsettings.defaultDatasetURL
+        ? resolvedDefaultDatasetURL
         : apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "pointtype", filterBy: "pointtype", filterValue: "point, exact location" });
     const [presenceDataURL, setPresenceDataURL] = useState<string>(defaultPresenceDataURL);
-    const [isLoadingPresenceData, rawPresenceData] = useGetJSONData(presenceDataURL, props.mapDataSets.isPresenceData);
-    const [isLoadingP_species, rawP_species] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "species", task: "getUniqueEntries" }), props.mapDataSets.isPresenceData && !props.mapUIsettings.inCovidDataView);
-    const [isLoadingP_years, rawP_years] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "year", task: "getUniqueEntries" }), props.mapDataSets.isPresenceData && !props.mapUIsettings.inCovidDataView);
+    const shouldLoadPresenceData = props.mapDataSets.isPresenceData && isPresData;
+    const [isLoadingPresenceData, rawPresenceData] = useGetJSONData(presenceDataURL, shouldLoadPresenceData);
+    const [isLoadingP_species, rawP_species] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "species", task: "getUniqueEntries" }), shouldLoadPresenceData && !props.mapUIsettings.inCovidDataView);
+    const [isLoadingP_years, rawP_years] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "year", task: "getUniqueEntries" }), shouldLoadPresenceData && !props.mapUIsettings.inCovidDataView);
     const effectiveTargetDate = dateRange?.to
         ? format(dateRange.to, "yyyy-MM-dd")
         : dateRange?.from
@@ -1195,16 +1240,40 @@ const baseStyle: Leaflet.PathOptions = {
     // sequence metadata
     const sequenceColumnForDonut = contextT.donutChartSelectedColumnName || "species";
     const geoAssignmentColumn = contextT.geoAssignmentColumnNameForDonut || "country";
-    const [isSequenceMetaData, setIsSequenceMetaData] = useState(props.mapUIsettings.isSequenceMetaDataChecked || false);
-    const [sequenceMetaDataURL, setSequenceMetaDataURL] = useState<string>(apiRoutes.fetchDbData({ relationName: contextT.curDonutChartDatasetName, feature: geoAssignmentColumn, task: "getCount" }));
+    const [isSequenceMetaData, setIsSequenceMetaData] = useState(
+        props.mapUIsettings.isSequenceMetaDataChecked || (props.isApplyContextData && contextT.isSequenceMetaData) || false
+    );
+    const [sequenceMetaDataURL, setSequenceMetaDataURL] = useState<string>(
+        (props.isApplyContextData ? contextT.curDonutChartDataURL : "") ||
+        apiRoutes.fetchDbData({ relationName: contextT.curDonutChartDatasetName, feature: geoAssignmentColumn, task: "getCount" })
+    );
+    const [cur_Sorgansim, setCur_SOrgansim] = useState<string>(
+        props.isApplyContextData ? contextT.curSOrgansim : "ALL"
+    )
+    const [cur_SYear, setCur_SYear] = useState<string>(
+        props.isApplyContextData ? contextT.curSyear : "ALL"
+    )
 
-    const [isLoading_sequenceMetadata, rawSequenceMetaData] = useGetJSONData( sequenceMetaDataURL, props.mapDataSets.isSequenceMetaData);
-    const [isLoadingS_organism, rawS_organsim] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curDonutChartDatasetName, feature: sequenceColumnForDonut, task: "getUniqueEntries" }), props.mapDataSets.isSequenceMetaData);
-    const [isLoadingS_years, rawS_years] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curDonutChartDatasetName, feature: "date", task: "getUniqueEntries" }), props.mapDataSets.isSequenceMetaData);
+    const shouldLoadSequenceData = props.mapDataSets.isSequenceMetaData && isSequenceMetaData;
+    const [isLoading_sequenceMetadata, rawSequenceMetaData] = useGetJSONData(sequenceMetaDataURL, shouldLoadSequenceData);
+    const [isLoadingS_organism, rawS_organsim] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curDonutChartDatasetName, feature: sequenceColumnForDonut, task: "getUniqueEntries" }), shouldLoadSequenceData);
+    const [isLoadingS_years, rawS_years] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curDonutChartDatasetName, feature: "date", task: "getUniqueEntries" }), shouldLoadSequenceData);
+    const sequenceBreakdownURL = useMemo(() => apiRoutes.fetchDbData({
+        relationName: contextT.curDonutChartDatasetName,
+        feature: geoAssignmentColumn,
+        task: "getGroupedCount",
+        groupBy: sequenceColumnForDonut,
+        filterBy: `'${sequenceColumnForDonut}','date'`,
+        filterValue: `'${cur_Sorgansim}','${cur_SYear}'`,
+    }), [contextT.curDonutChartDatasetName, geoAssignmentColumn, sequenceColumnForDonut, cur_Sorgansim, cur_SYear]);
+    const [isLoadingSequenceBreakdown, rawSequenceBreakdown] = useGetJSONData(
+        sequenceBreakdownURL,
+        shouldLoadSequenceData,
+    );
 
-    const [cur_Sorgansim, setCur_SOrgansim] = useState<string>("ALL")
-    const [cur_SYear, setCur_SYear] = useState<string>("ALL")
-    const [pieSize, setPieSize] = useState<number>(props.mapUIsettings.defaultDonutSize || 40);
+    const [pieSize, setPieSize] = useState<number>(
+        props.isApplyContextData ? contextT.pieSize_sequenceMetaData : props.mapUIsettings.defaultDonutSize || 40
+    );
     const [isCountryLevelData, setIsCountryLevelData] = useState(props.mapUIsettings.isCountryLevelData);
     const [isSubregionLevelData, setIsSubregionLevelData] = useState(props.mapUIsettings.isSubregionLevelData);
 
@@ -1306,7 +1375,9 @@ const baseStyle: Leaflet.PathOptions = {
     // assign data types
     let presenceDat= rawPresenceData as unknown as presDBdataI;
     let sequenceMetaData = rawSequenceMetaData as unknown as presDBdataI;
-    let mosquitoData = rawMosquitoData as unknown as presDBdataI;
+    let mosquitoData = rawMosquitoData as unknown as Omit<presDBdataI, 'response'> & {
+        response: presDBdataT[] | MapGridResponseV1;
+    };
     let P_species = rawP_species as unknown as UniquesDB_entriesI;
     let P_years = rawP_years as unknown as UniquesDB_entriesI;
     let S_organism = rawS_organsim as unknown as UniquesDB_entriesI;
@@ -1316,13 +1387,19 @@ const baseStyle: Leaflet.PathOptions = {
     let listOfDataSets = dataList as unknown as { [key: string]: string };
     const metaData = rawMetaData as unknown as metaDataT;
     const colNames = useMemo(() => {
-        if(mosquitoData.response !== undefined && mosquitoData.header && mosquitoData.error == null && mosquitoData.response.length > 1) {
+        if (mapUIsettings.inCovidDataView && Array.isArray(rawColumnNames)) {
+            return rawColumnNames.filter((name: string) => name !== "id");
+        }
+        const responseHasRows = Array.isArray(mosquitoData.response)
+            ? mosquitoData.response.length > 1
+            : Number(mosquitoData.response?.rowCount || 0) > 0;
+        if(mosquitoData.response !== undefined && mosquitoData.header && mosquitoData.error == null && responseHasRows) {
             return mosquitoData.header.filter((name: string) => name !== "id");
         }
         else {
             return [] as string[];
         }
-    }, [mosquitoData]);
+    }, [mapUIsettings.inCovidDataView, mosquitoData, rawColumnNames]);
     const mapData = useMemo<GEOjson.FeatureCollection>(() => {
         const incoming = (rawMapData as unknown as GEOjson.FeatureCollection | null) ?? null;
 
@@ -1391,7 +1468,12 @@ const baseStyle: Leaflet.PathOptions = {
         if(curColorMapType != contextT.curColorMap){
             setColorMapType(contextT.curColorMap);
         }
-        if(curDatasetname.current != contextT.curDatasetURL && contextT.curDatasetURL != ""){
+        if(selectedDatasetURL !== contextT.curDatasetURL && contextT.curDatasetURL != ""){
+            const relationName = getRelationNameFromDatasetURL(contextT.curDatasetURL);
+            if (relationName) {
+                curDatasetname.current = relationName;
+                setSelectedDatasetKey(relationName);
+            }
             setSelectedDataset(contextT.curDatasetURL);
         }
         if(isPresData != contextT.isPresenceData && contextT.isPresenceData !== undefined){
@@ -1494,7 +1576,10 @@ const baseStyle: Leaflet.PathOptions = {
             const ff = `${filterStr}_${contextT.curMonth}`;
             if (selectedFeature !== ff) {
                 setSelectedFeature(ff);
-                const url = apiRoutes.fetchDbData({ relationName: curDatasetname.current, feature: ff });
+                const url = buildMapDatasetURL(
+                    { relationName: curDatasetname.current, feature: ff },
+                    useCompactGridResponse,
+                );
                 setSelectedDataset(url);
             }
         } else {
@@ -1506,7 +1591,10 @@ const baseStyle: Leaflet.PathOptions = {
                 if (newDatasetName !== curDatasetname.current) {
                     curDatasetname.current = newDatasetName;
                     setSelectedDatasetKey(newDatasetName);
-                    const url = apiRoutes.fetchDbData({ relationName: newDatasetName, feature: selectedFeature });
+                    const url = buildMapDatasetURL(
+                        { relationName: newDatasetName, feature: selectedFeature },
+                        useCompactGridResponse,
+                    );
                     setSelectedDataset(url);
                 }
             }
@@ -1521,7 +1609,7 @@ const baseStyle: Leaflet.PathOptions = {
         if(props.isApplyContextData === true) {
             // Only show loading spinner if data-related context values changed
             const needsLoading = 
-                curDatasetname.current !== contextT.curDatasetURL ||
+                selectedDatasetURL !== contextT.curDatasetURL ||
                 selectedFeature !== contextT.curFeature ||
                 presenceDataURL !== contextT.curPresenceDatasetURL ||
                 sequenceMetaDataURL !== contextT.curDonutChartDataURL;
@@ -1585,32 +1673,6 @@ const baseStyle: Leaflet.PathOptions = {
         }
     }, [props.isSyncMapCoordsOnTheFly_RECIEVER, contextT.mapCoords]);
 
-    const frameRef = useRef(0);
-    useEffect(() => {
-        if (!map) return;
-        const renderLoop = () => {
-            const mouseData = contextT.mouseEvent.current;
-
-            if (mouseData?.event?.latlng != curMapMouseEvents.current.position) {
-                curMapMouseEvents.current.type = mouseData.type;
-                if (mouseData.event && map) {
-                    HandleMouseMoveX(mouseData.event, map, gridData)
-                } else if (mouseData.type === 'mouseout') {
-                    // Mouse left a sibling map — clear tooltip on this map too
-                    removeAllTooltips();
-                    curMapMouseEvents.current.position = [0, 0];
-                }
-            }
-            
-            frameRef.current = requestAnimationFrame(renderLoop);
-        };
-    renderLoop(); // start the loop
-
-    return () => cancelAnimationFrame(frameRef.current);
-}, [map, gridData, metaData, isLoading_MosquitoData, L, contextT.selectedGridcellID, curColorMapType]);
-
-
-
     useEffect(() => {
         if(props.isSyncMapCoordsOnTheFly_SETTER === true) {
             if(contextT.mapCoords.latitude === 0 && contextT.mapCoords.longitude === 0 && contextT.mapCoords.zoom === 0) {
@@ -1628,7 +1690,7 @@ const baseStyle: Leaflet.PathOptions = {
             acc[key] = listOfDataSets[key];
             return acc;
         }, {} as { [key: string]: string });
-    if(!isLoadingDatalist &&  selectedDatasetURL === "" && Object.keys(listOfDataSets).length > 0) {
+    if(!props.isApplyContextData && !isLoadingDatalist && selectedDatasetURL === "" && Object.keys(listOfDataSets).length > 0) {
 
         let filterStr = props.mapUIsettings.defaultDatasetName !== "" ? props.mapUIsettings.defaultDatasetName : ""; 
         let key = Object.keys(listOfDataSets).find(key => filterStr === "" || key.includes(filterStr)) ||  "-1";
@@ -1637,7 +1699,12 @@ const baseStyle: Leaflet.PathOptions = {
         }
         console.log("key:", key, "filterStr:", filterStr, "listOfDataSets:", listOfDataSets);
         curDatasetname.current = listOfDataSets[key];
-        let url = apiRoutes.fetchDbData({ relationName: listOfDataSets[key], feature: contextT.curFeature });
+        const initialFeature = props.mapUIsettings.defaultFeatureName ||
+            (props.isApplyContextData ? contextT.curFeature : "");
+        let url = buildMapDatasetURL(
+            { relationName: listOfDataSets[key], feature: initialFeature },
+            useCompactGridResponse,
+        );
         setSelectedDataset(url);
         // Find the first dataset key that contains the filter string, or fallback to the first key
     }
@@ -1965,127 +2032,66 @@ const baseStyle: Leaflet.PathOptions = {
     
   const DonutColors = useMemo(() => {
         const colors: Record<string, string> = {};
-        if (S_organism && S_organism.response) {
-            S_organism.response.forEach((item: any, index: number) => {
-                if (item && item.feature) {
-                    colors[item.feature] = categoricalColors[(index + 0) % categoricalColors.length]+""; // Adding "80" for transparency
-                }
-            });
-        }
+        const entries = Array.isArray(S_organism?.response)
+            ? [...S_organism.response]
+                .filter((item: any) => typeof item?.feature === "string" && item.feature !== "")
+                .sort((a: any, b: any) => a.feature.localeCompare(b.feature))
+            : [];
+        entries.forEach((item: any, index: number) => {
+            colors[item.feature] = categoricalColors[index % categoricalColors.length] || "#808080";
+        });
         return colors;
-    }, [isLoadingS_organism, isSequenceMetaData]);
+    }, [S_organism]);
 
 // Fetch country counts for the selected countries
 const [countryCounts, setCountryCounts] = useState<{ [key: string]: any }>({});
-const prevSequenceMetaDataRef = useRef<any>(null);
-const prevIsLoadingRef = useRef<boolean>(true);
-const prevSequenceMetaDataURLRef = useRef<string>("");
-const prevIsLoadingMapDataRef = useRef<boolean>(true);
 
 useEffect(() => {
-    // Skip if data hasn't actually changed
-    if (prevSequenceMetaDataRef.current === sequenceMetaData && 
-        prevIsLoadingRef.current === isLoadingS_organism &&
-        prevSequenceMetaDataURLRef.current === sequenceMetaDataURL &&
-        prevIsLoadingMapDataRef.current === isLoading_mapData) {
-        return;
-    }
-    prevSequenceMetaDataRef.current = sequenceMetaData;
-    prevIsLoadingRef.current = isLoadingS_organism;
-    prevSequenceMetaDataURLRef.current = sequenceMetaDataURL;
-    prevIsLoadingMapDataRef.current = isLoading_mapData;
-    
-    const fetchCountryCounts = async () => {
-        if (isLoading_sequenceMetadata || isLoading_mapData  || isLoadingS_organism){ 
-            return;
-        }
-        if(!props.mapDataSets.isSequenceMetaData){
-            return;
-        }
+    if (
+        !shouldLoadSequenceData ||
+        isLoading_sequenceMetadata ||
+        isLoadingSequenceBreakdown ||
+        isLoading_mapData
+    ) return;
 
-        
-        console.log("fetching country counts...", sequenceMetaDataURL, props.chartName, props.mapDataSets.isSequenceMetaData);
-            const counts: { [key: string]: any } = {};
-                try {
-                    const url =  sequenceMetaDataURL
-                    const response = await fetch(url);
-                    let dataM = await response.json();
-                    dataM = dataM.response || dataM; // Ensure we are working with the response array
-                if (dataM && Array.isArray(dataM) && dataM.length > 0) {
-                    dataM.forEach((item,index: any) => {
-                         let countryCenter =  getCountryCenterFromMapData(mapData, item.feature);
-                        // Fallback to categoryCoordsMap if map data doesn't have coordinates
-                        if (countryCenter && countryCenter.lat === 0 && countryCenter.lng === 0) {
-                            const fallback = categoryCoordsMap[item.feature];
-                            if (fallback) {
-                                countryCenter = { lat: fallback[0], lng: fallback[1] };
-                            }
-                        }
-                        if(countryCenter && (countryCenter.lat !== 0 || countryCenter.lng !== 0)) {
-                            // Ensure the feature key exists in counts
-                            if (!counts[item.feature]) {
-                                counts[item.feature] = {};
-                            }
-                            counts[item.feature]["count"] = item.count;
-                            counts[item.feature]["center"] = countryCenter;
-                        }
-                    });
-                } else {
-                        console.warn("No data found for the selected countries.");
-                    }
-                } catch (error) {
-                    console.error("Error fetching country counts:", error);
-                    let errorMsg = { ERROR: "ERROR: while fetching country counts. " + error};
-                    let res = <div>{String(errorMsg['ERROR'])}</div>;
-                    console.log("Error:", errorMsg);
-                    collectDataLoadingErrors.current.push(res);
-                }
-                // get counts for each dengue serotype
-                if(!isLoadingS_organism) {
-                    // S_organism is an object with response: array of features
-                    if (S_organism && S_organism.response && Array.isArray(S_organism.response)) {
-                        for (let index = 0; index < S_organism.response.length; index++) {
-                            const featureObj = S_organism.response[index];
-                            if (!featureObj || !featureObj.feature) continue;
-                            try {
-                                let url = apiRoutes.fetchDbData({
-                                    relationName: contextT.curDonutChartDatasetName,
-                                    feature: geoAssignmentColumn,
-                                    task: "getCount",
-                                    filterBy: "'" + sequenceColumnForDonut + "','date'",
-                                    filterValue: "'" + featureObj.feature + "','" + cur_SYear + "'",
-                                });
-                                const response = await fetch(url);
-                                let dataM = await response.json();
-                                dataM = dataM.response || dataM;
-                                if (dataM && Array.isArray(dataM) && dataM.length > 0) {
-                                    dataM.forEach((item: any) => {
-                                        if (counts[item.feature]) {
-                                            if (!Array.isArray(counts[item.feature]["counts"])) {
-                                                counts[item.feature]["counts"] = [];
-                                                counts[item.feature]["labels"] = [];
-                                            }
-                                            counts[item.feature]["counts"].push(Number(item.count));
-                                            counts[item.feature]["labels"].push(featureObj.feature);
-                                        }
-                                    });
-                                } else {
-                                    console.warn("No data found for the selected countries.");
-                                }
-                            } catch (error) {
-                                console.error("Error fetching country counts:", error);
-                                let errorMsg = { ERROR: "ERROR: while fetching country counts. " + error + " index: " + index, S_organism };
-                                let res = <div>{String(errorMsg['ERROR'])}</div>;
-                                console.log("Error:", errorMsg);
-                                collectDataLoadingErrors.current.push(res);
-                            }
-                        }
-                    }
-                }
-       setCountryCounts(counts);
-    };
-   fetchCountryCounts();
-}, [sequenceMetaData, isLoadingS_organism, sequenceMetaDataURL, cur_SYear, cur_Sorgansim, isLoading_mapData, mapData]);
+    const totals = Array.isArray(sequenceMetaData?.response) ? sequenceMetaData.response : [];
+    const breakdownResponse = rawSequenceBreakdown as unknown as dbDATA;
+    const breakdown = Array.isArray(breakdownResponse?.response) ? breakdownResponse.response : [];
+    const counts: { [key: string]: any } = {};
+
+    totals.forEach((item: any) => {
+        let countryCenter = getCountryCenterFromMapData(mapData, item.feature);
+        if (countryCenter && countryCenter.lat === 0 && countryCenter.lng === 0) {
+            const fallback = categoryCoordsMap[item.feature];
+            if (fallback) countryCenter = { lat: fallback[0], lng: fallback[1] };
+        }
+        if (countryCenter && (countryCenter.lat !== 0 || countryCenter.lng !== 0)) {
+            counts[item.feature] = {
+                count: item.count,
+                center: countryCenter,
+                counts: [],
+                labels: [],
+            };
+        }
+    });
+
+    breakdown.forEach((item: any) => {
+        const country = counts[item.feature];
+        if (!country) return;
+        country.counts.push(Number(item.count));
+        country.labels.push(item.category);
+    });
+
+    setCountryCounts(counts);
+}, [
+    shouldLoadSequenceData,
+    sequenceMetaData,
+    rawSequenceBreakdown,
+    isLoading_sequenceMetadata,
+    isLoadingSequenceBreakdown,
+    isLoading_mapData,
+    mapData,
+]);
 
 
   
@@ -2106,7 +2112,12 @@ useEffect(() => {
 
 
 // ─── Shared hook: parse raw polygon data → Map<gridCellIndex, VisDataT> ───
-const { gridData: parsedGridData, parseErrors } = useGridDataParser({
+const {
+    gridData: parsedGridData,
+    parseErrors,
+    featureRange: gridFeatureRange,
+    cellSize: parsedGridCellSize,
+} = useGridDataParser({
     isLoading: isLoading_MosquitoData || (mapUIsettings.inCovidDataView ?? false),
     rawData: mosquitoData,
     gridcellSizeRef: gridcellSizeLatLng,
@@ -2129,7 +2140,7 @@ useEffect(() => {
     // This prevents rapid zoom (wheel) or pan events from flooding the context
     // while still keeping the local map responsive.
     const mapCoordsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const MAP_COORDS_DEBOUNCE_MS = 1000;
+    const MAP_COORDS_DEBOUNCE_MS = 250;
 
     // Clean up on unmount
     useEffect(() => {
@@ -2143,7 +2154,7 @@ useEffect(() => {
      * to valid world bounds.
      *
      * When this component is configured as a SETTER (`isSyncMapCoordsOnTheFly_SETTER`),
-     * the coordinates are also debounced (1 s) and broadcast to
+     * the coordinates are also debounced (250 ms) and broadcast to
      * `InterfaceContext.mapCoords` so that RECEIVER maps can mirror the viewport.
      *
      * @param latitude  - Target latitude (will be clamped to `[-90, 90]`).
@@ -2450,12 +2461,12 @@ useLayerUpdateDebounce({
     startLoading: L_debounceLoading.start,
     stopLoading: L_debounceLoading.stop,
     setIsUpdate: setisUpdate,
+    interactionMap: map,
     onDebounceComplete: () => {
         presenceDrawHash.current += 1;
         console.log(" presenceDrawHash.current", presenceDrawHash.current)
         setIsSettingsOpen(true);
     },
-    delayOverrides: { wheel: 1500, null: 1000 },
     deps: [dimensions, map, latitude, longitude, zoom, layerOpacity, rawMosquitoData, curColorMapType],
 });
 
@@ -3043,18 +3054,35 @@ const HandleMouseMoveX = useCallback(
         }
         }
         if (isLoading_MosquitoData) return;
+        const gridCellDims = {
+            lat: gridcellSizeLatLng.current.lat,
+            lng: gridcellSizeLatLng.current.lng,
+        };
+        if (
+            !Number.isFinite(gridCellDims.lat) || gridCellDims.lat <= 0 ||
+            !Number.isFinite(gridCellDims.lng) || gridCellDims.lng <= 0 ||
+            !Number.isFinite(event.latlng.lat) || !Number.isFinite(event.latlng.lng)
+        ) return;
         let mapVal = gridData.entries().next();
         if (!mapVal || mapVal.done) return; // Ensure visData is not empty
 
         const [firstKey, firstVisData] = mapVal.value;
+        const firstTopLeft = firstVisData.corners
+            ? [
+                Math.max(firstVisData.corners[0], firstVisData.corners[2], firstVisData.corners[4], firstVisData.corners[6]),
+                Math.min(firstVisData.corners[1], firstVisData.corners[3], firstVisData.corners[5], firstVisData.corners[7]),
+            ] as [number, number]
+            : firstVisData.bounds
+                ? [firstVisData.bounds[0], firstVisData.bounds[2]] as [number, number]
+                : firstVisData.topLeft || firstVisData.geometry?.[0];
+        if (!firstTopLeft || !firstTopLeft.every(Number.isFinite)) return;
         let gridOffset = getGridOffset(
-            firstVisData.geometry[0][0],
-            firstVisData.geometry[0][1],
+            firstTopLeft[0],
+            firstTopLeft[1],
             gridcellSizeLatLng.current.lat,
             gridcellSizeLatLng.current.lng
         );
         let coords = {lat: event.latlng.lat, lng: event.latlng.lng};
-        let gridCellDims = {lat:gridcellSizeLatLng.current.lat, lng: gridcellSizeLatLng.current.lng};
         let curSnapped = snapToGrid(coords, gridCellDims, gridOffset);
 
         // Compute the top-left corner of the current grid cell
@@ -3062,6 +3090,7 @@ const HandleMouseMoveX = useCallback(
 
         let gridLat = rPoint.lat;
         let gridLng = rPoint.lng;
+        if (!Number.isFinite(gridLat) || !Number.isFinite(gridLng)) return;
 
         // avoid unnecessary updates
         if (curGridCell.current[0] === gridLat && curGridCell.current[1] === gridLng) {
@@ -3223,9 +3252,6 @@ function MapMouseEvents(isUpdate: boolean) {
 
               
                  curMouseEvent.current = "mousemove";
-                curMapMouseEvents.current.type = curMouseEvent.current;
-                curMapMouseEvents.current.position = [event.latlng.lng, event.latlng.lat];
-                curMapMouseEvents.current.event = event; 
                 //console.log("setMouseEvent:", curMouseEvent.current, event);
                     if (
                     typeof curMapMouseEvents.current.lastSetTime === "number" &&
@@ -3235,6 +3261,7 @@ function MapMouseEvents(isUpdate: boolean) {
                     contextT.mouseEvent.current.type = curMouseEvent.current;
                     contextT.mouseEvent.current.event = event;
                     contextT.mouseEvent.current.position = [event.latlng.lng, event.latlng.lat];
+                    contextT.notifyMouseEvent();
                  
                     curMapMouseEvents.current.lastSetTime = Date.now();
 
@@ -3290,22 +3317,35 @@ function MapMouseEvents(isUpdate: boolean) {
                 isZoomingRef.current = true;
                 if (zoomDebounceRef.current) {
                     clearTimeout(zoomDebounceRef.current);
+                    zoomDebounceRef.current = null;
                 }
             };
 
-            const handleZoomEnd = () => {
+            const scheduleZoomSettled = () => {
                 if (zoomDebounceRef.current) {
                     clearTimeout(zoomDebounceRef.current);
                 }
                 zoomDebounceRef.current = setTimeout(() => {
+                    zoomDebounceRef.current = null;
                     setIsZooming(false);
                     isZoomingRef.current = false;
                     gridLayerRedrawRef.current?.();
-                }, 500);
+                }, 150);
+            };
+            const handleZoomEnd = () => scheduleZoomSettled();
+            const handleMoveStart = () => {
+                if (!isZoomingRef.current || !zoomDebounceRef.current) return;
+                clearTimeout(zoomDebounceRef.current);
+                zoomDebounceRef.current = null;
+            };
+            const handleMoveEnd = () => {
+                handleMouseEvent();
+                if (isZoomingRef.current) scheduleZoomSettled();
             };
 
             map.on("click", (event: L.LeafletMouseEvent) => handleMouseClick(event));
-            map.on("moveend", handleMouseEvent);
+            map.on("movestart", handleMoveStart);
+            map.on("moveend", handleMoveEnd);
             map.on("zoomend", handleMouseEvent);
             map.on("zoomstart", handleZoomStart);
             map.on("zoomend", handleZoomEnd);
@@ -3323,7 +3363,8 @@ function MapMouseEvents(isUpdate: boolean) {
                 }
                 map.off("zoomstart", handleZoomStart);
                 map.off("zoomend", handleZoomEnd);
-                map.off("moveend", handleMouseEvent);
+                map.off("movestart", handleMoveStart);
+                map.off("moveend", handleMoveEnd);
                 map.off("zoomend", handleMouseEvent);
                 map.off("mousemove", handleMouseMove);
                 map.off("click", handleMouseClick);
@@ -3362,12 +3403,50 @@ useEffect(() => {
 
     // ─── Shared hook: hide tooltip when cursor leaves the map container ───
     const handleTooltipMouseLeave = useCallback(() => {
-        // Clear shared context so rAF loops on ALL maps stop triggering HandleMouseMoveX
+        // Clear the shared tooltip state and notify linked maps once.
         contextT.mouseEvent.current.event = undefined;
         contextT.mouseEvent.current.type = 'mouseout';
         contextT.mouseEvent.current.position = [0, 0];
-    }, [contextT]);
+        contextT.notifyMouseEvent();
+    }, [contextT.mouseEvent, contextT.notifyMouseEvent]);
     const { isMouseInsideRef } = useTooltipCleanup({ map, L, toolTipRef, onMouseLeave: handleTooltipMouseLeave });
+
+    // Synchronize linked-map tooltips only when a source map publishes a new
+    // mouse event. The previous implementation kept one requestAnimationFrame
+    // loop per map alive forever and compared incompatible values (LatLng vs.
+    // tuple), causing the same event to be processed up to 60 times per second.
+    useEffect(() => {
+        if (!map) return;
+
+        const handleSharedMouseEvent = () => {
+            const mouseData = contextT.mouseEvent.current;
+            const sharedPosition = mouseData.position;
+            const localPosition = curMapMouseEvents.current.position;
+            const positionChanged = Boolean(sharedPosition) && (
+                !localPosition ||
+                sharedPosition![0] !== localPosition[0] ||
+                sharedPosition![1] !== localPosition[1]
+            );
+            const typeChanged = mouseData.type !== curMapMouseEvents.current.type;
+
+            if (!positionChanged && !typeChanged) return;
+
+            curMapMouseEvents.current.type = mouseData.type;
+            curMapMouseEvents.current.position = sharedPosition
+                ? [sharedPosition[0], sharedPosition[1]]
+                : undefined;
+
+            if (mouseData.type === 'mouseout') {
+                removeAllTooltips();
+                return;
+            }
+            if (mouseData.event) {
+                HandleMouseMoveX(mouseData.event, map, gridData);
+            }
+        };
+
+        return contextT.subscribeMouseEvent(handleSharedMouseEvent);
+    }, [HandleMouseMoveX, contextT.mouseEvent, contextT.subscribeMouseEvent, gridData, map, removeAllTooltips]);
 
     // ─── Shared hook: screen distance calculation (replaces nested MapDistanceProvider) ───
     useMapDistance({
@@ -3401,15 +3480,32 @@ function DrawSelectedGridCell(GridCellID: number) {
         if (GridCellID !== -1) {
             // Find the selected grid cell's coordinates
             let selectedGridData = gridData.get(GridCellID);
-            if (selectedGridData && selectedGridData.geometry) {
-                // Derive bounds from every vertex so polygon winding and
-                // starting-point conventions cannot offset the highlight.
-                const selectedLatitudes = selectedGridData.geometry.map(([lat]) => lat);
-                const selectedLongitudes = selectedGridData.geometry.map(([, lng]) => lng);
-                const north = Math.max(...selectedLatitudes);
-                const south = Math.min(...selectedLatitudes);
-                const west = Math.min(...selectedLongitudes);
-                const east = Math.max(...selectedLongitudes);
+            if (selectedGridData && (selectedGridData.corners || selectedGridData.bounds || selectedGridData.topLeft || selectedGridData.geometry)) {
+                let north: number;
+                let south: number;
+                let west: number;
+                let east: number;
+                if (selectedGridData.corners) {
+                    const corners = selectedGridData.corners;
+                    north = Math.max(corners[0], corners[2], corners[4], corners[6]);
+                    south = Math.min(corners[0], corners[2], corners[4], corners[6]);
+                    west = Math.min(corners[1], corners[3], corners[5], corners[7]);
+                    east = Math.max(corners[1], corners[3], corners[5], corners[7]);
+                } else if (selectedGridData.bounds) {
+                    [north, south, west, east] = selectedGridData.bounds;
+                } else if (selectedGridData.topLeft) {
+                    [north, west] = selectedGridData.topLeft;
+                    south = north - gridcellSizeLatLng.current.lat;
+                    east = west + gridcellSizeLatLng.current.lng;
+                } else {
+                    const geometry = selectedGridData.geometry!;
+                    const selectedLatitudes = geometry.map(([lat]) => lat);
+                    const selectedLongitudes = geometry.map(([, lng]) => lng);
+                    north = Math.max(...selectedLatitudes);
+                    south = Math.min(...selectedLatitudes);
+                    west = Math.min(...selectedLongitudes);
+                    east = Math.max(...selectedLongitudes);
+                }
 
                 const selectedTopLeft = map.latLngToLayerPoint([north, west]);
                 const selectedBottomRight = map.latLngToLayerPoint([south, east]);
@@ -3486,16 +3582,12 @@ const [minVal, maxVal] = useMemo(() => {
     } else {
         const loading = isLoading_MosquitoData;
         const hasError = mosquitoData && mosquitoData.error !== null;
-        if (loading || hasError || !mosquitoData?.response) {
+        if (loading || hasError || parsedGridData.size === 0) {
             return [0, 0];
         }
-        return getMinMaxFeature(
-            (mosquitoData.response as presDBdataT[]).map(d => ({
-                feature: Number(d.feature)
-            }))
-        );
+        return gridFeatureRange;
     }
-}, [mosquitoData, isLoading_MosquitoData, presData, mapUIsettings.inCovidDataView]);
+}, [mosquitoData, isLoading_MosquitoData, presData, mapUIsettings.inCovidDataView, parsedGridData, gridFeatureRange]);
 
 
 const radiusScale = useMemo(() => {
@@ -3648,6 +3740,7 @@ useCanvasGridLayer({
     isLoading: isLoading_MosquitoData,
     hasError: mosquitoData.error !== null,
     gridData,
+    cellSize: parsedGridCellSize,
     dimensions,
     colorMap,
     layerOpacity,
@@ -3796,7 +3889,8 @@ function MapDrawLayer_CovidPresenceData(presenceDrawHash: number) {
         function Render(){
             if (!map) return;
 
-            if(isPresData) {
+            try {
+              if(isPresData) {
                 if (!map) return;
                 L_presenceLayerCovid.start();
 
@@ -3925,14 +4019,17 @@ function MapDrawLayer_CovidPresenceData(presenceDrawHash: number) {
                 }
             }
 
-            prev_presenceDrawHash.current = presenceDrawHash;
-            L_presenceLayerCovid.stop()
-            circlesSelectionRef.current = null;
+              prev_presenceDrawHash.current = presenceDrawHash;
+              circlesSelectionRef.current = null;
+            } finally {
+              L_presenceLayerCovid.stop();
+            }
         }
 
         Render();
 
         return () => {
+            L_presenceLayerCovid.stop();
             if (map) {
                 d3.select(map.getPanes().overlayPane)
                     .selectAll('.svg-circles-container_' + props.chartName)
@@ -4147,7 +4244,9 @@ function MapDrawLayer_SequenceMetadata(countryCounts: { [key: string]: any }) {
                     .append("path")
                     .attr("d", arcGenZero as any)
                     .attr("labelID", (_: d3.PieArcDatum<number>, i) => i.toString())
-                    .attr("fill", (_: d3.PieArcDatum<number>, i) => DonutColors[d.labels[i]])
+                    .attr("fill", (_: d3.PieArcDatum<number>, i) =>
+                        DonutColors[d.labels[i]] || categoricalColors[i % categoricalColors.length] || "#808080"
+                    )
                     .attr("label", (_: d3.PieArcDatum<number>,i) => d.labels[i])
                     .attr("stroke-opacity", 0.0)
                     .attr("stroke", "black")
@@ -4346,7 +4445,11 @@ useEffect(() => {
     // Initialize the selected feature when colNames are available
     if (mosquitoData !== undefined && !isLoading_MosquitoData && mosquitoData.error == null && mosquitoData.header && mosquitoData.header.length > 0 && selectedFeature === "") {
         let index = Math.ceil(mosquitoData.header.length / 2)-1;
-        const tempSelectedFeature = props.mapUIsettings.defaultFeatureName ? props.mapUIsettings.defaultFeatureName : mosquitoData.header[index];
+        const compactFeatureName = !Array.isArray(mosquitoData.response) &&
+            mosquitoData.response?.format === "map-grid-v1"
+            ? mosquitoData.response.featureName
+            : undefined;
+        const tempSelectedFeature = props.mapUIsettings.defaultFeatureName || compactFeatureName || mosquitoData.header[index];
         contextT.setCurFeature(tempSelectedFeature);
         setSelectedFeature(tempSelectedFeature);
         const curMonthNumber = tempSelectedFeature.split("_").length > 1 && !tempSelectedFeature.includes("prob") ? parseInt(tempSelectedFeature.split("_")[1]) : -1;
@@ -4519,13 +4622,13 @@ useEffect(() => {
                 const dataset = listOfDataSets[value];
                 curDatasetname.current = dataset;
                 setSelectedDatasetKey(value);
-                let url = apiRoutes.fetchDbData({
+                let url = buildMapDatasetURL({
                     relationName: dataset,
                     feature: mapUIsettings.defaultFeatureName,
                     aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
                     startDate: mapUIsettings.inCovidDataView && (dateRange && dateRange.from && dateRange.to) ? format(dateRange.from, "yyyy-MM-dd") : undefined,
                     endDate: mapUIsettings.inCovidDataView && (dateRange && dateRange.from && dateRange.to) ? format(dateRange.to, "yyyy-MM-dd") : undefined,
-                });
+                }, useCompactGridResponse);
 
 
                 setSelectedDataset(url);
@@ -4581,7 +4684,7 @@ useEffect(() => {
             {colNames && metaData && (
         <Select value={selectedFeature} onValueChange={(value) => { 
                 contextT.setCurFeature(value);
-                let url = apiRoutes.fetchDbData({
+                let url = buildMapDatasetURL({
                     relationName: curDatasetname.current,
                     feature: value,
                     filterBy: selectedCountry ? "iso_3166_1_alpha_3" : undefined,
@@ -4589,7 +4692,7 @@ useEffect(() => {
                     startDate: mapUIsettings.inCovidDataView && (dateRange && dateRange.from && dateRange.to) ? format(dateRange.from, "yyyy-MM-dd") : undefined,
                     endDate: mapUIsettings.inCovidDataView && (dateRange && dateRange.from && dateRange.to) ? format(dateRange.to, "yyyy-MM-dd") : undefined,
                     aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
-                });
+                }, useCompactGridResponse);
 
                 // get month from selection when feature includes a number after an underscore
                 const curMonthNumber = value.split("_").length > 1 && !value.includes("prob") ? parseInt(value.split("_")[1]) : -1;
@@ -4612,23 +4715,32 @@ useEffect(() => {
                 
                 }
                 } >
-                <SelectTrigger className="w-full">
-                <SelectValue placeholder={"loading..."} />
+                <SelectTrigger className="w-full text-left text-[15px] [&>span]:flex-1 [&>span]:text-left">
+                <SelectValue placeholder={"loading..."}>{selectedFeature || undefined}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                 <SelectGroup>
                     <SelectLabel></SelectLabel>
                         {colNames.map((name) => {
-                            const isAvailable = (metaData[name as keyof typeof metaData]?.availability === "1" ||
-                                metaData[name as keyof typeof metaData]?.availability === undefined) && name !== "id";
+                            const columnMetadata = metaData[name as keyof typeof metaData];
+                            const isAvailable = (columnMetadata?.availability === "1" ||
+                                columnMetadata?.availability === undefined) && name !== "id";
                             const filterStr = props.mapUIsettings.filterStringForAvailableFeature;
                             const passesFilter = !filterStr || name.includes(filterStr);
+                            const dimension = columnMetadata?.dimension && columnMetadata.dimension !== "NA"
+                                ? ` [${columnMetadata.dimension}]`
+                                : "";
+                            const description = columnMetadata?.description;
 
                             if (isAvailable && passesFilter) {
                                 return (
-                                    <SelectItem key={name} value={name}>
-                                    <b>{name + " [" + metaData[name as keyof typeof metaData]?.dimension + "]"}</b>
-                                    <i>{" " + metaData[name as keyof typeof metaData]?.description}</i>
+                                    <SelectItem key={name} value={name} className="py-2 text-left">
+                                        <div className="flex max-w-[28rem] flex-col text-left">
+                                            <span className="text-[15px] font-medium">{name + dimension}</span>
+                                            {description && description !== "NA" && (
+                                                <span className="text-xs italic text-slate-500">{description}</span>
+                                            )}
+                                        </div>
                                     </SelectItem>
                                 );
                             }
@@ -4817,7 +4929,7 @@ useEffect(() => {
                             contextT.setIsSequenceMetaData(checked);
                             setIsSequenceMetaData(checked);
                             let url = apiRoutes.fetchDbData({ relationName: contextT.curDonutChartDatasetName, feature: geoAssignmentColumn, task: "getCount", filterBy: "'" + sequenceColumnForDonut + "','date'", filterValue: "'" + cur_Sorgansim + "','" + cur_SYear + "'" });
-                            //setSequenceMetaDataURL(url);
+                            setSequenceMetaDataURL(url);
                             contextT.setCurDonutChartDataURL(url);
                             return checked;
 
@@ -5525,6 +5637,7 @@ useEffect(() => {
 
 
 /** @see {@link LeafD3MapLayerComponent} */
-export default  LeafD3MapLayerComponent;
+export { LeafD3MapLayerComponent };
+export default LeafD3MapLayerComponent;
 
 

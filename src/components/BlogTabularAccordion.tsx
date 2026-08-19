@@ -12,10 +12,17 @@ import { useTranslations } from "next-intl"
 import { t_richConfig } from '@/app/const_store';
 
 
+/** Localized pathogen/vector article rows displayed by `TabularAccordion`. */
 interface TabularAccordionProps {
     tabularAccordionContent: BlogPostProps[]
 }
 
+/**
+ * Renders localized pathogen/vector information as a two-column accordion.
+ *
+ * @param props - Domain-information records containing pathogen and vector labels.
+ * @returns A single-open Radix accordion with image, prose, and source details.
+ */
 export function TabularAccordion({ tabularAccordionContent }: TabularAccordionProps) {
 
 const columnCnt = 2

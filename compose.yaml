@@ -6,6 +6,7 @@ services:
     build:
       context: .
       dockerfile: ./db/Dockerfile.db
+      network: host
     ports:
       - "5333:5333"
     environment:
@@ -23,6 +24,8 @@ services:
     # Holds transient upload progress/error state + cache invalidation epochs
     # shared across the Gunicorn workers of icv-backend — no persistence needed.
     command: [ "redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru" ]
+    tmpfs:
+      - /data
     networks:
       - icv-network
 
@@ -64,6 +67,8 @@ services:
       REDIS_URL: "redis://icv-redis:6379/0"
       IS_DOCKER: "true"
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-}
+      # Global response-cache budget divided across Gunicorn workers.
+      CACHE_TOTAL_MB: ${CACHE_TOTAL_MB:-512}
 
 volumes:
   db-data-icv:

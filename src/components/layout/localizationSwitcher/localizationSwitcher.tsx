@@ -5,6 +5,11 @@ import LocalizationSwitcherSelect from "./localizationSwitcherSelect"
 
 
 
+/**
+ * Renders the application locale switcher for all supported routes.
+ *
+ * @returns A localized English/German switching control.
+ */
 export default function LocalizationSwitcher() {
   const t = useTranslations("localeSwitcher");
   const locale = useLocale();

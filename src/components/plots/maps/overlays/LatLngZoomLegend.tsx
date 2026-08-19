@@ -3,12 +3,26 @@ import React from 'react';
 import { useLocale } from "next-intl";
 
 /**
- * Props for the LatLngZoomOverlay component.
+ * Properties for the {@link LatLngZoomLegend} component.
+ *
+ * @example
+ * ```ts
+ * const viewportLegend: LatLngZoomLegendProps = {
+ *   latitude: 52.52,
+ *   longitude: 13.405,
+ *   zoom: 6,
+ *   scaleLegDims: { posX: 5, posY: 15, width: 100, height: 24 },
+ * };
+ * ```
  */
 export interface LatLngZoomLegendProps {
+    /** Viewport center latitude in degrees */
     latitude: number;
+    /** Viewport center longitude in degrees */
     longitude: number;
+    /** Current map zoom level */
     zoom: number;
+    /** Bounding dimensions and pixel offset of the companion distance scale bar */
     scaleLegDims: {
         posY: number;
         width: number;
@@ -18,8 +32,26 @@ export interface LatLngZoomLegendProps {
 }
 
 /**
- * Small overlay displaying current Lat / Lng / Zoom values
- * on the map. Positioned relative to the scale legend dimensions.
+ * HUD overlay component displaying live viewport numerical coordinates (Latitude, Longitude, Zoom).
+ *
+ * Positioned in the lower-left map corner relative to the distance scale bar (`scaleLegDims`), displaying
+ * localized numeric values formatted via `next-intl` (`useLocale`).
+ *
+ * @param props - Configuration properties defined in {@link LatLngZoomLegendProps}.
+ *
+ * @remarks
+ * `pointerEvents: "none"` is applied to the root container element to ensure that live HUD readout overlays
+ * do not intercept Leaflet map panning or zoom mouse gestures.
+ *
+ * @example
+ * ```tsx
+ * <LatLngZoomLegend
+ *   latitude={52.52}
+ *   longitude={13.405}
+ *   zoom={6.0}
+ *   scaleLegDims={{ posX: 5, posY: 5, width: 118, height: 35 }}
+ * />
+ * ```
  */
 const LatLngZoomLegend: React.FC<LatLngZoomLegendProps> = ({
     latitude,
@@ -60,4 +92,6 @@ const LatLngZoomLegend: React.FC<LatLngZoomLegendProps> = ({
     );
 };
 
+/** Default export for the current Leaflet viewport coordinate legend. */
 export default LatLngZoomLegend;
+

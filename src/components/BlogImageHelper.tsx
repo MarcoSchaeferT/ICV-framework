@@ -2,16 +2,24 @@ import { useState } from "react";
 import Image from 'next/image'
 import { BlogPostProps } from "./BlogPosts"
 
+/** Article collection and selected image index for `ImageBlogPostHandler`. */
 interface ImageBlogPostHandlerProps {
     postsData: BlogPostProps[];
     index: number;
 }
 
+/** Optional provenance URL displayed while hovering an article image. */
 interface ImageTooltipProps {
     sourceURL?: string;
 }
 
 
+/**
+ * Renders the image, attribution hover state, caption, and destination for one domain-information article.
+ *
+ * @param props - Complete post collection and index of the image to render.
+ * @returns A responsive Next.js image with optional source tooltip and caption.
+ */
 export function ImageBlogPostHandler({ postsData: postData, index}: ImageBlogPostHandlerProps){
 
     const [isImageHover, setIsImageHover] = useState(false);

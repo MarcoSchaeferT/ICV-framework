@@ -11,11 +11,40 @@ import FpsIndicator from "./FpsIndicator";
 import DemoModeDialog from "./DemoModeDialog";
 import DisclaimerDialog from "./DisclaimerDialog";
 
+/**
+ * Props for the application-wide navigation and dialog shell.
+ *
+ * @example
+ * ```tsx
+ * const props: DynamicUIProps = {
+ *   children: <main>Public-health dashboard</main>,
+ *   layoutSizes: {
+ *     rowSpanSize: 8.5,
+ *     gapSize: 20,
+ *     leftSidebarWidth: 40,
+ *     leftNavbarWidth: 0,
+ *     topNavbarHeight: 64,
+ *   },
+ * };
+ * ```
+ */
 interface DynamicUIProps {
+  /** Localized application route content. */
   children: React.ReactNode;
+  /** Initial layout measurements propagated through `UIContext`. */
   layoutSizes: LayoutSizesT;
 }
 
+/**
+ * Composes the persistent navigation, sidebar, dialogs, and page content.
+ *
+ * @param props - Localized route content and initial layout measurements.
+ * @returns The complete UI shell wrapped in `UIContextProvider`.
+ *
+ * @remarks
+ * This boundary owns shell state only. Linked visualization state must remain below `InterfaceContextProvider` in the
+ * dashboard that coordinates the affected widgets.
+ */
 export default function DynamicUI({children, layoutSizes}: DynamicUIProps) {
   const isLeftNavbar = false;
   const isPerformanceIndicator = false;
@@ -46,6 +75,12 @@ export default function DynamicUI({children, layoutSizes}: DynamicUIProps) {
 
 
 
+  /**
+   * Synchronizes layout measurements from the server layout into the client UI context.
+   *
+   * @param props - New shared dashboard dimensions.
+   * @returns No visible output.
+   */
   function UpdateLayoutSizes({newSizes}: {newSizes: LayoutSizesT}) {
     const UI_contextT = useUIContext();
 

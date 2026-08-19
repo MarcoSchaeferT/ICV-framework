@@ -7,6 +7,7 @@ import { Locale, usePathname, useRouter } from '@/i18n/routing';
 import {Globe} from 'lucide-react';
 
 
+/** Locale options and presentation mode for the route-preserving language control. */
 interface Props {
     children: ReactNode;
     defaultValue: string;
@@ -14,6 +15,12 @@ interface Props {
     style: 'chip' | 'dropdown';
 }
 
+/**
+ * Replaces the current route with the same pathname and parameters in a selected locale.
+ *
+ * @param props - Locale options, current locale, accessible label, and control style.
+ * @returns A dropdown or compact chip locale control.
+ */
 export default function LocalizationSwitcherSelect({ children, defaultValue, label, style }: Props) {
    const router = useRouter();
    const [isPending, startTransition] = useTransition();

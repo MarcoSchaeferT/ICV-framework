@@ -26,6 +26,15 @@ import MdxLayout from '@/mdx-layout';
 
 import { ReactNode } from "react";
 
+/**
+ * Renders collapsible introductory content above a dashboard, optionally from localized MDX.
+ *
+ * @param props - Heading plus either React content or a compiled MDX component.
+ * @returns The information panel and map scroll anchor, or `null` after dismissal.
+ *
+ * @remarks
+ * The scroll listener is removed on effect cleanup. MDX is preferred for maintained localized explanatory text.
+ */
 export const ViewMainInfoComponent: React.FC<{heading?: ReactNode, content?: ReactNode, mdxContent?: React.FC}> = ({ heading, content, mdxContent }) => {
   if (!heading) heading = <>Test Heading</>;
   if (!content) content = <>This is a test description of something important. It can be a long text that describes the content of this view.</>;

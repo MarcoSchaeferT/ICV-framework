@@ -4,18 +4,53 @@ import { ImageBlogPostHandler } from "./BlogImageHelper"
 import { useTranslations } from "next-intl"
 import { t_richConfig } from '@/app/const_store';
 
+/**
+ * Localized domain-information article and media metadata.
+ *
+ * @example
+ * ```ts
+ * const denguePost: BlogPostProps = {
+ *   title: "Dengue virus serotypes",
+ *   column_2: "Aedes mosquitoes",
+ *   content: "DENV-1 through DENV-4 are represented in the sequence dataset.",
+ *   imageUrl: "/images/dengue-serotypes.jpg",
+ *   imageCaption: "Dengue serotype overview",
+ *   sourceURL: "https://example.org/dengue-image-source",
+ *   textSourceURL: "https://example.org/dengue-reference",
+ * };
+ * ```
+ */
 export interface BlogPostProps {
+  /** Article heading; rendered as trusted HTML. */
   title: string
+  /** Optional second-column label used by tabular accordions. */
   column_2?: string
+  /** Main article body; rendered as trusted HTML. */
   content: string
+  /** Next.js-compatible image URL. */
   imageUrl: string
+  /** Optional trusted-HTML image caption. */
   imageCaption?: string
+  /** Optional image provenance URL. */
   sourceURL?: string
+  /** Optional prose/source reference URL. */
   textSourceURL?: string
+  /** Legacy flag indicating that image data may require blob loading. */
   isLoadAsBlob?: boolean
+  /** Optional destination opened when the image is selected. */
   link?: string
 }
 
+/**
+ * Renders alternating image/text domain-information articles.
+ *
+ * @param props - Localized article records.
+ * @returns One responsive article row per record.
+ *
+ * @remarks
+ * `title`, `content`, and `imageCaption` are rendered as HTML and therefore must come from trusted, maintained content
+ * modules rather than unvalidated user input.
+ */
 export function BlogPost({ blogContent }: { blogContent: BlogPostProps[] }) {
   let t = useTranslations("component_blogPosts");
     return (

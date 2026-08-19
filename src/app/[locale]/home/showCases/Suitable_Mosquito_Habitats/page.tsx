@@ -18,6 +18,7 @@ import { useUIContext } from '@/components/contexts/UIContext';
 
 const isSWAPY = true;
 
+/** Returns the modeled mosquito-habitat suitability showcase dashboard. */
 export default function Home() {
 
 const t = useTranslations("page_home.ShowCases.page_Suitable_Mosquito_Habitats");

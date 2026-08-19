@@ -16,14 +16,25 @@ const GRAPH_H = 34;
 /* Metric colors */
 const MEM_COLOR = "#60a5fa"; // blue-400 for memory/DOM line
 
+/** Secondary diagnostic reported alongside FPS when browser heap metrics are or are not available. */
 type MetricMode = "ram" | "dom";
 
+/** Chromium-compatible extension of the browser Performance API memory counters. */
 interface PerformanceMemory {
   usedJSHeapSize: number;
   totalJSHeapSize: number;
   jsHeapSizeLimit: number;
 }
 
+/**
+ * Displays an optional real-time FPS and browser-memory/DOM diagnostic overlay.
+ *
+ * @returns An interactive D3 performance indicator for development diagnostics.
+ *
+ * @remarks
+ * The component continuously samples animation frames while mounted and must remain disabled in normal production UI
+ * unless active performance analysis is required.
+ */
 export default function FpsIndicator() {
   const [fps, setFps] = useState(0);
   const [metricValue, setMetricValue] = useState("—");

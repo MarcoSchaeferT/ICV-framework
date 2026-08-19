@@ -19,6 +19,7 @@ import { useUIContext } from '@/components/contexts/UIContext';
 
 const isSWAPY = true;
 
+/** Returns the linked United States habitat suitability and mosquito-observation showcase. */
 export default function Home() {
 
 const t = useTranslations("page_home.ShowCases.page_USA_Habitats_Sightings");

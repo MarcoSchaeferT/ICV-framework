@@ -13,6 +13,8 @@ class ParsedData:
     sanitized_column_names: list[str]
     file_size: int
     file_path: Optional[Path]
+    inferred_types: Optional[dict[str, str]]
+    column_sql_types: list[str]
 
     def __init__(self):
         self.db_name: str = ""
@@ -20,6 +22,8 @@ class ParsedData:
         self.sanitized_column_names: list[str] = []
         self.file_size: int = 0
         self.file_path: Optional[Path] = None
+        self.inferred_types: Optional[dict[str, str]] = None
+        self.column_sql_types: list[str] = []
 
 
 async def parseCSVdata(file_path: Path) -> Union[ParsedData, dict]:

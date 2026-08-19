@@ -4,6 +4,11 @@ import { Locale } from '@/i18n/routing';
 import { useLocale, useTranslations } from 'next-intl';
 import { useUIContext } from '@/components/contexts/UIContext';
 
+/**
+ * Renders the localized MDX document currently selected through `UIContext`.
+ *
+ * @returns The documentation reading surface and active compiled MDX content.
+ */
 export default function Page() {
   const locale = useLocale() as Locale;
   const UI_contextT = useUIContext();

@@ -3,6 +3,13 @@ import stateMappersGermany, { stateMappersGermanyT } from '@/app/helpers';
 
 
 
+/**
+ * Dataset adapter for aggregated state-level RKI COVID-19 records.
+ *
+ * @remarks
+ * The adapter exposes state identifiers and mapper functions so table selections can brush the corresponding Leaflet
+ * state feature through `InterfaceContext`.
+ */
 class CovidDataStates {
 
 
@@ -51,4 +58,5 @@ class CovidDataStates {
 
 
 
+/** Default export for the state-level COVID-19 table adapter. */
 export default CovidDataStates;

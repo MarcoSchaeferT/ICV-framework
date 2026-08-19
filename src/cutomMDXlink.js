@@ -1,6 +1,16 @@
 'use client'; // This is a client component
 import { Link } from "@/i18n/routing";
 
+/**
+ * Renders locale-aware internal MDX links, smooth-scrolling anchors, and normal external anchors.
+ *
+ * @param {{href: string} & Record<string, unknown>} props - Link destination and forwarded anchor properties.
+ * @returns {import('react').ReactElement} Link element appropriate for the destination type.
+ *
+ * @remarks
+ * Hash links first target the dedicated `scrollRefx` documentation container so section navigation does not scroll the
+ * complete dashboard shell.
+ */
 const CustomMDXLink = ({ href, ...props }) => {
 
 
@@ -61,4 +71,5 @@ const CustomMDXLink = ({ href, ...props }) => {
   }
 };
 
+/** Default export for locale-aware links inside compiled MDX. */
 export default CustomMDXLink;

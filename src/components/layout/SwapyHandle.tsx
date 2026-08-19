@@ -4,6 +4,11 @@ import { useUIContext } from '../contexts/UIContext';
 import { useTranslations } from 'next-intl';
 
 
+/**
+ * Toggles visibility and activation of Swapy drag handles across dashboard cards.
+ *
+ * @returns A fixed localized card-rearrangement control.
+ */
 export default function Checkbox_isSwapy() {
   let c = useUIContext();
   const t = useTranslations('swapyHandle_component');

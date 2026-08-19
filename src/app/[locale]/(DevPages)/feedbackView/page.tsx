@@ -25,4 +25,5 @@ const FeedbackViewPage = () => {
   );
 };
 
+/** Default export for the development feedback-record inspection page. */
 export default FeedbackViewPage;

@@ -6,10 +6,16 @@ import { t_richConfig } from '@/app/const_store';
 import { routing, useRouter, Locale } from '@/i18n/routing';
 import { ScrollToButtonUp } from '@/components/layout/small_UI_elements/ScrollToButton';
 
+/** Returns one statically generated domain-information parameter for every supported locale. */
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({locale}));
 }
 
+/**
+ * Renders localized background information about diseases, viruses, and mosquito vectors.
+ *
+ * @returns Trusted maintained article and accordion content for the active locale.
+ */
 export default function BlogPage() {
 
   const t = useTranslations('page_domainInfo');

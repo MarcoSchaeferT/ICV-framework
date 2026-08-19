@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
+/** Editable localized scientific metadata for one database column. */
 interface ColumnMeta {
   columnName: string;
   datatype: string;
@@ -31,6 +32,14 @@ const DATATYPE_OPTIONS = ["string", "float", "int", "date"];
 /* ------------------------------------------------------------------ */
 /*  Page Component                                                     */
 /* ------------------------------------------------------------------ */
+/**
+ * Renders the localized editor for per-relation, per-language column metadata.
+ *
+ * @returns Relation and language selectors plus editable metadata records.
+ *
+ * @remarks
+ * Database mutations are disabled in demo mode and instead open the deployment restriction dialog.
+ */
 export default function MetadataEditorPage() {
   const t = useTranslations("page_metadata");
   const locale = useLocale();

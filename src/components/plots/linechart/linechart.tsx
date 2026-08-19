@@ -25,49 +25,74 @@ import { useLocale ,useTranslations } from "next-intl";
 import { Locale } from '@/i18n/routing';
 import { t_richConfig, monthNames, dbDATA } from '@/app/const_store';
 import { useLoadingTask, LoadingSpinnerAnimation } from '../maps/utils/loadingSpinner';
+import GenericCartesianChart from '../generic/GenericCartesianChart';
 
 /**
- * Props class for the LinechartComponent.
+ * Configuration contract for `LinechartComponent`.
  * 
  * @remarks
- * This class encapsulates all the properties required to render a bar chart using the BarchartComponent.
- * It includes configuration for the chart name, data source URL, localization, translations.
- * 
- * @property chartName - The name of the chart to be displayed.
- * @property dataURL - The URL from which to fetch the chart data. Can be a string.
- * @property locale - The locale to use for translations and formatting (e.g., "en", "de"). Defaults to "en".
- * @property translations - An object containing translation strings or functions, typically created using a translation hook. e.g.: useTranslations("covid_view_barchart")
- * @property isDummyMode - for demonstration purposes: loads dummy data for the chart if set to true.
+ * The line chart visualizes temporal feature values for the active linked-view selection and reads localized metadata
+ * through the shared data-fetching pipeline.
  * 
  * @example
- * ```
- * const props = LinechartProps(
- *   "COVID-19 Cases",
- *   apiRoutes.GET_DATASETS_METADATA,
- *   "de",
- *   useTranslations("covid_view_linechart")
- * );
- * <>
- *  <LinecharComponent chartProps={props} />
- * </>
+ * ```tsx
+ * const props: LinechartProps = {
+ *   chartName: "albopictus-monthly-habitat",
+ *   dataURL: apiRoutes.fetchDbData({
+ *     relationName: "t_2024_monthly_albopictus_predictions",
+ *     feature: "mean",
+ *     filterBy: "cellID",
+ *     filterValue: "200509",
+ *   }),
+ *   locale: "en",
+ *   translations: useTranslations("prediction_view_linechart"),
+ *   yDomain: [0, 1],
+ * };
  * ```
  */
 export interface LinechartProps {
+    /** Stable chart/container identifier. */
     chartName: string;
+    /** URL produced by `apiRoutes.fetchDbData`. */
     dataURL: string;
+    /** Locale used for value and metadata formatting. @default "en" */
     locale?: string;
+    /** `next-intl` translator for chart labels and tooltips. */
     translations?: any;
+    /** Uses bundled demonstration data instead of the backend. @default false */
     isDummyMode?: boolean;
+    /** Optional fixed numeric extent for the Y axis. */
     yDomain?: [number, number];
+    /** Selects the reusable row-oriented chart adapter used by layout templates. */
+    dataMode?: "linked" | "generic";
+    /** Maximum number of generic dataset rows rendered before truncation. */
+    rowLimit?: number | null;
 }
 
+/**
+ * Creates a complete temporal line-chart configuration.
+ *
+ * @param chartName - Stable chart/container identifier.
+ * @param dataURL - Encoded database API URL.
+ * @param locale - Locale for labels and number formatting.
+ * @param translations - `next-intl` translator for the chart namespace.
+ * @param isDummyMode - Uses bundled demonstration data.
+ * @param yDomain - Optional fixed Y-axis extent.
+ * @returns Configuration accepted by `LinechartComponent`.
+ * @default dataURL ""
+ * @default locale "en"
+ * @default translations {}
+ * @default isDummyMode false
+ */
 export function LinechartProps(
     chartName: string,
     dataURL = "",
     locale = "en",
     translations: any = {},
     isDummyMode = false,
-    yDomain?: [number, number]
+    yDomain?: [number, number],
+    dataMode: "linked" | "generic" = "linked",
+    rowLimit?: number | null,
 ): LinechartProps {
     return {
         chartName,
@@ -75,23 +100,27 @@ export function LinechartProps(
         locale,
         translations,
         isDummyMode,
-        yDomain
+        yDomain,
+        dataMode,
+        rowLimit,
     };
 }
 
+/** Geometry and temporal feature arrays consumed by the line-chart adapter. */
 type dbData = {
   geometry: string[];
   features: number[][];
 };
 
 
+/** Recharts-ready temporal observations. */
 type lineChartData = {
   name: string;
   feature: number;
 }[];
 
 
-const LinechartComponent = ({chartProps}: {chartProps: LinechartProps}) => {
+const LinkedLinechartComponent = ({chartProps}: {chartProps: LinechartProps}) => {
 
   let t = chartProps.translations;
   const locale = useLocale() as Locale; 
@@ -228,28 +257,30 @@ const [xLabel, yLabel] = useMemo(() => {
   }
 
   if (props.isDummyMode) {
-      return (
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart
-          width={500}
-          height={300}
-          data={dummyData}
-          margin={{
-            top: 5,
-            right: 30,
-            left: 20,
-            bottom: 5,
-          }}
-        >
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" />
-          <YAxis />
-          <Tooltip />
-          <Legend />
-          <Line type="monotone" dataKey="pv" stroke="#8884d8" activeDot={{ r: 8 }} />
-          <Line type="monotone" dataKey="uv" stroke="#82ca9d" />
-        </LineChart>
-      </ResponsiveContainer>
+    return (
+      <div className="size-full min-h-0 flex flex-col flex-1">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            width={500}
+            height={300}
+            data={dummyData}
+            margin={{
+              top: 5,
+              right: 30,
+              left: 20,
+              bottom: 5,
+            }}
+          >
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Line type="monotone" dataKey="pv" stroke="#8884d8" activeDot={{ r: 8 }} />
+            <Line type="monotone" dataKey="uv" stroke="#82ca9d" />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     );
   }
 
@@ -487,4 +518,19 @@ useEffect(() => {
 
 
 
+const LinechartComponent = ({ chartProps }: { chartProps: LinechartProps }) => {
+  if (chartProps.dataMode === "generic") {
+    return (
+      <GenericCartesianChart
+        chartName={chartProps.chartName}
+        kind="line"
+        rowLimit={chartProps.rowLimit}
+      />
+    );
+  }
+
+  return <LinkedLinechartComponent chartProps={chartProps} />;
+};
+
+/** Default export supporting linked and generic temporal line-chart modes. */
 export default LinechartComponent;

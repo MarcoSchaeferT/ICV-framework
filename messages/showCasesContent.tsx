@@ -56,6 +56,13 @@ export const showCasesList: Record<Locale, ShowcaseItem[]> = {
       icon: <ChartSpline  />,
       link: "/home/showCases/Uncertainty_Vis",
     },
+    {
+      title: "ENSO Suitability",
+      description: "Inspect mosquito habitat suitability predictions up to 6 months into the future",
+      backgroundImage: "/showCases/enso_suitability.png",
+      icon: <ChartSpline  />,
+      link: "/home/showCases/ENSO_Suitability",
+    },
      {
       title: "Historical COVID-Data Germany Dashboard",
       description: "Discover historical data of the COVID-19 pandemic in Germany",
@@ -113,6 +120,13 @@ export const showCasesList: Record<Locale, ShowcaseItem[]> = {
       backgroundImage: "/showCases/uncertainty_quantification.png",
       icon: <ChartSpline  />,
       link: "/home/showCases/Uncertainty_Vis",
+    },
+    {
+      title: "ENSO-Eignung",
+      description: "Untersuchen Sie Vorhersagen zur Mückenlebensraumeignung bis zu 6 Monate in die Zukunft",
+      backgroundImage: "/showCases/enso_suitability.png",
+      icon: <ChartSpline  />,
+      link: "/home/showCases/ENSO_Suitability",
     },
      {
       title: "Historische COVID-Daten Deutschland Dasboard",

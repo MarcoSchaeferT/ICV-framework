@@ -35,11 +35,18 @@ function LinkDirectOpen({ link }: { link: string }) {
 
  
 }
+/** Localized navigation links and initial expanded-state hint. */
 interface nav {
     navLinks: LINK[];
     isOpen: boolean;
 }
 
+/**
+ * Filters and renders top-navigation links for the currently selected disease group.
+ *
+ * @param props - Localized navigation links and layout state.
+ * @returns A responsive list of locale-aware route links.
+ */
 export function NavList(props: nav): JSX.Element {
 
   const UI_contextT = useUIContext();
@@ -82,6 +89,12 @@ export function NavList(props: nav): JSX.Element {
   );
 }
 
+/**
+ * Renders the primary localized navigation and redirects when the active disease family changes.
+ *
+ * @param props - Localized navigation links and initial open-state hint.
+ * @returns The sticky application top bar.
+ */
 export default function NavbarTop(props: nav): JSX.Element  {
 
   const UI_contextT = useUIContext();

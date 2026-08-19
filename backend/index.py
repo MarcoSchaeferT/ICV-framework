@@ -1,6 +1,7 @@
 from flask import Flask, Response
 from flask import request
 from flask import jsonify
+from backend.upload_request import DirectUploadRequest
 import time
 import json
 from backend.routes.setFilesToDB.db_utils import query_raw, execute_raw, get_db_connection_params
@@ -30,11 +31,13 @@ from backend.routes.manageDB.route_manageDB import route_manageDB
 from backend import metadata_utils
 from backend.metadata_utils import getMetaDataPath, loadMetadataCSV
 from backend.routes.processData.uncertaintyVis import create_uncertainty_visualizations
+from backend.routes.processData.ensoSuitability import create_ENSO_suitability_visualizations
 from backend.routes.processData.route_processData import route_processData
 import json
 
 
 app = Flask(__name__)
+app.request_class = DirectUploadRequest
 # register the blueprint
 
 template = {
@@ -208,10 +211,10 @@ async def get_compressed_json():
     url = ""
     data = []
     if request.method == "GET":
-        url = request.args["url"]
+        url = request.args.get("url", "")
         print("url", url)
     if url == "":
-        return "ERROR: No URL provided!"
+        return jsonify({"error": "ERROR: No URL provided!"}), 400
     try:
         response = requests.get(str(url))
         # Decompress the response content
@@ -223,12 +226,11 @@ async def get_compressed_json():
         # Parse the JSON data
         data = json.loads(json_data)
 
-        # print("data",data)
     except Exception as e:
         print("ERROR reading data: get_compressed_json", e)
-        data = {"ERROR": "ERROR reading JSON file: get_compressed_json" + str(e)}
+        return jsonify({"error": "ERROR reading JSON file: get_compressed_json " + str(e)}), 500
 
-    return data
+    return jsonify(data)
 
 
 @swag_from('API_docs/get_map_data.yml')
@@ -236,7 +238,7 @@ async def get_compressed_json():
 def getMap():
     mapName = request.args.get("mapName")
     if not mapName:
-        return "ERROR: No mapName provided!"
+        return jsonify({"error": "ERROR: No mapName provided!"}), 400
 
     # Mapping of map names to their respective paths
     map_paths = {
@@ -248,14 +250,14 @@ def getMap():
     }
 
     if mapName not in map_paths:
-        return f"ERROR: Map '{mapName}' not found!"
+        return jsonify({"error": f"ERROR: Map '{mapName}' not found!"}), 404
 
     try:
         data = load_TAR_GZ_JSON(map_paths[mapName])
         return jsonify(data)
     except Exception as e:
         print(f"ERROR reading map data for {mapName}:", e)
-        return f"ERROR reading map data for {mapName}: " + str(e)
+        return jsonify({"error": f"ERROR reading map data for {mapName}: " + str(e)}), 500
 
 
 def load_TAR_GZ_JSON(path):
@@ -396,21 +398,24 @@ def get_uncertainty_svg():
     if not svg_path.exists():
         # Derive which plot to generate from the requested filename
         original_filename = request.args["filename"]
-        if "calibration" in original_filename:
-            plot_type = "calibration"
-        elif "uncertainty" in original_filename:
-            plot_type = "uncertainty"
+        if "climate_forecast" in original_filename:
+            create_ENSO_suitability_visualizations(cell_id=cellID)
         else:
-            plot_type = "both"
+            if "calibration" in original_filename:
+                plot_type = "calibration"
+            elif "uncertainty" in original_filename:
+                plot_type = "uncertainty"
+            else:
+                plot_type = "both"
 
-        create_uncertainty_visualizations(
-            out_dir=None,
-            grid_start=cellID,
-            grid_end=cellID,
-            dataset_template="t_2024_monthly_mean_{month}_ocsvm_aegypti_predictions_2023_mod_sim",
-            months_range=range(1, 13),
-            plot_type=plot_type,
-        )
+            create_uncertainty_visualizations(
+                out_dir=None,
+                grid_start=cellID,
+                grid_end=cellID,
+                dataset_template="t_2024_monthly_mean_{month}_ocsvm_aegypti_predictions_2023_mod_sim",
+                months_range=range(1, 13),
+                plot_type=plot_type,
+            )
         # wait until the file is created (max 10 seconds)
         start_time = time.time()
         while not svg_path.exists() and time.time() - start_time < 10:

@@ -8,6 +8,7 @@ import { t_richConfig } from "@/app/const_store";
 import { useUIContext } from "@/components/contexts/UIContext";
 
 
+/** Returns one static footer route parameter for each supported locale. */
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({locale}));
 }
@@ -84,4 +85,5 @@ const CopyrightFooter = ({ textColor = "#000000" }: { textColor?: string }) => {
   );
 }
 
+/** Default export for the localized license, funding, and legal-navigation footer. */
 export default CopyrightFooter;

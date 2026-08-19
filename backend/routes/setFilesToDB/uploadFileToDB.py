@@ -7,7 +7,8 @@ from .createTable import createTable
 from .insertData import insertData
 from .resetTable import resetTable
 from backend.routes.columnMetadata.route_columnMetadata import populate_column_metadata
-from backend.upload_state import upload_state
+from backend.routes.processData.assignGeoPosToCountry import assign_geo_pos_to_country
+from backend.upload_state import NO_ERROR, upload_state
 from backend.cache import response_cache
 
 
@@ -26,6 +27,12 @@ async def uploadFileToDB(file_path: Path, upload_id: str):
         if checkErrors(data):
             return checkErrors(data)
 
+        has_geometry = "geometry" in data.sanitized_column_names
+        upload_state.set_phase(upload_id, "db")
+        upload_state.set_has_geometry(upload_id, has_geometry)
+        upload_state.set_db_progress(upload_id, 0.0)
+        upload_state.set_country_progress(upload_id, 0.0)
+
         # *** CREATE *** #
         res = await createTable(data)
         print("res", res)
@@ -41,9 +48,13 @@ async def uploadFileToDB(file_path: Path, upload_id: str):
         # Run insert synchronously since we're already in an async function
         # This allows proper sequential processing of multiple files
         try:
-            await insertData(data, upload_id)
+            inserted_rows = await insertData(data, upload_id)
         except Exception as e:
             return {"ERROR": f"Insert failed: {str(e)}"}
+
+        insert_error = upload_state.get_status(upload_id)["error"]
+        if insert_error != NO_ERROR:
+            return {"ERROR": insert_error}
 
         # *** POPULATE COLUMN METADATA *** #
         # Auto-fill column_metadata_en and column_metadata_de from CSV suggestions
@@ -54,6 +65,35 @@ async def uploadFileToDB(file_path: Path, upload_id: str):
             import traceback
             print(f"WARNING: Column metadata population failed: {e}")
             traceback.print_exc()
+
+        # *** ASSIGN COUNTRIES *** #
+        # Geometry is detected from the sanitized CSV header, which is also
+        # the actual PostgreSQL column name created above.
+        if has_geometry:
+            upload_state.set_phase(upload_id, "country")
+            upload_state.set_country_progress(upload_id, 0.0)
+
+            def report_country_progress(processed_rows: int, total_rows: int) -> None:
+                ratio = processed_rows / total_rows if total_rows else 1.0
+                upload_state.set_country_progress(
+                    upload_id, min(100.0, ratio * 100)
+                )
+
+            try:
+                updated_count = await asyncio.to_thread(
+                    assign_geo_pos_to_country,
+                    data.db_name,
+                    skip_existing=True,
+                    progress_callback=report_country_progress,
+                    total_rows=inserted_rows,
+                )
+                upload_state.set_country_progress(upload_id, 100.0)
+                print(
+                    f"[uploadFileToDB] Assigned countries for '{data.db_name}' "
+                    f"({updated_count} rows updated)"
+                )
+            except Exception as e:
+                return {"ERROR": f"Country assignment failed: {str(e)}"}
 
         # *** INVALIDATE CACHE *** #
         # The table's content (and possibly schema) just changed — drop

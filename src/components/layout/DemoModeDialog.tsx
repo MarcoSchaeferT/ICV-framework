@@ -5,6 +5,11 @@ import { useUIContext } from "../contexts/UIContext";
 import { AlertTriangle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+/**
+ * Renders the shell-level notice explaining restrictions of the hosted demonstration deployment.
+ *
+ * @returns A modal dialog while `UIContext.isDemoModeDialogOpen` is true, otherwise `null`.
+ */
 export default function DemoModeDialog() {
   const { isDemoModeDialogOpen, setIsDemoModeDialogOpen } = useUIContext();
 

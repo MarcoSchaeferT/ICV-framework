@@ -6,6 +6,7 @@ import { MDXContentProvider } from '@messages/markdown/MDXContentProvider'
 import { useUIContext } from '@/components/contexts/UIContext'
 import { notFound } from 'next/navigation'
 
+/** Returns the maintained localized legal-notice MDX page. */
 export default function ImpressumPage() {
   const locale = useLocale();
   const { showLegalTexts } = useUIContext();

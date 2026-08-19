@@ -13,6 +13,10 @@ import { apiRoutes } from '@/app/api_routes';
 import {useLocale, useTranslations} from 'next-intl';
 import { t_richConfig } from '@/app/const_store';
 
+const STATUS_POLL_INTERVAL_MS = 1000;
+const STATUS_POLL_MAX_FAILURES = 5;
+const STATUS_POLL_MAX_BACKOFF_MS = 5000;
+
 /**
  * POST one file as multipart/form-data via XMLHttpRequest so the real
  * transfer progress can be observed (fetch() exposes no upload progress).
@@ -56,6 +60,15 @@ function uploadFileWithProgress(
   });
 }
 
+/**
+ * Renders the multi-file ingestion workflow with transfer and backend-processing progress.
+ *
+ * @returns A localized drag-and-drop upload form with per-file status and error feedback.
+ *
+ * @remarks
+ * XMLHttpRequest is intentionally used for byte-level upload progress. In demo mode, mutation attempts open the
+ * restriction dialog instead of modifying the database.
+ */
 export default function FileUploadForm() {
 
   
@@ -74,14 +87,18 @@ export default function FileUploadForm() {
   // Real byte-level transfer progress (0–100) of the multipart POST,
   // reported by XHR upload events — fetch() cannot observe upload progress.
   const [transferProgress, setTransferProgress] = useState<number>(0);
-  // "transfer" = bytes still leaving the browser, "db" = backend integration
-  const [phase, setPhase] = useState<"idle" | "transfer" | "db">("idle");
+  const [dbProgress, setDbProgress] = useState<number>(0);
+  const [countryProgress, setCountryProgress] = useState<number>(0);
+  // Transfer is measured in the browser; later phases come from the backend.
+  const [phase, setPhase] = useState<"idle" | "transfer" | "db" | "country" | "complete">("idle");
+  const [hasGeometry, setHasGeometry] = useState<boolean>(false);
   const [isUpdate, setIsUpdate] = useState<boolean>(false);
 
   let message = useRef<string>("created");
   let complete = useRef<boolean>(false);
   let error =  useRef<boolean>(false);
 
+  /** Backend upload result keyed by uploaded relation or status field. */
   interface UploadResponse {
     [key: string]: string;
   }
@@ -112,6 +129,9 @@ export default function FileUploadForm() {
     files.current = [...files.current, ...validFiles];
     complete.current = false;
     setUploadProgress(0);
+    setDbProgress(0);
+    setCountryProgress(0);
+    setHasGeometry(false);
     processedFilesRef.current = {};
     setCollectErrors([]);
   }, []);
@@ -148,13 +168,75 @@ export default function FileUploadForm() {
     setCollectErrors([]);
     complete.current = false;
     error.current = false;
+    setHasGeometry(false);
+    setDbProgress(0);
+    setCountryProgress(0);
 
     // Poll the combined status endpoint (one request per second) until the
-    // backend reports completion (progress === 100) or an error.
+    // backend reports completion (progress === 100) or an application error.
+    // Short proxy/network interruptions are retried because processing keeps
+    // running in the backend independently from this polling connection.
     async function watchProgress(uploadId: string) {
+      let consecutiveFailures = 0;
+
       while (true) {
-        const response = await fetch(apiRoutes.uploadStatus({ id: uploadId }));
-        const status: { progress: number; error: string } = await response.json();
+        let status: {
+          progress: number;
+          error: string;
+          phase?: "db" | "country" | "complete";
+          has_geometry?: boolean;
+          db_progress?: number;
+          country_progress?: number;
+        };
+
+        try {
+          const response = await fetch(
+            apiRoutes.uploadStatus({ id: uploadId }),
+            { cache: "no-store" }
+          );
+          if (!response.ok) {
+            throw new Error(`Upload status returned HTTP ${response.status}`);
+          }
+
+          status = await response.json();
+          if (
+            typeof status.progress !== "number" ||
+            typeof status.error !== "string"
+          ) {
+            throw new Error("Upload status response is incomplete");
+          }
+          consecutiveFailures = 0;
+        } catch (pollError) {
+          consecutiveFailures += 1;
+          console.warn(
+            `Upload status request failed (${consecutiveFailures}/${STATUS_POLL_MAX_FAILURES})`,
+            pollError
+          );
+
+          if (consecutiveFailures >= STATUS_POLL_MAX_FAILURES) {
+            throw new Error(t("feedback.progressStatusUnavailable"));
+          }
+
+          const retryDelay = Math.min(
+            STATUS_POLL_INTERVAL_MS * 2 ** (consecutiveFailures - 1),
+            STATUS_POLL_MAX_BACKOFF_MS
+          );
+          await new Promise((resolve) => setTimeout(resolve, retryDelay));
+          continue;
+        }
+
+        if (typeof status.has_geometry === "boolean") {
+          setHasGeometry(status.has_geometry);
+        }
+        if (status.phase) {
+          setPhase(status.phase);
+        }
+        if (typeof status.db_progress === "number") {
+          setDbProgress(Number(status.db_progress.toFixed(2)));
+        }
+        if (typeof status.country_progress === "number") {
+          setCountryProgress(Number(status.country_progress.toFixed(2)));
+        }
 
         if (status.error !== "false") {
           setuploadResponse({ ERROR: (t("feedback.error") + ": " + status.error) });
@@ -166,9 +248,14 @@ export default function FileUploadForm() {
         const progress = Number(status.progress.toFixed(2));
         console.log("Progress:", progress);
         setUploadProgress(progress);
-        if (progress === 100) return;
+        if (progress === 100) {
+          setPhase("complete");
+          return;
+        }
 
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise((resolve) =>
+          setTimeout(resolve, STATUS_POLL_INTERVAL_MS)
+        );
       }
     }
 
@@ -179,7 +266,10 @@ export default function FileUploadForm() {
       // uploadProgress = 1 keeps the existing "busy" gating (disabled button,
       // visible progress area) until the DB phase takes over.
       setPhase("transfer");
+      setHasGeometry(false);
       setTransferProgress(0);
+      setDbProgress(0);
+      setCountryProgress(0);
       setUploadProgress(1);
       try {
         const jsonResponse: any = await uploadFileWithProgress(
@@ -206,7 +296,11 @@ export default function FileUploadForm() {
         console.log("File successfully uploaded:", file.name);
       } catch (uploadError) {
         console.error("Error uploading files:", uploadError);
-        const msg = `${file.name}: connection lost during transfer`;
+        const errorDetail =
+          uploadError instanceof Error
+            ? uploadError.message
+            : t("feedback.progressStatusUnavailable");
+        const msg = `${file.name}: ${errorDetail}`;
         setuploadResponse({ ERROR: (t("feedback.error") + ": " + msg) });
         setCollectErrors((prev) => [...prev, msg]);
         error.current = true;
@@ -221,6 +315,8 @@ export default function FileUploadForm() {
     setCurFile("");
     setUploadProgress(0);
     setTransferProgress(0);
+    setDbProgress(0);
+    setCountryProgress(0);
     setPhase("idle");
     complete.current = true;
   };
@@ -327,38 +423,47 @@ export default function FileUploadForm() {
              {t.rich("feedback.progressWorkingOn")}: <i>{curFile}</i>
             </div>
           )}
-            {uploadProgress > 0 && (
-              <>
-                {/* transfer phase: real bytes sent; db phase: backend progress */}
-                <Progress
-                  value={phase === "transfer" ? transferProgress : uploadProgress}
-                  className="w-full"
-                />
-                <div className="text-center text-xs text-slate-600">
-                  {phase === "transfer" ? transferProgress : uploadProgress}%
-                </div>
-              </>
-            )}
           {(complete.current || uploadProgress > 0) && files.current.length !== 0 && (
-            <div className="flex truncate max-w-xl items-center space-x-2">
-              {/* uploading...: */}
-              {t.rich("feedback.progressText")}
-              {phase !== "transfer" ? (
-                <Check />
-              ) : (
-                <LoadingSpinner />
-              )}
+            <div className="space-y-1">
+              <div className="flex truncate max-w-xl items-center space-x-2">
+                {t.rich("feedback.progressText")}
+                {phase !== "transfer" ? <Check /> : <LoadingSpinner />}
+              </div>
+              <Progress
+                value={phase === "transfer" ? transferProgress : 100}
+                className="w-full"
+              />
+              <div className="text-center text-xs text-slate-600">
+                {phase === "transfer" ? transferProgress : 100}%
+              </div>
             </div>
           )}
-          {(complete.current || phase === "db") && files.current.length !== 0 && (
-            <div className="flex truncate max-w-xl items-center space-x-2">
-               {/* db integration...: */}
-              {t.rich("feedback.progressDBIntegration")}
-              {!complete.current && uploadProgress < 99 ? (
-                <LoadingSpinner />
-              ) : (
-                <Check />
-              )}
+          {(complete.current || phase === "db" || phase === "country" || phase === "complete") && files.current.length !== 0 && (
+            <div className="space-y-1">
+              <div className="flex truncate max-w-xl items-center space-x-2">
+                {t.rich("feedback.progressDBIntegration")}
+                {!complete.current && phase === "db" ? <LoadingSpinner /> : <Check />}
+              </div>
+              <Progress value={dbProgress} className="w-full" />
+              <div className="text-center text-xs text-slate-600">
+                {dbProgress}%
+              </div>
+            </div>
+          )}
+          {hasGeometry && (phase === "db" || phase === "country" || phase === "complete") && (
+            <div className="space-y-1">
+              <div className="flex truncate max-w-xl items-center space-x-2">
+                {t.rich("feedback.progressCountryAssignment")}
+                {phase === "country" && countryProgress < 100 ? (
+                  <LoadingSpinner />
+                ) : phase === "complete" || countryProgress === 100 ? (
+                  <Check />
+                ) : null}
+              </div>
+              <Progress value={countryProgress} className="w-full" />
+              <div className="text-center text-xs text-slate-600">
+                {countryProgress}%
+              </div>
             </div>
           )}
           <Button

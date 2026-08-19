@@ -6,11 +6,13 @@ import { useLocale } from 'next-intl';
 import { InfoIcon } from 'lucide-react';
 import { OpenInBrowser } from 'iconoir-react';
 
+/** Returns one MDX test-page parameter for every supported locale. */
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({locale}));
 }
 
  
+/** Returns the development surface for verifying localized MDX rendering components. */
 export default function Page() {
   const locale = useLocale() as Locale;
   const MDXContent = MDXContentProvider[locale].pages.PredictionView.detailView;

@@ -22,6 +22,11 @@ import { useLocale } from 'next-intl';
 
 const isSWAPY = true;
 
+/**
+ * Renders the world COVID-19 linked-view dashboard.
+ *
+ * @returns Localized world map and companion analytical cards.
+ */
 export default function Home() {
 
 const t = useTranslations("page_covidWorldView");

@@ -1,73 +1,98 @@
-/**
- * useGridLayer – Renders grid-cell data as a native Leaflet L.GridLayer.
- *
- * Architecture:
- *  - Each 256×256 tile gets its own <canvas>; projection: equirectangular.
- *  - Spatial index built once on data load; per-tile query is O(k).
- *  - canvas.style.pointerEvents = 'none' so Leaflet mouse events pass through.
- *
- * D3-tween transition guard:
- *  zoomAnimation={false} in BaseMap means Leaflet fires zoomend on every
- *  map.setView() call from the D3 tween (~60/s). updateWhenZooming:false
- *  responds to zoomend → createTile() 60×/s → main-thread block.
- *
- *  Fix: the parent passes `isTransitioningRef` (set true by onTransitionStart,
- *  false by onTransitionEnd). During transition, createTile() returns a blank
- *  canvas immediately. The parent calls the function stored in `redrawRef`
- *  once after onTransitionEnd to trigger a single full redraw.
- */
 import { useEffect, useRef, useMemo } from 'react';
 import * as d3 from 'd3';
 import type { VisDataT } from '../types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+/** Internal spatial grid cell descriptor for tile rendering */
 interface GridCell {
-    lat: number;   // north (top) edge latitude
-    lng: number;   // west  (left) edge longitude
-    dLat: number;  // cell height in degrees (positive)
-    dLng: number;  // cell width  in degrees (positive)
+    /** North (top) edge latitude in degrees */
+    lat: number;
+    /** West (left) edge longitude in degrees */
+    lng: number;
+    /** Cell height in latitude degrees */
+    dLat: number;
+    /** Cell width in longitude degrees */
+    dLng: number;
+    /** Numerical feature value */
     value: number;
 }
 
+/** Spatial bucket index structure providing $O(k)$ tile bounding box queries */
 interface SpatialIndex {
+    /** Query cells intersecting a tile's latitude/longitude bounding box */
     query(minLat: number, maxLat: number, minLng: number, maxLng: number): GridCell[];
+    /** Total indexed grid cell count */
     size: number;
 }
 
+/**
+ * Parameters for the {@link useGridLayer} tile rendering hook.
+ *
+ * @example
+ * ```ts
+ * const params: UseGridLayerParams = {
+ *   map: null,
+ *   L: null,
+ *   gridData: new Map(),
+ *   cellSize: { lat: 0.25, lng: 0.25 },
+ *   colorMap: (value) => d3.interpolateViridis(value),
+ *   layerOpacity: 0.85,
+ *   isLoading: false,
+ *   hasError: false,
+ * };
+ * ```
+ */
 export interface UseGridLayerParams {
+    /** Target Leaflet map instance */
     map: L.Map | null;
+    /** Imported Leaflet module instance */
     L: typeof import('leaflet') | null;
+    /** Parsed grid cell data Map from {@link useGridDataParser} */
     gridData: Map<number, VisDataT>;
+    /** Grid cell angular dimensions in degrees `{ lat, lng }` */
     cellSize: { lat: number; lng: number };
+    /** D3 color interpolator function projecting numerical feature values to CSS color strings */
     colorMap: (value: number) => string;
+    /** Spatial tile layer alpha opacity (0 to 1) */
     layerOpacity: number;
+    /** Whether dataset query is loading */
     isLoading: boolean;
+    /** Whether data loading failed */
     hasError: boolean;
     /**
-     * Set to true by useMapTransition's onTransitionStart,
-     * false by onTransitionEnd. Prevents tile creation during D3 tweens.
+     * Set true by {@link useMapTransition}'s `onTransitionStart`, false by `onTransitionEnd`.
+     * Forces `createTile()` to return blank canvas tiles during D3 camera tweens to maintain 60 fps.
      */
     isTransitioningRef?: React.MutableRefObject<boolean>;
     /**
-     * Set to true during active map zoom interactions.
-     * Prevents pruning old tiles and stops expensive tile redraws.
+     * Set true during active map zoom interactions.
+     * Prevents tile pruning overhead during zoom pinches.
      */
     isZoomingRef?: React.MutableRefObject<boolean>;
     /**
-     * Whether a D3 map transition is currently active.
-     * When true, the grid layer is removed from the map to avoid 60fps layout recalculation.
+     * Flag indicating active D3 map camera transition. Removes grid layer from Leaflet map during transitions.
      */
     isTransitioning?: boolean;
     /**
-     * The hook writes its redraw() function here.
-     * The parent calls it in onTransitionEnd to trigger one clean redraw.
+     * Mutable ref storing the layer `redraw()` callback. Executed once inside `onTransitionEnd` for a clean repaint.
      */
     redrawRef?: React.MutableRefObject<() => void>;
 }
 
 // ─── Spatial Index ────────────────────────────────────────────────────────────
 
+/**
+ * Constructs a 2.0-degree spatial bucket index (`SpatialIndex`) over a grid cell dataset.
+ *
+ * Partitions global coordinates into 2.0-degree latitude/longitude spatial buckets. Reduces tile bounding box lookup complexity from $O(N)$ to $O(k)$.
+ *
+ * @param gridData - Parsed grid cell Map matching {@link VisDataT}.
+ * @param cellSize - Angular cell width and height `{ lat, lng }`.
+ * @returns Spatial index object providing `query()` bounding box search method.
+ *
+ * @see {@link useGridLayer} for tile canvas rendering using this spatial index.
+ */
 function buildSpatialIndex(
     gridData: Map<number, VisDataT>,
     cellSize: { lat: number; lng: number }
@@ -135,6 +160,18 @@ function buildSpatialIndex(
 
 // ─── Tile renderer ────────────────────────────────────────────────────────────
 
+/**
+ * Renders grid cells onto an individual 256x256 pixel HTML5 `<canvas>` tile element.
+ *
+ * @param canvas - Target HTML5 canvas element.
+ * @param cells - List of grid cells intersecting tile bounds.
+ * @param minLat - Minimum latitude of tile.
+ * @param maxLat - Maximum latitude of tile.
+ * @param minLng - Minimum longitude of tile.
+ * @param maxLng - Maximum longitude of tile.
+ * @param opacity - Layer alpha opacity.
+ * @param colorMap - D3 color interpolator function.
+ */
 function renderTileCanvas(
     canvas: HTMLCanvasElement,
     cells: GridCell[],
@@ -164,6 +201,41 @@ function renderTileCanvas(
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
+/**
+ * High-performance spatial raster tile layer hook extending Leaflet `L.GridLayer`.
+ *
+ * Renders spatial grid datasets onto dynamic 256×256 HTML5 `<canvas>` tiles projected in equirectangular CRS.
+ *
+ * @param params - Configuration parameters matching {@link UseGridLayerParams}.
+ *
+ * @remarks
+ * **Tile Rendering Engine & Transition Guard Architecture:**
+ * 1. **2.0-Degree Spatial Indexing:** Builds a spatial bucket index (`buildSpatialIndex`) once when dataset changes. Per-tile query time is $O(k)$.
+ * 2. **Pointer Event Pass-Through:** Sets `canvas.style.pointerEvents = 'none'` on individual canvas tile elements so mouse hover/click gestures pass directly through to Leaflet base maps.
+ * 3. **D3 Transition Guard:** During animated camera `flyTo` transitions (`isTransitioningRef.current === true`), `createTile()` returns blank canvas elements instantly, bypassing expensive canvas repaints and maintaining main-thread 60 fps frame rates.
+ * 4. **Clean Redraw:** Triggers a single `layer.redraw()` execution via `redrawRef` upon transition completion (`onTransitionEnd`).
+ *
+ * @see {@link LeafD3Map} for primary Leaflet spatial map consumer component.
+ * @see {@link useGridDataParser} for input data parsing.
+ * @see {@link useMapTransition} for transition guard trigger integration.
+ * @see {@link VisDataT} for spatial data record contract.
+ *
+ * @example
+ * ```tsx
+ * useGridLayer({
+ *   map,
+ *   L,
+ *   gridData,
+ *   cellSize: { lat: 0.25, lng: 0.25 },
+ *   colorMap: (v) => d3.interpolateInferno(v),
+ *   layerOpacity: 0.85,
+ *   isLoading: false,
+ *   hasError: false,
+ *   isTransitioningRef,
+ *   redrawRef,
+ * });
+ * ```
+ */
 export function useGridLayer({
     map, L, gridData, cellSize, colorMap, layerOpacity,
     isLoading, hasError,
@@ -298,3 +370,4 @@ export function useGridLayer({
         }
     }, [isTransitioning, map]);
 }
+

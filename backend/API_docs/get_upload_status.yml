@@ -26,6 +26,23 @@ responses:
               type: string
               description: Error message, or "false" if no error occurred
               example: "false"
+            phase:
+              type: string
+              enum: [db, country, complete]
+              description: Currently active backend processing phase
+              example: "country"
+            has_geometry:
+              type: boolean
+              description: Whether the current dataset contains a geometry column
+              example: true
+            db_progress:
+              type: number
+              description: Database integration progress from 0 to 100
+              example: 82.5
+            country_progress:
+              type: number
+              description: Country assignment progress from 0 to 100, or 0 when not applicable
+              example: 35.0
   400:
     description: Missing id query parameter
     content:

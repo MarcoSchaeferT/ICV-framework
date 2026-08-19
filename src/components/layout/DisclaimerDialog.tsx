@@ -17,6 +17,14 @@ function setCookie(name: string, val: string, maxAgeSeconds: number) {
   document.cookie = `${name}=${val}; max-age=${maxAgeSeconds}; path=/; SameSite=Lax`;
 }
 
+/**
+ * Fetches deployment disclaimer policy and requests temporary acknowledgement when required.
+ *
+ * @returns The access disclaimer modal until accepted, otherwise `null`.
+ *
+ * @remarks
+ * Acknowledgement is stored as a short-lived `SameSite=Lax` cookie. The dialog does not process visualization data.
+ */
 export default function DisclaimerDialog() {
   const [isOpen, setIsOpen] = useState<boolean>(false);
 

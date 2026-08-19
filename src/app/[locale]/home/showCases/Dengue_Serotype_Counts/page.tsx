@@ -19,6 +19,7 @@ import { useUIContext } from '@/components/contexts/UIContext';
 
 const isSWAPY = true;
 
+/** Returns the geographic dengue-serotype distribution showcase dashboard. */
 export default function Home() {
 
 const t = useTranslations("page_home.ShowCases.page_Dengue_Serotype_Counts");

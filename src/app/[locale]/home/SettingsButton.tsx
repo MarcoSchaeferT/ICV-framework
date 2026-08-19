@@ -31,4 +31,5 @@ const SettingButton = () => {
         </>
   )
 }
+/** Default export for the landing-page control that opens disease selection. */
 export default SettingButton;

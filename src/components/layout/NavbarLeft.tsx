@@ -11,12 +11,19 @@ import { layoutSizes } from '@/app/const_store'
 import Checkbox_isSwapy from './SwapyHandle'
 import { useUIContext } from '../contexts/UIContext'
 
+/** Localized navigation links and initial expanded-state hint. */
 interface nav {
     navLinks: LINK[];
     isOpen: boolean;
 }
 
 
+/**
+ * Renders the optional collapsible icon navigation and Swapy control.
+ *
+ * @param props - Localized navigation links and initial open-state hint.
+ * @returns The animated left navigation bar.
+ */
 export default function NavbarLeft(props: nav): JSX.Element  {
   const [isOpen, setIsOpen] = useState(false)
   const [isPin, setIsPin] = useState(false)

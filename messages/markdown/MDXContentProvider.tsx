@@ -110,6 +110,9 @@ import SC_DengueSerotypeCounts_de from './pages/ShowCases/DengueSerotypeCounts/m
 // Uncertainty_Vis
 import SC_Uncertainty_Vis_en from './pages/ShowCases/Uncertainty_Vis/mainInfo_en.mdx';
 import SC_Uncertainty_Vis_de from './pages/ShowCases/Uncertainty_Vis/mainInfo_de.mdx';
+// ENSO_Suitability
+import SC_ENSO_Suitability_en from './pages/ShowCases/ENSO_Suitability/mainInfo_en.mdx';
+import SC_ENSO_Suitability_de from './pages/ShowCases/ENSO_Suitability/mainInfo_de.mdx';
 
 export interface HoverCardsContent {
     Info: React.FC; // general info + how to (+ data set details)
@@ -152,6 +155,7 @@ export interface MDXContentProviderType {
             ClimateAndHabitats: React.FC;
             DengueSerotypeCounts: React.FC;
             Uncertainty_Vis: React.FC;
+            ENSO_Suitability: React.FC;
         }
     }
     MapUI: {
@@ -215,6 +219,7 @@ export const MDXContentProvider: Record<string, MDXContentProviderType> = {
                 ClimateAndHabitats: SC_ClimateAndHabitats_en,
                 DengueSerotypeCounts: SC_DengueSerotypeCounts_en,
                 Uncertainty_Vis: SC_Uncertainty_Vis_en,
+                ENSO_Suitability: SC_ENSO_Suitability_en,
         }
         },
         MapUI: {
@@ -273,6 +278,7 @@ export const MDXContentProvider: Record<string, MDXContentProviderType> = {
                 ClimateAndHabitats: SC_ClimateAndHabitats_de,
                 DengueSerotypeCounts: SC_DengueSerotypeCounts_de,
                 Uncertainty_Vis: SC_Uncertainty_Vis_de,
+                ENSO_Suitability: SC_ENSO_Suitability_de,
             }
         },
         MapUI: {

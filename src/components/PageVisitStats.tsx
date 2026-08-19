@@ -4,6 +4,11 @@ import { useGetJSONData } from '@/app/hooks/useFetchAndCache';
 import { apiRoutes } from '@/app/api_routes';
 import { useMemo } from "react";
 
+/**
+ * Aggregates page-visit records into total visits and unique session counts per path.
+ *
+ * @returns A loading state, error state, or visit-statistics table.
+ */
 export default function PageVisitStats() {
   const url = apiRoutes.fetchDbData({ relationName: "page_visits", feature: "ALL" });
   const [isLoading, data] = useGetJSONData(url);

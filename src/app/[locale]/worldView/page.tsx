@@ -8,6 +8,7 @@ import { InterfaceContextProvider, useInterfaceContext } from '@/components/cont
 import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
 import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '@/components/plots/maps/LeafD3Map';
+import MiniMapOverlay from '@/components/plots/maps/overlays/MiniMapOverlay';
 import { createSwapy, Swapy } from 'swapy';
 import { MDXContentProvider } from '@messages/markdown/MDXContentProvider';
 import {ViewMainInfoComponent} from '@/components/ViewPageMainInfo';
@@ -18,6 +19,11 @@ import { useUIContext } from '@/components/contexts/UIContext';
 
 const isSWAPY = true;
 
+/**
+ * Renders the supported world prediction dashboard with linked Leaflet/D3 views.
+ *
+ * @returns Localized cards wrapped by the shared linked-view context and Swapy grid.
+ */
 export default function Home() {
 
 const t = useTranslations("page_predictionView");
@@ -171,42 +177,15 @@ let MDX = MDXContentProvider[locale];
           <SGridPlotCard rowColSpan={[9,6]} cardProps={d3MapCardProps_overview}>
             {/* Main world map */}
             <LeafD3MapLayerComponent props={worldMapProsp}/>
-            {/* Google-Maps-style overview minimap overlay.
-                NOTE: gridPlotCardContent class on the inner wrapper is REQUIRED by
-                useChartResizer so Leaflet can measure its container correctly. */}
-            <div
-              className="absolute overflow-hidden rounded-[10px] border-2 border-white/55 shadow-[0_4px_10px_rgba(0,0,0,0.45)]"
-              style={{
-                bottom: 50,
-                left: 4,
-                width: 450,
-                height: 230,
-                zIndex: 800,
-                backdropFilter: 'blur(2px)',
-              }}
-            >
-              {/* Label pill — non-interactive, floats above the minimap */}
-              <div
-                className="absolute top-1.5 left-2 pointer-events-none select-none rounded-full px-2 py-0.5 text-white font-semibold tracking-widest"
-                style={{
-                  zIndex: 900,
-                  fontSize: 10,
-                  background: 'rgba(20,20,30,0.72)',
-                  backdropFilter: 'blur(4px)',
-                }}
-              >
-                {d3MapCardProps2_overveiwDetail.headline || 'Overview'}
-              </div>
-              {/* gridPlotCardContent class REQUIRED by useChartResizer —
-                  position:relative + explicit px dims let MapContainer's "size-full absolute"
-                  resolve to real pixels via getBoundingClientRect. */}
-              <div
-                className="gridPlotCardContent relative pointer-events-none"
-                style={{ width: 450, height: 230 }}
-              >
-                <LeafD3MapLayerComponent props={mapPropsWorld2}/>
-              </div>
-            </div>
+            {/* Google-Maps-style overview minimap overlay */}
+            <MiniMapOverlay
+              mapProps={mapPropsWorld2}
+              height={225}
+              bottom={50}
+              zoom={0.1}
+              left={4}
+              label={d3MapCardProps2_overveiwDetail.headline || 'Overview'}
+            />
           </SGridPlotCard>
         </div>
       </InterfaceContextProvider>

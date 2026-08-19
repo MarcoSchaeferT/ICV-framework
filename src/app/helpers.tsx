@@ -163,6 +163,13 @@ class stateMappersGermany {
   }
 }
 
+/**
+ * Extracts a backend error only after a data request has finished.
+ *
+ * @param isLoading - Whether the associated request remains active.
+ * @param data - Standard Flask response wrapper.
+ * @returns The error string when available, otherwise `undefined`.
+ */
 function handleLoadDataError(isLoading: boolean, data: dbDATA): any | undefined {
   if (!isLoading) {
     if (data.error != undefined) {
@@ -172,6 +179,15 @@ function handleLoadDataError(isLoading: boolean, data: dbDATA): any | undefined 
   return undefined;
 }
 
+/**
+ * Displays unique errors collected from the data and metadata requests of one visualization.
+ *
+ * @param props - Error candidates and overlay positioning mode.
+ * @returns A hidden container when no error remains, otherwise a visible error list.
+ *
+ * @remarks
+ * Deduplication prevents the same shared backend failure from being repeated by several dependent loading operations.
+ */
 const PrintDataLoadingErrors = ({
   listOfErrors,
   position = "absolute",
@@ -197,6 +213,9 @@ const PrintDataLoadingErrors = ({
   );
 };
 
+/** Default export for German state identifier translation across linked map and table views. */
 export default stateMappersGermany;
+/** Public loading-error extraction and presentation helpers. */
 export { handleLoadDataError, PrintDataLoadingErrors };
+/** Type-only export for the German state mapper class. */
 export type { stateMappersGermany as stateMappersGermanyT };

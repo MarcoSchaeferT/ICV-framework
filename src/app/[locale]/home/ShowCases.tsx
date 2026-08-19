@@ -6,6 +6,7 @@ import { Locale, useLocale } from "next-intl";
 import { showCasesList } from "@messages/showCasesContent";
 import { useUIContext } from "@/components/contexts/UIContext";
 
+/** Returns the localized grid of maintained interactive ICV showcase dashboards. */
 export default function ShowcaseGrid() {
 
   const locale = useLocale() as Locale;

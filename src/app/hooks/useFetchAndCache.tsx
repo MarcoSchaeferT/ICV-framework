@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { dbDATA } from "@/app/const_store";
 
 /******************************
@@ -10,17 +10,23 @@ import { dbDATA } from "@/app/const_store";
 const dataCache = new Map<string, { data: dbDATA; timestamp: number; sizeBytes: number }>();
 
 // Track in-flight requests to prevent duplicate fetches for same URL
-// Structure: Map<URL, Promise<dbDATA | undefined>> — resolves to undefined
-// when the request was aborted (waiters check for this and skip the update)
-const inflightRequests = new Map<string, Promise<dbDATA | undefined>>();
+interface InflightRequest {
+    promise: Promise<dbDATA | undefined>;
+    controller: AbortController;
+    subscribers: number;
+}
+
+// Subscribers share one request. The request is aborted only after its last
+// consumer unmounts or changes URL.
+const inflightRequests = new Map<string, InflightRequest>();
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds (300,000ms)
 
 // Cache limits — whichever is hit first evicts the least-recently-used
 // entries. Dataset responses can be tens of MB, so without a bound a long
 // session browsing many datasets/filters would grow tab memory unbounded.
-const MAX_CACHE_ENTRIES = 100;
-const MAX_CACHE_BYTES = 2048 * 1024 * 1024; // 2 GB (estimated)
+const MAX_CACHE_ENTRIES = 32;
+const MAX_CACHE_BYTES = 256 * 1024 * 1024; // 256 MB estimated JS heap
 
 // Running total of the estimated cache size in bytes
 let cacheTotalBytes = 0;
@@ -31,6 +37,26 @@ function removeCacheEntry(url: string) {
         cacheTotalBytes -= entry.sizeBytes;
         dataCache.delete(url);
     }
+}
+
+function responseMatchesRequest(url: string, data: dbDATA): boolean {
+    let expectedRelation = "";
+    try {
+        expectedRelation = new URL(url, "http://localhost").searchParams.get("relationName") || "";
+    } catch {
+        return true;
+    }
+    const actualRelation = typeof data?.relationName === "string" ? data.relationName : "";
+    return !expectedRelation || !actualRelation || expectedRelation === actualRelation;
+}
+
+function getUsableCacheEntry(url: string) {
+    const entry = dataCache.get(url);
+    if (entry && !responseMatchesRequest(url, entry.data)) {
+        removeCacheEntry(url);
+        return undefined;
+    }
+    return entry;
 }
 
 /** Re-insert an entry so it becomes the most-recently-used one.
@@ -44,6 +70,7 @@ function touchCacheEntry(url: string) {
 }
 
 function storeInCache(url: string, data: dbDATA, sizeBytes: number) {
+    if (!responseMatchesRequest(url, data)) return;
     // A single response bigger than the whole budget is served but not cached
     if (sizeBytes > MAX_CACHE_BYTES) return;
 
@@ -73,25 +100,50 @@ function storeInCache(url: string, data: dbDATA, sizeBytes: number) {
 // Stable empty object reference — avoids creating a new {} on every render
 const EMPTY_DATA = {} as dbDATA;
 
+function releaseInflightRequest(url: string, request: InflightRequest) {
+    const current = inflightRequests.get(url);
+    if (current !== request) return;
+    current.subscribers = Math.max(0, current.subscribers - 1);
+    if (current.subscribers === 0) {
+        inflightRequests.delete(url);
+        current.controller.abort();
+    }
+}
+
 
 /**
- * Custom React hook to fetch JSON data from a given API URL with caching and proper cleanup.
+ * Primary HTTP data fetching hook with LRU caching, in-flight request deduplication, and an `AbortController` signal.
  *
- * @param url - The API URL to fetch the data from.
- * @param isAllowed - Optional flag to control if fetching is allowed.
- * @returns A tuple containing:
- * - `isLoadingData`: A boolean indicating if the data is still being loaded.
- * - `data`: The fetched JSON data.
+ * Primary data pipeline hook for retrieving spatial grid datasets, vector presence markers, and genomic metadata payloads
+ * from backend endpoints (`/api/db/getDataFromDB`).
  *
- * Features:
- * - Caches data for 5 minutes (prevents repeated fetches)
- * - Cache is bounded (max 50 entries / ~150 MB) with LRU eviction
- * - Prevents duplicate fetches (if 2+ components request same URL simultaneously)
- * - Aborts in-flight requests on unmount (prevents memory leaks)
+ * @param url - Absolute or relative API URL string to fetch.
+ * @param isAllowed - Optional boolean flag controlling whether the request is authorized to execute. @default true
+ * @returns A tuple `[isLoadingData, data]`:
+ * - `isLoadingData`: True while the HTTP request is pending or initializing.
+ * - `data`: Parsed JSON response payload matching {@link dbDATA}.
  *
+ * @remarks
+ * **Performance & Memory Architecture:**
+ * 1. **Zero-Latency Cached Reads:** Uses `useState` lazy initializers to synchronously return cached data on initial component mount.
+ * 2. **In-Flight Request Deduplication:** If multiple dashboard cards request the same dataset simultaneously, only a single HTTP network request is dispatched. Subscribing components await the shared Promise (`inflightRequests`).
+ * 3. **LRU Cache Eviction:** Bounded in-memory LRU cache holding up to 32 entries or an estimated 256 MB (`MAX_CACHE_BYTES`).
+ * 4. **5-Minute TTL:** Cached items automatically expire after 300,000 ms (`CACHE_DURATION`).
+ * 5. **Unmount Safety:** Reference-counted subscribers abort a request after its final consumer unmounts.
+ *
+ * @see {@link InterfaceContext} for global URL state parameters driving this hook.
+ * @see {@link LeafD3Map} for Leaflet map integration consuming `useGetJSONData`.
+ * @see {@link clearDataCache} to flush all cached endpoints.
+ * @see {@link clearCacheForUrl} to evict a specific endpoint.
  *
  * @example
- * const [isLoadingData, data] = useGetJSONData('https://api.example.com/data');
+ * ```tsx
+ * const url = "/api/db/getDataFromDB?dataset=world_mosquitos&feature=mosquito_amount";
+ * const [isLoading, rawData] = useGetJSONData(url, true);
+ *
+ * if (isLoading) return <LoadingSpinner />;
+ * console.log("Fetched grid records:", rawData.response?.length);
+ * ```
  */
 function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boolean, data: dbDATA] {
 
@@ -103,7 +155,7 @@ function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boole
     // between mount and effect, so no need for workarounds in the return.
     const [isLoadingData, setLoading] = useState(() => {
         if (!shouldFetch) return false;
-        const cached = dataCache.get(url);
+        const cached = getUsableCacheEntry(url);
         if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
             return false; // cache hit → not loading
         }
@@ -112,28 +164,28 @@ function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boole
 
     const [data, setData] = useState<dbDATA>(() => {
         if (!shouldFetch) return EMPTY_DATA;
-        const cached = dataCache.get(url);
+        const cached = getUsableCacheEntry(url);
         if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
             return cached.data; // start with cached data immediately
         }
         return EMPTY_DATA;
     });
-
-    const abortControllerRef = useRef<AbortController | null>(null);
+    const [dataUrl, setDataUrl] = useState(() => shouldFetch ? url : "");
 
     // STEP 2: Effect to handle URL changes and fetch data
     useEffect(() => {
         if (!shouldFetch) {
             // Reset to idle state when fetching is disabled (e.g. empty URL)
-            setLoading(false);
+            setLoading(false); // eslint-disable-line react-hooks/set-state-in-effect
             setData(EMPTY_DATA);
+            setDataUrl("");
             return;
         }
 
         let isMounted = true;
 
         // STEP 2a: Check cache before fetching
-        const cached = dataCache.get(url);
+        const cached = getUsableCacheEntry(url);
         if (cached) {
             const age = Date.now() - cached.timestamp;
 
@@ -143,7 +195,8 @@ function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boole
                 // Cache is valid — synchronous setState is intentional here:
                 // this is a data-fetching hook that reads from an in-memory cache.
                 if (isMounted) {
-                    setData(cached.data); // eslint-disable-line react-hooks/set-state-in-effect
+                    setData(cached.data);
+                    setDataUrl(url);
                     setLoading(false);
                 }
                 return () => {
@@ -162,11 +215,14 @@ function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boole
         if (existingRequest) {
             // Another component is already fetching this URL!
             // Wait for that fetch to complete instead of starting a new one
-            existingRequest
+            existingRequest.subscribers += 1;
+            existingRequest.promise
                 .then((fetchedData) => {
-                    // fetchedData is undefined on abort, skip state update in that case
-                    if (isMounted && fetchedData !== undefined) {
-                        setData(fetchedData);
+                    if (isMounted) {
+                        if (fetchedData !== undefined) {
+                            setData(fetchedData);
+                            setDataUrl(url);
+                        }
                         setLoading(false);
                     }
                 });
@@ -174,12 +230,17 @@ function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boole
             // Return cleanup function to prevent state updates after unmount
             return () => {
                 isMounted = false;
+                releaseInflightRequest(url, existingRequest);
             };
         }
 
         // STEP 2c: No cache, no in-flight request - create new fetch
         const abortController = new AbortController();
-        abortControllerRef.current = abortController;
+        const requestEntry: InflightRequest = {
+            promise: Promise.resolve(undefined),
+            controller: abortController,
+            subscribers: 1,
+        };
 
         const fetchPromise = fetch(url, {
             method: "GET",
@@ -199,14 +260,35 @@ function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boole
                     console.log("Expected server error gracefully caught:", errorMSG);
                     return { error: errorMSG } as dbDATA;
                 }
-                // Read as text first: its length is a cheap size estimate for the
-                // cache accounting (UTF-16 code units ≈ bytes for JSON payloads)
-                const text = await res.text();
-                const fetchedData = JSON.parse(text) as dbDATA;
+                let fetchedData: dbDATA;
+                try {
+                    fetchedData = await res.json() as dbDATA;
+                } catch (parseErr) {
+                    console.error("Failed to parse JSON response from:", url, parseErr);
+                    fetchedData = { error: "Invalid non-JSON response from server" } as dbDATA;
+                }
+
+                if (!responseMatchesRequest(url, fetchedData)) {
+                    const actualRelation = fetchedData.relationName || "unknown";
+                    fetchedData = {
+                        error: `Discarded response for unexpected relation '${actualRelation}'.`,
+                    } as dbDATA;
+                }
 
                 // STEP 5: Save to cache with size-bounded LRU (only if no error)
                 if (!(fetchedData as any).error) {
-                    storeInCache(url, fetchedData, text.length);
+                    const reportedLength = Number(
+                        res.headers.get("X-Uncompressed-Length") ||
+                        res.headers.get("Content-Length") ||
+                        0
+                    );
+                    // Parsed JS arrays/objects need more memory than their JSON
+                    // representation. The multiplier deliberately errs on the
+                    // conservative side for cache eviction.
+                    const estimatedHeapBytes = reportedLength > 0
+                        ? Math.ceil(reportedLength * 2.5)
+                        : 1024 * 1024;
+                    storeInCache(url, fetchedData, estimatedHeapBytes);
                 }
                 return fetchedData;
             })
@@ -214,6 +296,7 @@ function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boole
                 // Update this component's state
                 if (isMounted) {
                     setData(fetchedData);
+                    setDataUrl(url);
                     setLoading(false);
                 }
 
@@ -229,6 +312,7 @@ function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boole
                     const errorData: dbDATA = { error: `Fetch error: ${error.message}` } as dbDATA;
                     if (isMounted) {
                         setData(errorData);
+                        setDataUrl(url);
                         setLoading(false);
                     }
                     console.error('Fetch error:', error);
@@ -237,27 +321,34 @@ function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boole
             })
             .finally(() => {
                 // STEP 6: Clean up in-flight request tracking
-                inflightRequests.delete(url);
+                if (inflightRequests.get(url) === requestEntry) {
+                    inflightRequests.delete(url);
+                }
             });
 
         // Store the promise so other components can wait for it
-        inflightRequests.set(url, fetchPromise);
+        requestEntry.promise = fetchPromise;
+        inflightRequests.set(url, requestEntry);
 
         return () => {
             isMounted = false;
+            releaseInflightRequest(url, requestEntry);
         };
 
     }, [url, shouldFetch]);
 
     if (!shouldFetch) return [false, EMPTY_DATA];
+    if (dataUrl !== url) return [true, EMPTY_DATA];
     return [isLoadingData, data];
 }
 
 /**
- * Clear the entire data cache - useful for forcing fresh data fetch
- * 
- * Use case: User clicks "Refresh All Data" button
- * Result: All cached URLs cleared, next fetch will be fresh
+ * Flushes all cached dataset responses from the global in-memory cache and resets byte counters.
+ *
+ * @remarks
+ * Useful when the user triggers a explicit "Refresh Data" action, forcing fresh HTTP API fetches.
+ *
+ * @see {@link useGetJSONData}
  */
 function clearDataCache() {
     dataCache.clear();
@@ -265,15 +356,17 @@ function clearDataCache() {
 }
 
 /**
- * Clear specific URL from cache
- * 
- * Use case: User knows data for specific endpoint changed
- * Result: Only that URL cleared, other cached data preserved
- * 
- * @param url - The specific URL to remove from cache
+ * Removes a specific API endpoint URL entry from the global in-memory cache.
+ *
+ * @param url - The API endpoint URL to evict.
+ *
+ * @see {@link useGetJSONData}
+ * @see {@link clearDataCache}
  */
 function clearCacheForUrl(url: string) {
     removeCacheEntry(url);
 }
 
+/** Public client-data cache and retrieval API. */
 export { useGetJSONData, clearDataCache, clearCacheForUrl };
+

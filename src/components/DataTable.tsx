@@ -68,19 +68,44 @@ import { useLoadingTask, LoadingSpinnerAnimation } from "./plots/maps/utils/load
 const EMPTY_ARRAY: any[] = [];
 const NO_DATA_FALLBACK: any[] = [{ no_data: "" }];
 
-// define the values and types for the DataTableComponent
+/**
+ * Configuration contract for the linked, virtualized public-health data table.
+ *
+ * @remarks
+ * `refDataTableClass` supplies the dataset-specific columns and URL contract. Row clicks may update `InterfaceContext`
+ * so maps and charts can brush the same selected record.
+ *
+ * @example
+ * ```tsx
+ * const config: dataTableComponentT = {
+ *   refDataTableClass: new CovidDataStates(),
+ *   cardProps: CardPropsClass(
+ *     "germany-state-table",
+ *     "COVID-19 by state",
+ *     "Select a state to link all views",
+ *     "Source: RKI",
+ *   ),
+ *   onClickEvent: (row, key, context) => context.setTableRowID(key),
+ * };
+ * ```
+ */
 export interface dataTableComponentT {
+  /** Dataset-specific columns, mapping behavior, and endpoint builder. */
   refDataTableClass: any,
+  /** Standard dashboard-card presentation. */
   cardProps: CardPropsClass,
+  /** Optional linked-view row-selection handler. */
   onClickEvent?: (row: Row<unknown>, key: number, context: interfaceContextI) => void,
 };
 
 
 
 declare module "@tanstack/react-table" {
+  /** ICV-specific fuzzy filter registered with TanStack Table. */
   interface FilterFns {
     fuzzy: FilterFn<unknown>;
   }
+  /** Ranking metadata attached to a fuzzy-filtered cell. */
   interface FilterMeta {
     itemRank: RankingInfo;
   }
@@ -504,5 +529,6 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
   }   
  
 
-  export default DataTableComponent;
+/** Default export for the linked public-health data table. */
+export default DataTableComponent;
 

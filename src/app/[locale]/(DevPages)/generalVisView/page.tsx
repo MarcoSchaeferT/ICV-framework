@@ -19,6 +19,7 @@ import { availableColorMapsNames } from '@/components/plots/maps/constants';
 
 const isSWAPY = true;
 
+/** Returns the development dashboard used to exercise linked supported visualization components. */
 export default function Home() {
 
 const t = useTranslations("page_predictionView");

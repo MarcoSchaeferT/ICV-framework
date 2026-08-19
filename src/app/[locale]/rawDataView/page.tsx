@@ -33,6 +33,11 @@ import {
 
 const isSWAPY = true;
 
+/**
+ * Renders the raw-data exploration dashboard with linked map and temporal chart views.
+ *
+ * @returns Localized, resizable Leaflet/D3 and data-analysis cards.
+ */
 export default function Home() {
 
   const locale = useLocale() as Locale;

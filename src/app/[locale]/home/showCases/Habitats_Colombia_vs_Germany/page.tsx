@@ -18,6 +18,7 @@ import { useUIContext } from '@/components/contexts/UIContext';
 
 const isSWAPY = true;
 
+/** Returns the linked Colombia-versus-Germany habitat comparison showcase. */
 export default function Home() {
 
 const t = useTranslations("page_home.ShowCases.page_Habitats_Colombia_vs_Germany");

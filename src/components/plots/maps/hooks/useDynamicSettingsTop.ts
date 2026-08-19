@@ -1,13 +1,31 @@
 import { useState, useRef, useEffect } from 'react';
 
 /**
- * Custom hook to dynamically calculate the top position of the settings gear button.
- * If a card title element exists, the button is centered vertically in the middle of that title row.
- * Otherwise, it falls back to header centering or top padding inside the card container.
+ * Dynamically computes the vertical pixel offset (`top`) for positioning the map settings gear button.
  *
- * @param defaultTop - Fallback top offset in pixels if no card header/title exists (default: 6)
- * @param buttonHeight - The outer height of the gear button in pixels for vertical centering (default: 32)
- * @returns An object containing `containerRef` to attach to the root container and `settingsTop` in pixels.
+ * Traverses up the DOM to find the parent dashboard card (`.cardWrapper` or `[data-swapy-slot]`), inspects header element bounding rectangles,
+ * and centers the gear button relative to the card title row.
+ *
+ * @param defaultTop - Fallback pixel offset if no header or title element is found. @default 6
+ * @param buttonHeight - Outer pixel height of the gear button for vertical centering calculations. @default 32
+ * @returns Object containing `containerRef` to attach to the map root container and computed `settingsTop` pixel offset.
+ *
+ * @remarks
+ * In multi-view dashboard grid layouts, cards may have varying header heights, badges, or title rows. Hardcoding absolute pixel offsets
+ * causes the gear button to misalign with card headers. Using a `ResizeObserver` on the parent card wrapper guarantees seamless vertical alignment
+ * during dynamic container resizes or dynamic card expansions.
+ *
+ * @example
+ * ```tsx
+ * const { containerRef, settingsTop } = useDynamicSettingsTop(6, 32);
+ * return (
+ *   <div ref={containerRef} className="relative size-full">
+ *     <div className="absolute right-14 z-600" style={{ top: `${settingsTop}px` }}>
+ *       <button className="p-1 rounded-full bg-black"><Settings /></button>
+ *     </div>
+ *   </div>
+ * );
+ * ```
  */
 export function useDynamicSettingsTop(defaultTop: number = 6, buttonHeight: number = 32) {
     const containerRef = useRef<HTMLDivElement | null>(null);
@@ -68,3 +86,4 @@ export function useDynamicSettingsTop(defaultTop: number = 6, buttonHeight: numb
 
     return { containerRef, settingsTop };
 }
+

@@ -1,4 +1,10 @@
 
+/**
+ * Applies the standard readable typography used by full-page MDX documentation.
+ *
+ * @param props - Compiled localized MDX children.
+ * @returns A responsive prose container for documentation pages.
+ */
 export default function MdxLayout({ children }: { children: React.ReactNode }) {
   // Create any shared layout or styles here
   return (
@@ -22,6 +28,12 @@ export default function MdxLayout({ children }: { children: React.ReactNode }) {
 }
 
 
+/**
+ * Applies compact, high-contrast typography to MDX rendered inside visualization tooltips.
+ *
+ * @param props - Compiled localized MDX children.
+ * @returns A dark tooltip-safe prose container.
+ */
 export function MdxLayoutTooltip({ children }: { children: React.ReactNode }) {
   // Create any shared layout or styles here
   return (
@@ -53,6 +65,12 @@ export function MdxLayoutTooltip({ children }: { children: React.ReactNode }) {
 }
 
 
+/**
+ * Applies the restrained typography used by project and domain-information prose.
+ *
+ * @param props - Compiled localized MDX children.
+ * @returns A prose container optimized for longer descriptive text.
+ */
 export function MdxLayoutAbout({ children }: { children: React.ReactNode }) {
   // Create any shared layout or styles here
   return (

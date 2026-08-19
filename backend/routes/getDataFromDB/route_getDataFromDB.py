@@ -1,9 +1,11 @@
-from flask import request, jsonify, Blueprint, make_response
-from backend.routes.setFilesToDB.db_utils import query_raw
+from flask import request, jsonify, Blueprint, make_response, Response
+from backend.routes.setFilesToDB.db_utils import query_raw, query_columnar
 from backend.routes.processData.aggregateRKIdata import aggregate_rki_data
 from backend.cache import response_cache, make_cache_key
+from dataclasses import dataclass
+import gzip
 import time
-from math import ceil
+from math import ceil, isfinite
 from pydantic import BaseModel, ValidationError
 from typing import Optional, List, Union
 from flasgger import swag_from
@@ -11,15 +13,26 @@ import re
 import json as JSON
 from psycopg import errors as psycopg_errors, sql
 
+try:
+  import orjson
+except ImportError:  # Local development can still run before dependencies are refreshed.
+  orjson = None
+
 # Blueprint configuration
 route_getDataFromDB = Blueprint('getDataFromDB', __name__)
+GRID_COORDINATE_RE = re.compile(
+  r"([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)\s+"
+  r"([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)"
+)
 
 #***************#
 # *** Route *** #
 #***************#
 class RequestParams(BaseModel):
   relationName: str
-  feature: str
+  feature: str = ""
+  features: Optional[str] = None
+  limit: Optional[int] = None
   filterBy: Optional[str] = None
   filterValue: Optional[str] = None
   startDate: Optional[str] = None
@@ -27,12 +40,76 @@ class RequestParams(BaseModel):
   targetDate: Optional[str] = None
   task: Optional[str] = None
   aggregation_level: Optional[str] = None
+  responseFormat: Optional[str] = None
+  groupBy: Optional[str] = None
 
 class ResponseJson(BaseModel):
   relationName: str
   header: list[str]
   response: object
   error: str | None = None
+  isTruncated: bool = False
+  rowLimit: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CachedJSONResponse:
+  body: bytes
+  encoding: str
+  uncompressed_length: int
+
+
+def _response_payload(response_json: ResponseJson) -> dict:
+  """Build the response envelope without recursively copying large payloads."""
+  return {
+    "relationName": response_json.relationName,
+    "header": response_json.header,
+    "response": response_json.response,
+    "error": response_json.error,
+    "isTruncated": response_json.isTruncated,
+    "rowLimit": response_json.rowLimit,
+  }
+
+
+def _requested_encoding() -> str:
+  return "gzip" if request.accept_encodings["gzip"] > 0 else "identity"
+
+
+def _encode_json_response(payload: object, encoding: str) -> CachedJSONResponse:
+  if orjson is not None:
+    # Match Flask's compatibility behavior for PostgreSQL-specific scalar
+    # types such as Decimal while retaining orjson's fast native path.
+    raw = orjson.dumps(payload, default=str)
+  else:
+    raw = JSON.dumps(
+      payload,
+      ensure_ascii=False,
+      separators=(",", ":"),
+      default=str,
+    ).encode("utf-8")
+  body = gzip.compress(raw, compresslevel=5) if encoding == "gzip" else raw
+  return CachedJSONResponse(body, encoding, len(raw))
+
+
+def _make_cached_response(cached: CachedJSONResponse, cache_status: str) -> Response:
+  response = Response(cached.body, status=200, content_type="application/json; charset=utf-8")
+  if cached.encoding == "gzip":
+    response.headers["Content-Encoding"] = "gzip"
+  response.headers["Vary"] = "Accept-Encoding"
+  response.headers["X-Uncompressed-Length"] = str(cached.uncompressed_length)
+  response.headers["X-Cache"] = cache_status
+  return response
+
+
+def _cache_json_response(cache_key: str, payload: object, relation_name: str) -> Response:
+  encoded = _encode_json_response(payload, _requested_encoding())
+  response_cache.set(
+    cache_key,
+    encoded,
+    scopes=(relation_name,),
+    size_bytes=len(encoded.body),
+  )
+  return _make_cached_response(encoded, "MISS")
 
 @swag_from('../../API_docs/get_data_from_db.yml')
 @route_getDataFromDB.route("", methods=["GET"])
@@ -48,7 +125,9 @@ async def getDataFromDB():
       try:
         params = RequestParams(
           relationName=request.args["relationName"],
-          feature=request.args["feature"],
+          feature=request.args.get("feature", ""),
+          features=request.args.get("features"),
+          limit=request.args.get("limit"),
           filterBy=request.args.get("filterBy"),
           filterValue=request.args.get("filterValue"),
           startDate=request.args.get("startDate"),
@@ -56,22 +135,31 @@ async def getDataFromDB():
           targetDate=request.args.get("targetDate"),
           # aggregation_level is optional, used for filtering data by aggregation level (e.g., country (aggregation_level=0), (aggregation_level=1))
           aggregation_level=request.args.get("aggregation_level"),
-          task=request.args.get("task")
+          task=request.args.get("task"),
+          responseFormat=request.args.get("responseFormat"),
+          groupBy=request.args.get("groupBy"),
         )
       except ValidationError as e:
         response_json.error =  "ERROR: Invalid request parameters, details:" + str(e.errors())
         return response_json.model_dump()
 
       # --- Cache lookup ---
+      response_encoding = _requested_encoding()
       cache_key = make_cache_key(
           "getDataFromDB", params.relationName, params.feature,
+          params.features, params.limit,
           params.filterBy, params.filterValue,
           params.startDate, params.endDate, params.targetDate,
           params.task, params.aggregation_level,
+          params.responseFormat, params.groupBy, response_encoding,
       )
       cached = response_cache.get(cache_key)
       if cached is not None:
           print(f"[CACHE HIT] {cache_key}")
+          if isinstance(cached, CachedJSONResponse):
+            return _make_cached_response(cached, "HIT")
+          # Backwards-compatible path for small schema/legacy entries created
+          # by older workers during a graceful deployment.
           resp = make_response(jsonify(cached))
           resp.headers["X-Cache"] = "HIT"
           return resp
@@ -79,11 +167,20 @@ async def getDataFromDB():
       print("***params", params)
       relationName: str = params.relationName
       feature: str = params.feature
+      requested_features = [
+          value.strip()
+          for value in (params.features or "").split(",")
+          if value.strip()
+      ]
       filterBy: List[str] = consumeARGSvalues(params.filterBy)
       filterValue: List[str] = consumeARGSvalues(params.filterValue)
       startDate: Optional[str] = params.startDate
       endDate: Optional[str] = params.endDate
       aggregation_level: Optional[str] = params.aggregation_level
+
+      if params.responseFormat not in (None, "", "map-grid-v1"):
+        response_json.error = f"Unsupported responseFormat '{params.responseFormat}'."
+        return response_json.model_dump()
 
       if feature.upper() == "ALL":
         feature = "ALL"
@@ -123,6 +220,44 @@ async def getDataFromDB():
         
       response_json.header = list(schema["columns"].keys())
 
+      # Multi-column chart queries are opt-in and do not alter the existing
+      # single-feature response contract. Duplicate column names are removed
+      # while preserving the caller's requested order.
+      requested_features = list(dict.fromkeys(requested_features))
+      if requested_features:
+        missing_features = [name for name in requested_features if name not in response_json.header]
+        if missing_features:
+          response_json.error = (
+              f"Columns {missing_features} do not exist in table '{relationName}'."
+          )
+          return response_json.model_dump()
+
+        requested_limit = params.limit if params.limit is not None else 100
+        # A limit of -1 is an explicit opt-in to the potentially expensive
+        # unbounded debug mode exposed by the layout-template sidebar.
+        row_limit = None if requested_limit == -1 else max(1, min(requested_limit, 10000))
+        response_json.rowLimit = row_limit
+        [
+            response_json.response,
+            response_json.error,
+            response_json.isTruncated,
+        ] = await getDBdata_selectedCols(relationName, requested_features, row_limit)
+
+        result = _response_payload(response_json)
+        if response_json.error is None:
+          return _cache_json_response(cache_key, result, params.relationName)
+        return jsonify(result)
+
+      # Dynamic map views such as rawDataView know the relation before they
+      # have loaded its columns. Select a meaningful numeric value column for
+      # that initial compact request and report it in the response so the UI
+      # can adopt the exact same feature without a failed bootstrap request.
+      if not feature and params.responseFormat == "map-grid-v1":
+        feature = _default_grid_feature(response_json.header, schema["columns"])
+        if not feature:
+          response_json.error = "Compact map grids require a numeric feature column."
+          return response_json.model_dump()
+
       # if feature is not provided, get the middle feature
       if not feature:
         feature = response_json.header[ceil(len(response_json.header)/2)-1]
@@ -141,10 +276,25 @@ async def getDataFromDB():
               response_json.error = f"Filter column '{fb}' does not exist in table '{relationName}'."
               return response_json.model_dump()
 
+      if params.groupBy and params.groupBy not in response_json.header:
+        response_json.error = f"Group-by column '{params.groupBy}' does not exist in table '{relationName}'."
+        return response_json.model_dump()
+
 
       # get the records from the database
-      if isFeatureScan:
-        [response_json.response, response_json.error] = await getDBdata_multiCol(relationName, feature, filterBy, filterValue, startDate, endDate, aggregation_level)
+      if params.responseFormat == "map-grid-v1":
+         [response_json.response, response_json.error] = await getDBdata_mapGrid(
+           relationName,
+           feature,
+           filterBy,
+           filterValue,
+           startDate,
+           endDate,
+           aggregation_level,
+           params.targetDate,
+         )
+      elif isFeatureScan:
+         [response_json.response, response_json.error] = await getDBdata_multiCol(relationName, feature, filterBy, filterValue, startDate, endDate, aggregation_level)
       elif feature == "ALL":
          [response_json.response, response_json.error] = await getDBdata_allCols(relationName, params.targetDate, startDate, endDate)
       else:
@@ -155,22 +305,257 @@ async def getDataFromDB():
              [response_json.response, response_json.error] = await getDBdata_singleColMinMax(relationName, feature)
           case "getCount":
              [response_json.response, response_json.error] = await getDBdata_singleColCount(relationName, feature, filterBy, filterValue)
+          case "getGroupedCount":
+             if not params.groupBy:
+               response_json.error = "The getGroupedCount task requires groupBy."
+             else:
+               [response_json.response, response_json.error] = await getDBdata_groupedCount(
+                 relationName,
+                 feature,
+                 params.groupBy,
+                 filterBy,
+                 filterValue,
+               )
           case _:
              [response_json.response, response_json.error] = await getDBdata_singleCol(relationName, feature, filterBy, filterValue, startDate, endDate, aggregation_level, params.targetDate)
              if response_json.error:
                 response_json.error = "ERROR: task-> "+str(params.task)+ " unknown -OR- " + response_json.error
 
       # --- Store in cache (only successful responses) ---
-      result = response_json.model_dump()
+      result = _response_payload(response_json)
       if response_json.error is None:
-          response_cache.set(cache_key, result, scopes=(params.relationName,))
           print(f"[CACHE STORE] {cache_key}")
+          return _cache_json_response(cache_key, result, params.relationName)
 
-      resp = make_response(jsonify(result))
-      resp.headers["X-Cache"] = "MISS"
-      return resp
+      return jsonify(result)
   # If the request method is not GET, return an error or appropriate response
   return {"ERROR": "Invalid request method."}
+
+
+def _grid_geometry_points(geometry: str) -> tuple[tuple[float, float], ...]:
+  """Return the first four unique WKT polygon corners as ``(lat, lng)``."""
+  # Uploaded grids use simple POLYGON WKT. Splitting that common form is about
+  # twice as fast as a full regex scan over hundreds of thousands of cells.
+  try:
+    start = geometry.index("((") + 2
+    end = geometry.rindex("))")
+    tokens = geometry[start:end].split(",", 4)[:4]
+    points = []
+    for token in tokens:
+      longitude, latitude = token.strip().split()[:2]
+      points.append((float(latitude), float(longitude)))
+    if len(points) == 4:
+      return tuple(points)
+  except (AttributeError, ValueError, IndexError):
+    pass
+
+  pairs = GRID_COORDINATE_RE.findall(geometry or "")
+  if len(pairs) < 4:
+    raise ValueError("The first grid geometry is not a valid polygon.")
+  return tuple((float(lat), float(lng)) for lng, lat in pairs[:4])
+
+
+def _grid_geometry_bounds(geometry: str) -> tuple[float, float, float, float]:
+  """Return north, south, west and east bounds for a WKT grid polygon."""
+  points = _grid_geometry_points(geometry)
+
+  latitudes = [point[0] for point in points]
+  longitudes = [point[1] for point in points]
+  north = max(latitudes)
+  south = min(latitudes)
+  west = min(longitudes)
+  east = max(longitudes)
+  return north, south, west, east
+
+
+GRID_STRUCTURAL_COLUMNS = {
+  "id", "geometry", "latitude", "longitude", "lat", "lon", "lng", "x", "y",
+  "north", "south", "east", "west", "lat0", "lng0", "lat1", "lng1",
+  "lat2", "lng2", "lat3", "lng3",
+}
+GRID_NUMERIC_TYPES = {
+  "smallint", "integer", "bigint", "decimal", "numeric", "real",
+  "double precision", "smallserial", "serial", "bigserial",
+}
+
+
+def _default_grid_feature(column_names: list[str], column_types: dict[str, str]) -> str:
+  """Choose a stable numeric value column for a compact-grid bootstrap."""
+  candidates = [
+    name for name in column_names
+    if name.lower() not in GRID_STRUCTURAL_COLUMNS
+    and column_types.get(name, "").lower() in GRID_NUMERIC_TYPES
+  ]
+  if not candidates:
+    return ""
+  return candidates[ceil(len(candidates) / 2) - 1]
+
+
+def _grid_geometry_metadata(
+  geometry: str,
+  latitude: object,
+  longitude: object,
+) -> tuple[list[float], list[float]]:
+  """Return per-dataset cell size and the grid anchor offset.
+
+  The legacy frontend already assumes one uniform resolution per dataset.
+  Deriving these values from the first valid polygon preserves that behavior
+  while avoiding a repeated WKT polygon in every response row.
+  """
+  north, south, west, east = _grid_geometry_bounds(geometry)
+  cell_size = [north - south, east - west]
+  if cell_size[0] <= 0 or cell_size[1] <= 0:
+    raise ValueError("The first grid geometry has a zero-sized cell.")
+
+  anchor_offset = [north - float(latitude), west - float(longitude)]
+  return cell_size, anchor_offset
+
+
+async def getDBdata_mapGrid(
+  relationName: str,
+  feature: str,
+  filterBy: Optional[List[str]],
+  filterValue: Optional[List[str]],
+  startDate: Optional[str],
+  endDate: Optional[str],
+  aggregation_level: Optional[str] = None,
+  targetDate: Optional[str] = None,
+) -> tuple[object, str | None]:
+  """Return compact per-cell bounds while preserving source projections."""
+  start_time = time.time()
+  schema = await get_relation_schema(relationName)
+  column_names = list(schema["columns"].keys())
+  if "geometry" not in column_names:
+    return ("", "Compact map grids require a geometry column.")
+  if not feature or feature not in column_names:
+    return ("", "Compact map grids require a valid feature column.")
+
+  conditions = []
+  params: list = []
+  if filterBy and filterValue and filterBy[0] != "" and filterValue[0] != "":
+    for fb, fv in zip(filterBy, filterValue):
+      if fv != "ALL" and fv != "" and fb != "":
+        if fb == "date":
+          conditions.append(sql.SQL("EXTRACT(YEAR FROM {}) = %s").format(sql.Identifier(fb)))
+        else:
+          conditions.append(sql.SQL("{} = %s").format(sql.Identifier(fb)))
+        params.append(fv)
+
+  feature_type = schema["columns"].get(feature, "")
+  conditions.append(conditionBuilderFeatureNotEmpty(feature, feature_type, params))
+  if startDate and endDate and "date" in column_names:
+    conditions.append(conditionBuilderRange(startDate, endDate, "date", params))
+  if aggregation_level and "aggregation_level" in column_names:
+    conditions.append(sql.SQL("aggregation_level = %s"))
+    params.append(aggregation_level)
+  if "datenstand" in column_names:
+    filter_date = targetDate or endDate or startDate
+    if filter_date:
+      conditions.append(
+        sql.SQL("datenstand = (SELECT MAX(datenstand) FROM {} WHERE datenstand <= %s)").format(
+          sql.Identifier(relationName)
+        )
+      )
+      params.append(filter_date)
+    else:
+      conditions.append(
+        sql.SQL("datenstand = (SELECT MAX(datenstand) FROM {})").format(sql.Identifier(relationName))
+      )
+
+  where_clause = sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions) if conditions else sql.SQL("")
+  select_items = []
+  result_columns = []
+  if "id" in column_names:
+    select_items.append(sql.Identifier("id"))
+    result_columns.append("id")
+  select_items.extend([
+    sql.Identifier("geometry"),
+    sql.SQL("{} AS feature").format(sql.Identifier(feature)),
+  ])
+  corner_columns = [
+    "lat0", "lng0", "lat1", "lng1",
+    "lat2", "lng2", "lat3", "lng3",
+  ]
+  result_columns.extend([*corner_columns, "feature"])
+
+  query = sql.SQL("SELECT {} FROM {}{}").format(
+    sql.SQL(", ").join(select_items),
+    sql.Identifier(relationName),
+    where_clause,
+  )
+  if "id" in column_names:
+    query += sql.SQL(" ORDER BY id")
+
+  try:
+    has_id = "id" in column_names
+
+    def geometry_row_mapper(row: tuple) -> tuple:
+      geometry_index = 1 if has_id else 0
+      feature_index = geometry_index + 1
+      points = _grid_geometry_points(row[geometry_index])
+      compact_row = (
+        points[0][0], points[0][1],
+        points[1][0], points[1][1],
+        points[2][0], points[2][1],
+        points[3][0], points[3][1],
+        row[feature_index],
+      )
+      return (row[0], *compact_row) if has_id else compact_row
+
+    columns = await query_columnar(query, result_columns, params, row_mapper=geometry_row_mapper)
+  except Exception as e:
+    print("ERROR COMPACT GRID QUERY", e)
+    return ("", "ERROR DB QUERY " + str(e))
+
+  row_count = len(columns["feature"])
+  if "id" not in columns:
+    columns["id"] = list(range(1, row_count + 1))
+
+  if row_count == 0:
+    return ({
+      "format": "map-grid-v1",
+      "featureName": feature,
+      "id": columns["id"],
+      **{name: columns[name] for name in corner_columns},
+      "feature": columns["feature"],
+      "cellSize": [0, 0],
+      "anchorOffset": [0, 0],
+      "featureRange": [0, 0],
+      "rowCount": 0,
+    }, None)
+
+  first_latitudes = [columns[f"lat{index}"][0] for index in range(4)]
+  first_longitudes = [columns[f"lng{index}"][0] for index in range(4)]
+  first_north = max(first_latitudes)
+  first_south = min(first_latitudes)
+  first_west = min(first_longitudes)
+  first_east = max(first_longitudes)
+  cell_size = [first_north - first_south, first_east - first_west]
+
+  feature_min = None
+  feature_max = None
+  for value in columns["feature"]:
+    try:
+      numeric = float(value)
+      if isfinite(numeric):
+        feature_min = numeric if feature_min is None else min(feature_min, numeric)
+        feature_max = numeric if feature_max is None else max(feature_max, numeric)
+    except (TypeError, ValueError):
+      continue
+  feature_range = [feature_min, feature_max] if feature_min is not None else [0, 0]
+
+  print(f"Compact grid query/processing time: {time.time() - start_time} seconds")
+  return ({
+    "format": "map-grid-v1",
+    "featureName": feature,
+    "id": columns["id"],
+    **{name: columns[name] for name in corner_columns},
+    "feature": columns["feature"],
+    "cellSize": cell_size,
+    "anchorOffset": [0, 0],
+    "featureRange": feature_range,
+    "rowCount": row_count,
+  }, None)
 
 
 
@@ -337,6 +722,43 @@ async def getDBdata_singleColCount( relationName, feature, filterBy, filterValue
   end_processing_time = time.time()
   print(f"Processing time: {end_processing_time - start_processing_time} seconds")
   return (records_json, None)
+
+
+async def getDBdata_groupedCount(
+  relationName: str,
+  feature: str,
+  groupBy: str,
+  filterBy: Optional[List[str]],
+  filterValue: Optional[List[str]],
+) -> tuple[object, str | None]:
+  """Return counts grouped by a geographic feature and one category."""
+  where_clause, params = conditionBuilderEquals(filterBy, filterValue)
+  query = sql.SQL(
+    "SELECT {}, {} AS category, COUNT(*) AS count FROM {} {} "
+    "GROUP BY {}, {} ORDER BY {}, {}"
+  ).format(
+    sql.Identifier(feature),
+    sql.Identifier(groupBy),
+    sql.Identifier(relationName),
+    where_clause if where_clause else sql.SQL(""),
+    sql.Identifier(feature),
+    sql.Identifier(groupBy),
+    sql.Identifier(feature),
+    sql.Identifier(groupBy),
+  )
+  try:
+    records_raw = await query_raw(query, params)
+    return ([
+      {
+        "feature": record[feature],
+        "category": record["category"],
+        "count": record["count"],
+      }
+      for record in records_raw
+    ], None)
+  except Exception as e:
+    print("ERROR GROUPED COUNT QUERY", e)
+    return ("", "ERROR DB QUERY " + str(e))
 
 
 
@@ -682,6 +1104,57 @@ async def getDBdata_allCols(relationName: str, targetDate: Optional[str] = None,
   end_processing_time = time.time()
   print(f"Processing time: {end_processing_time - start_processing_time} seconds")
   return (records_json, None)
+
+
+async def getDBdata_selectedCols(
+    relationName: str,
+    features: list[str],
+    row_limit: int | None,
+) -> tuple[list[dict], str | None, bool]:
+  """Return only the requested columns for generic charts.
+
+  For bounded requests, one extra row is requested so callers can warn about
+  truncation without an additional ``COUNT(*)`` query. A ``None`` limit is the
+  explicitly requested unbounded debug mode. Tables with an ``id`` column
+  retain their stable database order; other tables use the returned row order.
+  """
+  schema = await get_relation_schema(relationName)
+  column_names = list(schema["columns"].keys())
+  select_items = [sql.Identifier(feature) for feature in features]
+
+  query = sql.SQL("SELECT {} FROM {}").format(
+      sql.SQL(", ").join(select_items),
+      sql.Identifier(relationName),
+  )
+  if "id" in column_names:
+      query += sql.SQL(" ORDER BY id")
+  query_params = ()
+  if row_limit is not None:
+      query += sql.SQL(" LIMIT %s")
+      query_params = (row_limit + 1,)
+
+  try:
+      records_raw = await query_raw(query, query_params)
+  except Exception as e:
+      print("ERROR DB MULTI-COLUMN QUERY", e)
+      return ([], f"ERROR DB QUERY {e}", False)
+
+  is_truncated = row_limit is not None and len(records_raw) > row_limit
+  if row_limit is not None:
+      records_raw = records_raw[:row_limit]
+
+  import datetime
+  records_json = []
+  for record in records_raw:
+      rec_dict = {}
+      for key, value in record.items():
+          if isinstance(value, (datetime.date, datetime.datetime)):
+              rec_dict[key] = value.isoformat()
+          else:
+              rec_dict[key] = value
+      records_json.append(rec_dict)
+
+  return (records_json, None, is_truncated)
 
 
 

@@ -6,60 +6,83 @@ import { metaDataT, alignFeature_to_Metadata } from '@/components/plots/MetaData
 import { getGoodReadableRange } from '../helpers';
 
 /**
- * Props for the universal ColorMapLegend component.
+ * Properties for the {@link ColorMapLegend} component.
  *
- * This component renders a vertical color gradient legend with axis tick labels,
+ * @example
+ * ```ts
+ * const legend: ColorMapLegendProps = {
+ *   chartId: "albopictus-habitat-map",
+ *   colorMapType: "interpolateInferno",
+ *   minVal: 0,
+ *   maxVal: 1,
+ *   selectedFeature: "mean",
+ *   metaData: {
+ *     mean: { valuename: "mean", dimension: "probability", description: "Habitat suitability", availability: "2024" },
+ *   },
+ *   layerOpacity: 0.85,
+ *   locale: "en",
+ * };
+ * ```
  */
 export interface ColorMapLegendProps {
-    /** Unique ID suffix for the SVG gradient definition (avoids collisions when multiple legends exist). */
+    /** Unique DOM ID suffix for the SVG linearGradient definition preventing collisions across multi-map layouts */
     chartId: string;
-   
-    /** Key into `availableColorMaps`, e.g. "interpolateInferno". */
+    /** Sequential D3 color map key (e.g. "interpolateInferno", "interpolateViridis", "interpolateRdBu") */
     colorMapType: string;
-   
-    /** Raw minimum feature value (before metadata alignment). */
+    /** Raw minimum feature data value before metadata unit scaling */
     minVal: number;
-   
-    /** Raw maximum feature value (before metadata alignment). */
+    /** Raw maximum feature data value before metadata unit scaling */
     maxVal: number;
-   
-    /** Currently selected feature name. */
+    /** Name of the active dataset column feature */
     selectedFeature: string;
-   
-    /** Metadata dictionary for unit/dimension/scaling info. */
+    /** Metadata dictionary specifying units, scaling factors, and dimension labels */
     metaData: metaDataT;
-   
-    /** Layer opacity (0–1). Applied to gradient stop colors. */
+    /** Map layer opacity (0 to 1) applied to SVG gradient stop stops */
     layerOpacity: number;
-   
-    /** Locale string for number formatting (e.g. "en", "de"). */
+    /** BCP-47 locale identifier for localized number formatting (e.g. "en", "de") */
     locale: string;
-   
-    /** Width of the legend box in pixels. @default 5 */
+    /** Outer SVG width in pixels. @default 5 */
     width?: number;
-   
-    /** Height of the legend box in pixels. @default 160 */
+    /** Outer SVG height in pixels. @default 160 */
     height?: number;
-   
-    /** Width of the gradient bar inside the legend. @default 10 */
+    /** Width of the vertical color gradient bar in pixels. @default 10 */
     barWidth?: number;
-   
-    /** Whether the legend is visible. @default true */
+    /** Visibility toggle flag. @default true */
     isVisible?: boolean;
-   
-    /** Number of tick labels on the axis. @default 5 */
+    /** Target number of axis ticks along the color scale. @default 5 */
     tickCount?: number;
 }
 
 /**
- * A universal color-map legend component using classical D3 imperative rendering.
+ * Universal color map legend component using classical D3 SVG imperative rendering.
  *
- * Renders a vertical gradient bar with axis ticks, correctly handling:
- * - Feature-to-metadata alignment (unit conversion, scaling)
- * - Nice readable ranges via `getGoodReadableRange`
- * - Symmetric domain for `interpolateRdBu` diverging color maps
- * - Opacity-aware gradient stop colors
- * - Locale-aware number formatting
+ * Renders a vertical color scale bar with unit-aligned axis ticks, handling:
+ * - Feature-to-metadata alignment (`alignFeature_to_Metadata` for unit scaling)
+ * - Human-readable numeric ranges (`getGoodReadableRange`)
+ * - Symmetric domain centering for `interpolateRdBu` diverging color maps
+ * - Opacity-aware SVG gradient stops matching map layer alpha settings
+ * - Dynamic SVG container auto-sizing based on rendered text bounding boxes
+ *
+ * @param props - Configuration properties defined in {@link ColorMapLegendProps}.
+ *
+ * @remarks
+ * In multi-view map layouts, legend SVG gradient IDs must be unique to avoid SVG linearGradient collision bugs.
+ * `pointer-events: none` is set on the container SVG element so hovering or clicking over legend overlays does not block map navigation.
+ *
+ * @example
+ * ```tsx
+ * <ColorMapLegend
+ *   chartId="habitat-map-legend"
+ *   colorMapType="interpolateInferno"
+ *   minVal={0.0}
+ *   maxVal={1.0}
+ *   selectedFeature="prob_7"
+ *   metaData={metaData}
+ *   layerOpacity={0.85}
+ *   locale="en"
+ *   height={160}
+ * />
+ * ```
  */
 const ColorMapLegend: React.FC<ColorMapLegendProps> = ({
     chartId,
@@ -190,4 +213,6 @@ const ColorMapLegend: React.FC<ColorMapLegendProps> = ({
     return <svg ref={svgRef} />;
 };
 
+/** Default export for the accessible continuous-color map legend. */
 export default ColorMapLegend;
+

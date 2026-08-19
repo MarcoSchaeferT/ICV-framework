@@ -9,4 +9,5 @@ const dummyData = [
 ];
 
 
+/** Default export for demonstration-only chart records; production visualizations use backend datasets. */
 export default dummyData;

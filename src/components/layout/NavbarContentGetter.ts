@@ -16,4 +16,5 @@ const Nav_LINKS_LEFT = () => {
 
 
 
+/** Locale-aware navigation registries for the top and optional left navigation. */
 export { Nav_LINKS_TOP, Nav_LINKS_LEFT };

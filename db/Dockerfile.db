@@ -8,9 +8,6 @@ LABEL org.opencontainers.image.description="ICV db"
 LABEL org.opencontainers.image.version="latest"
 LABEL org.opencontainers.image.source="https://github.com/MarcoSchaeferT/ICV-framework"
 
-# Set the working directory
-VOLUME /var/lib/postgresql/data
-
 # Expose the port that the db will run on
 EXPOSE 5333
 

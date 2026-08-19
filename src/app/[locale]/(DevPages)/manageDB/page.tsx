@@ -4,11 +4,13 @@ import { useEffect, useState, useCallback } from "react";
 import { apiRoutes } from "@/app/api_routes";
 import { useUIContext } from "@/components/contexts/UIContext";
 
+/** Database-relation summary returned by the administration endpoint. */
 interface Relation {
   table_name: string;
   row_count: number;
 }
 
+/** Returns the development database-relation inspection and deletion utility. */
 export default function ManageDBPage() {
   const { setIsDemoModeDialogOpen, demoMode } = useUIContext();
   const [relations, setRelations] = useState<Relation[]>([]);

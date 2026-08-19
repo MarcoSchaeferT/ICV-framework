@@ -15,57 +15,82 @@ import { useLoadingTask, LoadingSpinnerAnimation } from '../maps/utils/loadingSp
 import  CovidDataStates from "@/components/dataTableClasses/CovidDataStates";
 import { t_richConfig, dbDATA } from '@/app/const_store';
 import { getGoodReadableRange, StandardTooltip } from '../maps/helpers';
+import GenericCartesianChart from '../generic/GenericCartesianChart';
 
 /**
- * Props class for the BarchartComponent
+ * Configuration contract for `BarchartComponent`.
  * 
  * @remarks
- * This class encapsulates all the properties required to render a bar chart using the BarchartComponent.
- * It includes configuration for the chart name, data source URL, localization, translations.
- * 
- * @property chartName - The name of the chart to be displayed.
- * @property dataURL - The URL from which to fetch the chart data. Can be a string.
- * @property locale - The locale to use for translations and formatting (e.g., "en", "de"). Defaults to "en".
- * @property translations - An object containing translation strings or functions, typically created using a translation hook. e.g.: useTranslations("covid_view_barchart")
- * @property isDummyMode - for demonstration purposes: loads dummy data for the chart if set to true.
+ * The component retrieves database data and localized metadata through `useGetJSONData`, then participates in linked
+ * selection through `InterfaceContext`.
  * 
  * @example
- * ```
- * const props = BarchartProps(
- *   "COVID-19 Cases",
- *   apiRoutes.GET_DATASETS_METADATA,
- *   "de",
- *   useTranslations("covid_view_barchart")
- * );
- * <>
- *  <BarchartComponent chartProps={props} />
- * </>
+ * ```tsx
+ * const props: BarchartProps = {
+ *   chartName: "germany-covid-incidence",
+ *   dataURL: apiRoutes.fetchDbData({
+ *     relationName: "aktuell_deutschland_sarscov2_infektionen",
+ *     feature: "accuCasesPerWeek",
+ *     targetDate: "2024-01-31",
+ *   }),
+ *   locale: "de",
+ *   translations: useTranslations("covid_view_barchart"),
+ *   isDummyMode: false,
+ * };
  * ```
  */
 export interface BarchartProps {
+    /** Stable chart/container identifier. */
     chartName: string;
+    /** URL produced by `apiRoutes.fetchDbData`. */
     dataURL: string;
+    /** Locale used for value and metadata formatting. @default "en" */
     locale?: string;
+    /** `next-intl` translator for chart labels and tooltips. */
     translations?: any;
+    /** Uses bundled demonstration data instead of the backend. @default false */
     isDummyMode?: boolean;
+    /** Selects the reusable row-oriented chart adapter used by layout templates. */
+    dataMode?: "linked" | "generic";
+    /** Maximum number of generic dataset rows rendered before truncation. */
+    rowLimit?: number | null;
 }
 
+/**
+ * Creates a complete bar-chart configuration.
+ *
+ * @param chartName - Stable chart/container identifier.
+ * @param dataURL - Encoded database API URL.
+ * @param locale - Locale for labels and number formatting.
+ * @param translations - `next-intl` translator for the chart namespace.
+ * @param isDummyMode - Uses bundled demonstration data.
+ * @returns Configuration accepted by `BarchartComponent`.
+ * @default dataURL ""
+ * @default locale "en"
+ * @default translations {}
+ * @default isDummyMode false
+ */
 export function BarchartProps(
     chartName: string,
     dataURL = "",
     locale = "en",
     translations: any = {},
-    isDummyMode = false
+    isDummyMode = false,
+    dataMode: "linked" | "generic" = "linked",
+    rowLimit?: number | null,
 ): BarchartProps {
     return {
         chartName,
         dataURL,
         locale,
         translations,
-        isDummyMode
+        isDummyMode,
+        dataMode,
+        rowLimit,
     };
 }
 
+/** Array-oriented database payload consumed by the state bar-chart adapter. */
 type Data = {
   geometry: string[];
   features: number[][];
@@ -73,11 +98,13 @@ type Data = {
 };
 
 
+/** Standard database wrapper narrowed to the bar-chart payload. */
 interface dbDat extends dbDATA {
   response: Data;
 }
 
 
+/** Recharts-ready state/category records derived from backend arrays. */
 type barChartData = {
   name: string;
   feature: number[];
@@ -117,7 +144,7 @@ const CustomBarchartTooltip = ({ active, payload, label, locale, yLabel, xLabel,
 };
 
 
-const BarchartComponent = ({chartProps}: {chartProps: BarchartProps}) => {
+const LinkedBarchartComponent = ({chartProps}: {chartProps: BarchartProps}) => {
 
   
   let props = chartProps;
@@ -329,6 +356,7 @@ let [xLabel, yLabel] = useMemo(() => {
 
   if (chartProps.isDummyMode) {
     return (
+      <div className="size-full min-h-0 flex flex-col flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             width={500}
@@ -350,7 +378,8 @@ let [xLabel, yLabel] = useMemo(() => {
             <Bar dataKey="uv" fill="#82ca9d" shape={<Rectangle fill="gold" stroke="purple" />} />
           </BarChart>
         </ResponsiveContainer>
-      );
+      </div>
+    );
   }
 
     if(procData.length == 0 && collectDataLoadingErrors.some((error) => error == undefined) && contextT.curFeatureValue != "NA" && contextT.curFeatureValue != "undefined"){
@@ -588,4 +617,19 @@ function isDictSortedDesc(dict: any) {
   return true;
 }
 
+const BarchartComponent = ({ chartProps }: { chartProps: BarchartProps }) => {
+  if (chartProps.dataMode === "generic") {
+    return (
+      <GenericCartesianChart
+        chartName={chartProps.chartName}
+        kind="bar"
+        rowLimit={chartProps.rowLimit}
+      />
+    );
+  }
+
+  return <LinkedBarchartComponent chartProps={chartProps} />;
+};
+
+/** Default export supporting linked and generic categorical bar-chart modes. */
 export default BarchartComponent;
