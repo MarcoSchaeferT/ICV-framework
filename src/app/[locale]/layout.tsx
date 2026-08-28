@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { ReactNode } from "react";
 import { Inter } from "next/font/google";
 import "../globals.css";
@@ -9,7 +10,6 @@ import NavbarLeft from '@/components/layout/NavbarLeft';
 import { layoutSizes } from "@/app/const_store";
 import CopyrightFooter from '@/components/layout/small_UI_elements/copyrightFooter';
 import PageTracker from '@/components/PageTracker';
-import Script from "next/script";
 
 
 
@@ -19,11 +19,13 @@ const inter = Inter({
   display: "swap",
 });
 
+/** Asynchronous App Router locale parameters and nested route content. */
 interface LocaleLayoutProps {
   children?: ReactNode;
   params: Promise<{ locale: string }>;
 }
 
+/** Global application metadata and non-indexing policy. */
 export const metadata: Metadata = {
   title: "ICV",
   description: "Developed by AI-DAVis members...",
@@ -41,12 +43,19 @@ export const metadata: Metadata = {
 
 import { routing } from '@/i18n/routing';
 
+/** Returns one statically generated layout parameter for every supported locale. */
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
 }
 
 import { setRequestLocale } from 'next-intl/server';
 
+/**
+ * Provides localized messages, persistent navigation, tracking, dialogs, and the legal footer to every route.
+ *
+ * @param props - Localized route content and asynchronous locale parameter.
+ * @returns The root HTML document for the selected locale.
+ */
 export default async function LocaleLayout({ children, params }: LocaleLayoutProps) {
   const resolvedParams = await params;
   setRequestLocale(resolvedParams.locale);
@@ -61,20 +70,19 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
   return (
     <html lang={locale} suppressHydrationWarning={true}>
       <body className={`${inter.className} overflow-y-scroll overflow-x-clip bg-surface-default`} suppressHydrationWarning={true}>
+        <PageTracker />
         {/* Privacy-friendly analytics by Plausible */}
         <Script
           async
           src="http://168.119.228.102:8100/js/pa-Za_Qqqc2BILDkJGFan2I7.js"
           strategy="afterInteractive"
         />
-          <Script id="plausible-init" strategy="afterInteractive">
-            {`
+        <Script id="plausible-init" strategy="afterInteractive">
+          {`
               window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};
               plausible.init();
             `}
         </Script>
-        
-        <PageTracker />
         <NextIntlClientProvider messages={messages}>
 
           {/* Wrap all pages in the layout with the dynamicUI (navbars etc.)

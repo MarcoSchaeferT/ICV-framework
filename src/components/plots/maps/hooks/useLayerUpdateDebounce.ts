@@ -45,7 +45,8 @@ export interface UseLayerUpdateDebounceParams {
 const DEFAULT_DELAYS: Record<string, number> = {
     wheel: 250,
     opacity: 100,
-    null: 100,
+    null: 250,
+    drag: 250,
     slider: 120,
     mousemove: 250,
 };
@@ -170,9 +171,30 @@ export function useLayerUpdateDebounce({
         const handleDragEnd = () => resumePendingUpdate('drag');
         const handleZoomStart = () => pausePendingUpdate('zoom');
         const handleZoomEnd = () => resumePendingUpdate('zoom');
+
+        // Wheel fires BEFORE Leaflet's zoomstart, giving the earliest
+        // possible cancellation point for scroll-zoom interactions.
+        // A debounced resume ensures rapid wheel ticks are coalesced
+        // into a single interaction block.
+        let wheelResumeTimer: ReturnType<typeof setTimeout> | null = null;
+        const handleWheel = () => {
+            pausePendingUpdate('wheel');
+            if (wheelResumeTimer) clearTimeout(wheelResumeTimer);
+            wheelResumeTimer = setTimeout(() => {
+                wheelResumeTimer = null;
+                resumePendingUpdate('wheel');
+            }, 150);
+        };
         const container = interactionMap.getContainer();
+        container.addEventListener('wheel', handleWheel, { passive: true });
+
+        const handleTouchStart = () => pausePendingUpdate('touch');
+        const handleTouchEnd = () => resumePendingUpdate('touch');
 
         container.addEventListener('pointerdown', handlePointerDown, { passive: true });
+        container.addEventListener('touchstart', handleTouchStart, { passive: true });
+        container.addEventListener('touchend', handleTouchEnd, { passive: true });
+        container.addEventListener('touchcancel', handleTouchEnd, { passive: true });
         window.addEventListener('pointerup', handlePointerUp, { passive: true });
         window.addEventListener('pointercancel', handlePointerUp, { passive: true });
         interactionMap.on('dragstart', handleDragStart);
@@ -182,12 +204,17 @@ export function useLayerUpdateDebounce({
 
         return () => {
             container.removeEventListener('pointerdown', handlePointerDown);
+            container.removeEventListener('touchstart', handleTouchStart);
+            container.removeEventListener('touchend', handleTouchEnd);
+            container.removeEventListener('touchcancel', handleTouchEnd);
+            container.removeEventListener('wheel', handleWheel);
             window.removeEventListener('pointerup', handlePointerUp);
             window.removeEventListener('pointercancel', handlePointerUp);
             interactionMap.off('dragstart', handleDragStart);
             interactionMap.off('dragend', handleDragEnd);
             interactionMap.off('zoomstart', handleZoomStart);
             interactionMap.off('zoomend', handleZoomEnd);
+            if (wheelResumeTimer) clearTimeout(wheelResumeTimer);
             activeInteractions.clear();
             interactionActiveRef.current = false;
         };

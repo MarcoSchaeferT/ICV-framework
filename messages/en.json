@@ -73,7 +73,7 @@
             "subHeading": "ICV is a web app that offers a variety of views rich in context. It allows for the interactive visualization and exploration of public health data ranging from historical to predictive.",
             "funding": "Funded by the Federal Ministry of Health (BMG) under grant No. 2523DAT400 (project: ",
             "projectName": " AI-DAVis PANDEMICS",
-            "ShowCases": "Show Cases",
+            "ShowCases": "Showcases",
             "startButton": "Get started"
         },
         "subpage_features": {
@@ -376,6 +376,7 @@
     },
     "sidebarLeft": {
         "heading": "ICV - Settings",
+        "backToHome": "Back to Home / Showcases",
         "currentSelection": "Current Selection",
         "transmissionPath": "Transmission Path",
         "disease": "Disease / Feature",
@@ -385,7 +386,8 @@
         }
     },
     "navbar_top": {
-        "mode": "Mode"
+        "mode": "Mode",
+        "home": "Home"
     },
     "page_metadata": {
         "heading": "Metadata Editor",

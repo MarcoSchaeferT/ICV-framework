@@ -90,3 +90,50 @@ export const availableColorMapsNames = {
     interpolateRdBu: "interpolateRdBu",
     interpolateViridis: "interpolateViridis",
 };
+
+/**
+ * Presence data dot colors tailored to each D3 colormap for maximum visual contrast.
+ */
+export const COLORMAP_PRESENCE_COLORS: Record<string, string> = {
+    interpolateInferno: "rgb(2, 246, 250)",      // Türkis / Light Blue (high contrast against dark purple, red, orange, yellow)
+    interpolateMagma: "rgb(2, 246, 250)",        // Türkis / Light Blue
+    interpolatePlasma: "rgb(2, 246, 250)",       // Türkis / Light Blue
+    interpolateWarm: "rgb(2, 246, 250)",         // Türkis / Light Blue
+    interpolateYlOrRd: "rgb(2, 246, 250)",       // Türkis / Light Blue
+    interpolateOrRd: "rgb(2, 246, 250)",         // Türkis / Light Blue
+    interpolateReds: "rgb(2, 246, 250)",         // Türkis / Light Blue
+    interpolateOranges: "rgb(2, 246, 250)",      // Türkis / Light Blue
+    interpolateViridis: "rgb(255, 128, 0)",      // Vivid Orange (high contrast against deep purple, teal, yellow-green)
+    interpolateCividis: "rgb(239, 23, 23)",      // Bright Red (high contrast against dark navy and yellow)
+    interpolateBlues: "rgb(255, 128, 0)",        // Vivid Orange (complementary contrast against blue tones)
+    interpolateBuPu: "rgb(255, 128, 0)",         // Vivid Orange
+    interpolatePuBu: "rgb(255, 128, 0)",         // Vivid Orange
+    interpolateCool: "rgb(255, 128, 0)",         // Vivid Orange
+    interpolatePuBuGn: "rgb(255, 128, 0)",       // Vivid Orange
+    interpolateGreens: "rgb(236, 72, 153)",      // Vivid Magenta (complementary contrast against green tones)
+    interpolateBuGn: "rgb(236, 72, 153)",        // Vivid Magenta
+    interpolateYlGn: "rgb(236, 72, 153)",        // Vivid Magenta
+    interpolateYlGnBu: "rgb(236, 72, 153)",      // Vivid Magenta
+    interpolateRdBu: "rgb(255, 191, 0)",         // Bright Gold / Amber (high contrast against both red and blue)
+    interpolateSpectral: "rgb(2, 246, 250)",     // Türkis / Light Blue
+    interpolateRdYlBu: "rgb(2, 246, 250)",       // Türkis / Light Blue
+    interpolateRdYlGn: "rgb(2, 246, 250)",       // Türkis / Light Blue
+};
+
+/**
+ * Returns a high-contrast presence data dot color based on the selected colormap.
+ * If a custom presence color is provided and no specific colormap mapping applies, it falls back to customColor.
+ *
+ * @param colorMapType - Active colormap key (e.g. "interpolateInferno", "interpolateBlues", "interpolateViridis")
+ * @param customColor  - Optional custom color override from mapUIsettings
+ * @returns CSS color string (e.g. "rgb(2, 246, 250)")
+ */
+export function getPresenceDataColor(colorMapType?: string, customColor?: string): string {
+    if (colorMapType && COLORMAP_PRESENCE_COLORS[colorMapType]) {
+        return COLORMAP_PRESENCE_COLORS[colorMapType];
+    }
+    if (customColor && customColor.trim() !== "") {
+        return customColor;
+    }
+    return "rgb(2, 246, 250)"; // Default Türkis / Light Blue
+}

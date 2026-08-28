@@ -73,7 +73,7 @@
             "subHeading": "ICV ist eine Webanwendung, die eine Vielzahl kontextreicher Ansichten bietet. Sie ermöglicht die interaktive Visualisierung und Erkundung von Gesundheitsdaten – von historischen bis hin zu prognostischen Daten.",
             "funding": "Gefördert durch das Bundesministerium für Gesundheit (BMG) unter der Fördernummer 2523DAT400 (Projekt",
             "projectName": " AI-DAVis PANDEMICS)",
-            "ShowCases": "Show Cases",
+            "ShowCases": "Showcases",
             "startButton": "Starte hier!"
         },
         "subpage_features": {
@@ -376,6 +376,7 @@
     },
     "sidebarLeft": {
         "heading": "ICV-Einstellungen",
+        "backToHome": "Zur Startseite / Showcases",
         "currentSelection": "Aktuelle Auswahl",
         "transmissionPath": "Übertragungsweg",
         "disease": "Krankheit / Merkmal",
@@ -385,7 +386,8 @@
         }
     },
     "navbar_top": {
-        "mode": "Modus"
+        "mode": "Modus",
+        "home": "Startseite"
     },
     "page_metadata": {
         "heading": "Metadaten Editor",

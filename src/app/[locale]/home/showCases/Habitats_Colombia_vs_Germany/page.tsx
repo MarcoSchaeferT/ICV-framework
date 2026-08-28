@@ -62,15 +62,17 @@ let md = MDXContentProvider[locale];
   p1.mapUIsettings.isPresenceData = true;
   p1.mapUIsettings.isPresenceDataChecked = true;
   p1.mapUIsettings.presenceDataColor = "rgb(2, 246, 250)";
-  p1.mapUIsettings.isSequenceMetaData = true;
+  p1.mapUIsettings.isSequenceMetaData = false;
+  p1.mapUIsettings.isSequenceMetaDataChecked = false;
   p1.mapInteractions = {
     disableMouse: true,
     disableScroll: true,
+    disableClick: true
   };
   p1.mapDataSets = {
     isGridData: true,
     isPresenceData: true,
-    isSequenceMetaData: false,
+    isSequenceMetaData: true,
   };
   p1.mapStyles.strokeWidth = 3; 
   
@@ -98,6 +100,9 @@ let md = MDXContentProvider[locale];
   p2.isProjection_equirectangular = false;
   p2.mapUIsettings.isPresenceDataChecked = true;
   p2.mapUIsettings.presenceDataColor = "rgb(2, 246, 250)";
+  p2.mapUIsettings.isPresenceData = false;
+  p2.mapUIsettings.isSequenceMetaData = false;
+  p2.mapUIsettings.isSequenceMetaDataChecked = false;
   p2.mapUIsettings.filterStringForAvailableDatasetInclude = "probability";
   p2.mapUIsettings.defaultDatasetName = "";
   p2.mapUIsettings.defaultFeatureName = "prob_1";
@@ -106,6 +111,7 @@ let md = MDXContentProvider[locale];
   p2.mapInteractions = {
     disableMouse: true,
     disableScroll: true,
+    disableClick: true
   };
  p2.mapDataSets = {
     isGridData: true,

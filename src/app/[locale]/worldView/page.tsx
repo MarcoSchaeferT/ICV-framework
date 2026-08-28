@@ -2,16 +2,16 @@
 "use client";
 
 import { useRef, useEffect } from 'react'
-import {apiRoutes } from "@/app/api_routes";
+import { apiRoutes } from "@/app/api_routes";
 import React from 'react';
 import { InterfaceContextProvider, useInterfaceContext } from '@/components/contexts/InterfaceContext';
 import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
-import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '@/components/plots/maps/LeafD3Map';
+import LeafD3MapLayerComponent, { LeafD3MapLayerProps } from '@/components/plots/maps/LeafD3Map';
 import MiniMapOverlay from '@/components/plots/maps/overlays/MiniMapOverlay';
 import { createSwapy, Swapy } from 'swapy';
 import { MDXContentProvider } from '@messages/markdown/MDXContentProvider';
-import {ViewMainInfoComponent} from '@/components/ViewPageMainInfo';
+import { ViewMainInfoComponent } from '@/components/ViewPageMainInfo';
 import { Locale, useLocale, useTranslations } from "next-intl";
 import { t_richConfig } from "@/app/const_store";
 import { useUIContext } from '@/components/contexts/UIContext';
@@ -26,12 +26,12 @@ const isSWAPY = true;
  */
 export default function Home() {
 
-const t = useTranslations("page_predictionView");
-const locale = useLocale() as Locale;
-let MDX = MDXContentProvider[locale];
+  const t = useTranslations("page_predictionView");
+  const locale = useLocale() as Locale;
+  let MDX = MDXContentProvider[locale];
 
- const UI_contextT = useUIContext();
- const layoutSizes = UI_contextT.layoutDims;
+  const UI_contextT = useUIContext();
+  const layoutSizes = UI_contextT.layoutDims;
 
   // set up the map props
   let worldMapProsp = LeafD3MapLayerProps();
@@ -60,6 +60,7 @@ let MDX = MDXContentProvider[locale];
   p1.mapUIsettings.filterStringForAvailableDatasetInclude = ["month", "probability"];
   p1.mapUIsettings.defaultDatasetName = "t_2024_monthly_mean_4_ocsvm_aegypti_predictions_2023_mod_sim";
   p1.mapUIsettings.defaultFeatureName = "prob_1";
+  p1.mapUIsettings.filterStringForAvailableFeature = ["prob"];
   p1.mapUIsettings.isPresenceData = true;
   p1.mapUIsettings.isSequenceMetaData = true;
   p1.mapUIsettings.presenceDataColor = "rgb(255, 128, 0)";
@@ -68,7 +69,7 @@ let MDX = MDXContentProvider[locale];
     disableScroll: false
   };
   p1.mapStyles.backgroundColor = "rgb(215, 234, 245)";
-   
+
 
   let mapPropsWorld2 = LeafD3MapLayerProps();
   let p2 = mapPropsWorld2
@@ -95,7 +96,7 @@ let MDX = MDXContentProvider[locale];
   p2.mapUIsettings.presenceDataColor = "rgb(255, 128, 0)";
   p2.isApplyContextData = true;
   p2.isApplyTransitions = false;
-  p2.mapUIsettings.defaultDatasetName =   p1.mapUIsettings.defaultDatasetName ;
+  p2.mapUIsettings.defaultDatasetName = p1.mapUIsettings.defaultDatasetName;
   p2.mapInteractions = {
     disableMouse: true,
     disableScroll: true,
@@ -121,10 +122,10 @@ let MDX = MDXContentProvider[locale];
   const swapyRef = useRef<Swapy | null>(null)
   const swapContainerRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const container =swapContainerRef.current;
+    const container = swapContainerRef.current;
     console.log("container", container)
-    if(isSWAPY && container) {
-      swapyRef.current = createSwapy(container,{
+    if (isSWAPY && container) {
+      swapyRef.current = createSwapy(container, {
         animation: 'dynamic', // dynamic or spring or none
         manualSwap: false,
         swapMode: 'hover', //'hover' | 'drop';;
@@ -142,53 +143,53 @@ let MDX = MDXContentProvider[locale];
   }, []);
   const footer: React.FC = () => (
     "Hello Test"
-   
+
   );
 
-    let d3MapCardProps2_overveiwDetail = CardPropsClass(
-      t.rich('headingOverview', {...t_richConfig})?.toString() || '',
-      t.rich('headingOverview', {...t_richConfig})?.toString() || '',"","");
-      
-    let d3MapCardProps_overview = CardPropsClass(
-      t.rich('headingDetailView', {...t_richConfig})?.toString() || '',
-     t.rich('headingDetailView', {...t_richConfig})?.toString()||"","","");
-      d3MapCardProps2_overveiwDetail.infoCard = {content: MDX.pages.PredictionView.detailView.Info, footer: undefined};
-      d3MapCardProps2_overveiwDetail.infoCardInteraction = {content: undefined, footer: undefined};
+  let d3MapCardProps2_overveiwDetail = CardPropsClass(
+    t.rich('headingOverview', { ...t_richConfig })?.toString() || '',
+    t.rich('headingOverview', { ...t_richConfig })?.toString() || '', "", "");
 
-      d3MapCardProps_overview.infoCard = {content: MDX.pages.PredictionView.overview.Info, footer: undefined};
-      d3MapCardProps_overview.infoCardInteraction = {content: MDX.pages.PredictionView.overview.Interaction, footer: undefined};
+  let d3MapCardProps_overview = CardPropsClass(
+    t.rich('headingDetailView', { ...t_richConfig })?.toString() || '',
+    t.rich('headingDetailView', { ...t_richConfig })?.toString() || "", "", "");
+  d3MapCardProps2_overveiwDetail.infoCard = { content: MDX.pages.PredictionView.detailView.Info, footer: undefined };
+  d3MapCardProps2_overveiwDetail.infoCardInteraction = { content: undefined, footer: undefined };
 
-     // build the page
-    return (
+  d3MapCardProps_overview.infoCard = { content: MDX.pages.PredictionView.overview.Info, footer: undefined };
+  d3MapCardProps_overview.infoCardInteraction = { content: MDX.pages.PredictionView.overview.Interaction, footer: undefined };
+
+  // build the page
+  return (
     <>
-      <main className="flex max-h-fit flex-col items-center justify-between " style={{paddingTop: layoutSizes.gapSize}}>
-      <InterfaceContextProvider>
-      <ViewMainInfoComponent heading={mainInfoHeading} mdxContent={MDX.pages.PredictionView.mainInfo} />
-        {/*** START: grid layout ***/}
-        <div ref={swapContainerRef} className={`grid grid-cols-6 w-full`} style={{
-              gridTemplateRows: `repeat(auto-fill, minmax(${layoutSizes.rowSpanSize}vh, ${layoutSizes.rowSpanSize}vh))`,
-              gap: `${layoutSizes.gapSize}px`,
-              height: `calc(110vh - ${layoutSizes.topNavbarHeight}px - ${layoutSizes.gapSize}px)`,
-             paddingRight: `${layoutSizes.gapSize}px`,
-             paddingLeft: `${layoutSizes.gapSize}px`,
+      <main className="flex max-h-fit flex-col items-center justify-between " style={{ paddingTop: layoutSizes.gapSize }}>
+        <InterfaceContextProvider>
+          <ViewMainInfoComponent heading={mainInfoHeading} mdxContent={MDX.pages.PredictionView.mainInfo} />
+          {/*** START: grid layout ***/}
+          <div ref={swapContainerRef} className={`grid grid-cols-6 w-full`} style={{
+            gridTemplateRows: `repeat(auto-fill, minmax(${layoutSizes.rowSpanSize}vh, ${layoutSizes.rowSpanSize}vh))`,
+            gap: `${layoutSizes.gapSize}px`,
+            height: `calc(110vh - ${layoutSizes.topNavbarHeight}px - ${layoutSizes.gapSize}px)`,
+            paddingRight: `${layoutSizes.gapSize}px`,
+            paddingLeft: `${layoutSizes.gapSize}px`,
 
-            }}>
-          {/*** Grid Cells ***/}
-          <SGridPlotCard rowColSpan={[9,6]} cardProps={d3MapCardProps_overview}>
-            {/* Main world map */}
-            <LeafD3MapLayerComponent props={worldMapProsp}/>
-            {/* Google-Maps-style overview minimap overlay */}
-            <MiniMapOverlay
-              mapProps={mapPropsWorld2}
-              height={225}
-              bottom={50}
-              zoom={0.1}
-              left={4}
-              label={d3MapCardProps2_overveiwDetail.headline || 'Overview'}
-            />
-          </SGridPlotCard>
-        </div>
-      </InterfaceContextProvider>
+          }}>
+            {/*** Grid Cells ***/}
+            <SGridPlotCard rowColSpan={[9, 6]} cardProps={d3MapCardProps_overview}>
+              {/* Main world map */}
+              <LeafD3MapLayerComponent props={worldMapProsp} />
+              {/* Google-Maps-style overview minimap overlay */}
+              <MiniMapOverlay
+                mapProps={mapPropsWorld2}
+                height={225}
+                bottom={50}
+                zoom={0.1}
+                left={4}
+                label={d3MapCardProps2_overveiwDetail.headline || 'Overview'}
+              />
+            </SGridPlotCard>
+          </div>
+        </InterfaceContextProvider>
       </main>
     </>
   );

@@ -871,7 +871,30 @@ const MapLibreGermanyMap = ({ props }: { props: MapLibreGermanyMapProps }) => {
                                     setSelectedFeature(value);
                                     contextT.setCurFeature(value);
                                 }}>
-                                    <SelectTrigger className="w-full"><SelectValue placeholder={"loading..."} /></SelectTrigger>
+                                    {(() => {
+                                        const selectedMetadata = metaData?.[selectedFeature as keyof typeof metaData];
+                                        const selectedDimension = selectedMetadata?.dimension && selectedMetadata.dimension !== "NA"
+                                            ? ` [${selectedMetadata.dimension}]`
+                                            : "";
+                                        const selectedDescription = selectedMetadata?.description && selectedMetadata.description !== "NA"
+                                            ? selectedMetadata.description
+                                            : "";
+
+                                        return (
+                                            <SelectTrigger className="w-full text-left text-[15px]">
+                                                {selectedFeature ? (
+                                                    <span className="truncate flex-1 text-left min-w-0 block">
+                                                        <span className="text-[15px] font-medium">{selectedFeature + selectedDimension}</span>
+                                                        {selectedDescription && (
+                                                            <span className="ml-2 text-xs italic text-slate-500 dark:text-slate-400">{selectedDescription}</span>
+                                                        )}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-slate-500 text-sm">loading...</span>
+                                                )}
+                                            </SelectTrigger>
+                                        );
+                                    })()}
                                     <SelectContent>
                                         <SelectGroup>
                                             <SelectLabel></SelectLabel>

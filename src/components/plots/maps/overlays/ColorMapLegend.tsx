@@ -113,6 +113,8 @@ const ColorMapLegend: React.FC<ColorMapLegendProps> = ({
         let maxGoodVal = alignFeature_to_Metadata(maxVal, selectedFeature, metaData).value;
         let unit = alignFeature_to_Metadata(minVal, selectedFeature, metaData).unit;
         [minGoodVal, maxGoodVal] = getGoodReadableRange(minGoodVal, maxGoodVal);
+        if (isNaN(minGoodVal)) minGoodVal = 0;
+        if (isNaN(maxGoodVal) || maxGoodVal <= minGoodVal) maxGoodVal = minGoodVal + 1;
 
         // --- Build D3 color scale ---
         const colorMap = d3.scaleSequential(

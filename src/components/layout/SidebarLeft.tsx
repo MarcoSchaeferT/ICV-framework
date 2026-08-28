@@ -1,7 +1,7 @@
 "use client"
 
 import { use, useEffect, useState } from "react"
-import { X, ArrowDown, Bookmark} from "lucide-react"
+import { X, ArrowDown, Bookmark, Home } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
@@ -151,32 +151,57 @@ export function DiseaseSidebar({ className }: DiseaseSidebarProps) {
       >
         {/* Header with toggle button */}
         <div className="flex items-center justify-between p-4 border-b border-gray-600">
-       
-        <Link href="/" className=" block pl-2 py-1 font-semibold max-lg:hidden hover:text-primary">
-          <Image
+          <Link
+            href="/"
+            onClick={() => {
+              UI_contextT.setIsSidebarOpen(false);
+              setSidebarOpen(false);
+            }}
+            className="flex items-center gap-2.5 font-semibold hover:text-amber-500 transition-colors group"
+          >
+            <Image
               src="/icon.svg"
               alt="Icon"
               width={25}
               height={30}
-              className="transition-transform duration-300 hover:scale-110 "
+              className="transition-transform duration-300 group-hover:scale-110"
             />
+            <span className="text-white text-xl group-hover:text-amber-400 transition-colors">
+              {t.rich("heading", t_richConfig)}
+            </span>
           </Link>
-          <Link href="/" className=" text-white text-xl block max-lg:hidden "> {t.rich("heading", t_richConfig) }</Link>
      
-        {isOpen && toggleSidebar && (
-          <Button
-        variant="ghost"
-        size="sm"
-        onClick={toggleSidebar}
-        className="text-sidebar-foreground hover:bg-sidebar-accent bg-gray-700/40 rounded-full p-2"
-          >
-        <X className="h-4 w-4" />
-          </Button>
-        )}
+          {isOpen && toggleSidebar && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleSidebar}
+              className="text-sidebar-foreground hover:bg-sidebar-accent bg-gray-700/40 rounded-full p-2"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
 
         {/* Content */}
         <div className="flex-1 p-6 space-y-6">
+          {/* Back to Home / Showcases button */}
+          <div className="space-y-3">
+            <Link
+              href="/"
+              onClick={() => {
+                UI_contextT.setIsSidebarOpen(false);
+                setSidebarOpen(false);
+              }}
+              className="flex items-center justify-center gap-2.5 w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-[#279BBA]/25 to-blue-600/25 hover:from-[#279BBA]/40 hover:to-blue-600/40 border border-[#279BBA]/40 text-white hover:text-amber-400 font-medium text-sm transition-all duration-200 shadow-sm hover:shadow-md hover:scale-[1.01] active:scale-[0.99] group"
+            >
+              <Home className="h-4 w-4 text-[#279BBA] group-hover:text-amber-400 transition-colors" />
+              <span className="font-semibold tracking-wide">
+                {t.rich("backToHome", t_richConfig)}
+              </span>
+            </Link>
+            <hr className="border-t border-gray-600/60" />
+          </div>
        
         {/* Transmission Path Dropdown */}
         <div className="space-y-3">

@@ -3,6 +3,67 @@ import * as d3 from 'd3';
 import * as GEOjson from 'geojson';
 
 
+/** A substring filter can contain one value or several alternatives. */
+export type MapStringFilter = string | string[];
+
+/** Return the non-empty substrings represented by a map filter option. */
+export function getActiveStringFilters(filter?: MapStringFilter): string[] {
+    const filters = Array.isArray(filter) ? filter : [filter];
+    return filters.filter((value): value is string => Boolean(value));
+}
+
+/**
+ * Determines whether a value passes optional include and exclude substring
+ * filters. Multiple values in either filter use OR semantics.
+ */
+export function passesStringFilters(
+    value: string,
+    includeFilter?: MapStringFilter,
+    excludeFilter?: MapStringFilter
+): boolean {
+    const includeFilters = getActiveStringFilters(includeFilter);
+    const excludeFilters = getActiveStringFilters(excludeFilter);
+
+    return !excludeFilters.some((filter) => value.includes(filter)) &&
+        (includeFilters.length === 0 || includeFilters.some((filter) => value.includes(filter)));
+}
+
+/**
+ * Determines whether a dataset key passes both include and exclude
+ * substring filters.
+ *
+ * Used by the dataset-selection dropdown to reduce the visible list to
+ * only those datasets relevant to the current showcase or view.
+ *
+ * @param key            - The dataset key (relation name) to test.
+ * @param includeFilter  - A single substring **or** an array of substrings.
+ *                         The key must contain **at least one** non-empty
+ *                         substring to pass. An empty string, empty array,
+ *                         or `undefined` disables the include filter.
+ * @param excludeFilter  - A single substring **or** an array of substrings.
+ *                         If the key contains at least one non-empty substring
+ *                         it is excluded regardless of the include filter.
+ *                         An empty string, empty array, or `undefined` disables
+ *                         the exclude filter.
+ * @returns `true` if the dataset should be shown in the UI.
+ *
+ * @example
+ * ```ts
+ * isDatasetIncluded("t_2024_albopictus_predictions", "albopictus", "?");  // true
+ * isDatasetIncluded("t_2024_aegypti_predictions",    "albopictus", "?");  // false
+ * isDatasetIncluded("t_2024_albopictus_debug?",       "albopictus", "?"); // false (excluded)
+ * isDatasetIncluded("anything",                       "",           "");  // true  (no filter)
+ * ```
+ */
+export function isDatasetIncluded(
+    key: string,
+    includeFilter?: MapStringFilter,
+    excludeFilter?: MapStringFilter
+): boolean {
+    return passesStringFilters(key, includeFilter, excludeFilter);
+}
+
+
 /**
  * Computes the minimum and maximum feature numerical values across a dataset array.
  *
@@ -61,7 +122,7 @@ export function getGridOffset(latGeometryTopLeft: number, lngGeometryTopLeft: nu
  * @param gridOffset - Optional offset displacement `{ lat, lng }`.
  * @returns Object containing `topLeft` snapped coordinate pair.
  */
-export function snapToGrid(coords:{lat: number, lng: number}, gridCellDims:{lat:number, lng: number}, gridOffset?:{lat:number, lng: number}) : {topLeft: {lat: number, lng: number}} {
+export function snapToGrid(coords:{lat: number, lng: number}, gridCellDims:{lat:number, lng: number}, gridOffset?:{lat:number, lng: number}) : {topLeft: {lat: number, lng: number}, center: {lat: number, lng: number}} {
 
     if(gridOffset == undefined) {
         gridOffset = {lat:0, lng:0};
@@ -75,8 +136,9 @@ export function snapToGrid(coords:{lat: number, lng: number}, gridCellDims:{lat:
 
     // add the offset to get the top-left corner of the grid cell (transfrom back to original grid)
     let topLeft= {lat:gridLat+gridOffset.lat, lng:gridLng+gridOffset.lng};
+    let center = {lat:topLeft.lat - gridCellDims.lat/2, lng:topLeft.lng - gridCellDims.lng/2};
 
-    return {topLeft};
+    return {topLeft, center};
 }
 
 /**
@@ -117,10 +179,10 @@ export function getGridCellIndex(coords:{lat: number, lng: number}, gridCellDims
  * Rounds latitude and longitude coordinates to a specified decimal precision.
  *
  * @param point - Geographical coordinate point `{ lat, lng }`.
- * @param roundTo - Decimal places precision. @default 3
+ * @param roundTo - Decimal places precision. @default 2
  * @returns Rounded coordinate point `{ lat, lng }`.
  */
-export function roundLatLng(point: { lat: number; lng: number }, roundTo: number = 3): { lat: number; lng: number } {
+export function roundLatLng(point: { lat: number; lng: number }, roundTo: number = 2): { lat: number; lng: number } {
 
     const rounder = Math.pow(10, roundTo);
     let lat = point.lat;

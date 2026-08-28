@@ -58,10 +58,11 @@ let md = MDXContentProvider[locale];
   p1.mapUIsettings.filterStringForAvailableDatasetInclude = "probability";
   p1.mapUIsettings.defaultDatasetName = "t_2019_ocsvm_albopictus_probability_predictions_named";
   p1.mapUIsettings.defaultFeatureName = "prob_1";
-  p1.mapUIsettings.isPresenceData = true;
-  p1.mapUIsettings.isPresenceDataChecked = true;
+  p1.mapUIsettings.isPresenceData = false;
+  p1.mapUIsettings.isPresenceDataChecked = false;
   p1.mapUIsettings.presenceDataColor = "rgb(2, 246, 250)";
-  p1.mapUIsettings.isSequenceMetaData = true;
+  p1.mapUIsettings.isSequenceMetaData = false;
+  p1.mapUIsettings.isSequenceMetaDataChecked = false;
   p1.mapInteractions = {
     disableMouse: false,
     disableScroll: false,

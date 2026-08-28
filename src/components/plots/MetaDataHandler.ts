@@ -66,7 +66,7 @@ export function alignFeature_to_Metadata(value: number, featureName: string, met
   let unit = "";
   let d = value;
 
-  if (metaData[featureName] != undefined) {
+  if (metaData && metaData[featureName] != undefined) {
     unit = metaData[featureName].dimension;
   } else {
     // Only warn for non-empty feature names; empty string is the expected initial state.

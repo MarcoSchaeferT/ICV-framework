@@ -96,6 +96,8 @@ interface SidebarRightProps {
   swapyRef?: React.RefObject<Swapy | null>;
   /** Additional CSS classes applied to the outer wrapper. */
   className?: string;
+  /** Initial open state of the right sidebar. Defaults to `true`. */
+  defaultOpen?: boolean;
 }
 
 /**
@@ -113,7 +115,7 @@ interface SidebarRightProps {
  * <SidebarRight pageId="3col" />
  * ```
  */
-export default function SidebarRight({ pageId, swapyRef, className }: SidebarRightProps) {
+export default function SidebarRight({ pageId, swapyRef, className, defaultOpen = true }: SidebarRightProps) {
   const UI_contextT = useUIContext();
   const {
     selectedDataset,
@@ -124,7 +126,7 @@ export default function SidebarRight({ pageId, swapyRef, className }: SidebarRig
     rowLimit,
     setRowLimit,
   } = useChartDataset();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
 
   // Counter tracking total spawned instances per chart type
   const [typeCounters, setTypeCounters] = useState<Record<ChartType, number>>({
@@ -141,6 +143,16 @@ export default function SidebarRight({ pageId, swapyRef, className }: SidebarRig
     { id: `${pageId}-sb-pie-1`, type: "pie", instanceNumber: 1 },
     { id: `${pageId}-sb-map-1`, type: "map", instanceNumber: 1 },
   ]);
+
+  // Enable Swapy drag handles when sidebar is open on mount, and clean up on unmount
+  React.useEffect(() => {
+    if (defaultOpen) {
+      UI_contextT.setIsSwapy(true);
+    }
+    return () => {
+      UI_contextT.setIsSwapy(false);
+    };
+  }, [defaultOpen]);
 
   // Whenever chartItems change, update Swapy so it scans new DOM slots
   React.useEffect(() => {

@@ -132,7 +132,7 @@ let p2 = mapPropsWorld_prediction
   p2.mapUIsettings.isZoomSlider = false;
   p2.mapUIsettings.isDatasetSelectionDropdown = false;
   p2.mapUIsettings.isColorMapSelectionDropdown = false;
-  p2.mapUIsettings.isFeatureSelectionDropdown = true;
+  p2.mapUIsettings.isFeatureSelectionDropdown = false;
   p2.mapUIsettings.isDatasetSelectionDropdown = true;
   p2.mapUIsettings.filterStringForAvailableFeature = "prob";
   p2.mapUIsettings.isLatLngZoomOverlay = false;
@@ -188,7 +188,7 @@ let p2 = mapPropsWorld_prediction
       swapyRef.current = createSwapy(container,{
         animation: 'dynamic', // dynamic or spring or none
         manualSwap: false,
-        swapMode: 'hover', //'hover' | 'drop';
+        swapMode: 'drop', //'hover' | 'drop';
         autoScrollOnDrag: true,
         // dragAxis: 'x',
         // dragOnHold: true

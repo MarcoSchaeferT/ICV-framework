@@ -32,13 +32,18 @@ import {
     getContrastTextColorForBgColor,
     getOceanMaskGeoJSON,
     renderStandardTooltipHTML,
+    getGoodReadableRange,
+    getActiveStringFilters,
+    passesStringFilters,
+    isDatasetIncluded,
+    type MapStringFilter,
 } from './helpers';
 import stateMappersGermany from '@/app/helpers';
 import {
     metaDataT,
     alignFeature_to_Metadata,
 } from '../MetaDataHandler';
-import {availableColorMaps} from './constants';
+import {availableColorMaps, getPresenceDataColor} from './constants';
 import * as d3 from 'd3';
 import {useInterfaceContext} from '@/components/contexts/InterfaceContext';
 import { apiRoutes } from '@/app/api_routes';
@@ -98,7 +103,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { getGoodReadableRange } from './helpers';
 import type * as Leaflet from "leaflet";
 import { metadata } from '@/app/[locale]/layout';
 
@@ -142,9 +146,14 @@ const legendDistanceToMapBorderX = 5;
 const legendDistanceToMapBorderY = 5;
 /** Approximate pixel height of the Leaflet attribution logo, used to offset the color-map legend. */
 const leafletLogoHeight = 14;
+/** ISO-3 column used by the epidemiology dataset for country filtering. */
+const COVID_COUNTRY_FILTER_COLUMN = "iso_3166_1_alpha_3";
 
 // Default dates moved to state within the component
 
+
+export { passesStringFilters, isDatasetIncluded };
+export type { MapStringFilter };
 
 /**
  * Full configuration interface for a single ICV `LeafD3MapLayerComponent`
@@ -308,19 +317,21 @@ export interface LeafD3MapLayerProps {
          * least one of these substrings are shown in the dropdown.
          * An empty string or empty array means "show all".
          */
-        filterStringForAvailableDatasetInclude: string | string[];
+        filterStringForAvailableDatasetInclude: MapStringFilter;
         /**
-         * Exclude filter for dataset keys. Datasets whose key contains this
-         * substring are hidden from the dropdown.
+         * Exclude filter for dataset keys. Datasets whose key contains at least
+         * one of these substrings are hidden from the dropdown.
+         * An empty string or empty array disables the filter.
          * @default "?"
          */
-        filterStringForAvailableDatasetExclude: string;
+        filterStringForAvailableDatasetExclude: MapStringFilter;
         /**
-         * If set, only features (column names) containing this substring are
-         * shown in the feature dropdown. Useful for monthly prediction columns
-         * like `"prob_"` or `"mean_"`. An empty string means "show all".
+         * If set, only features (column names) containing at least one of these
+         * substrings are shown in the feature dropdown. Useful for monthly
+         * prediction columns like `"prob_"` or `"mean_"`.
+         * An empty string or empty array means "show all".
          */
-        filterStringForAvailableFeature: string;
+        filterStringForAvailableFeature: MapStringFilter;
         /** Database relation name of the initially selected dataset. */
         defaultDatasetName: string;
         /** Column name of the initially selected feature / variable. */
@@ -494,51 +505,24 @@ export interface LeafD3MapLayerProps {
     isProjection_equirectangular?: boolean;
 }
 
-/**
- * Determines whether a dataset key passes both include and exclude
- * substring filters.
- *
- * Used by the dataset-selection dropdown to reduce the visible list to
- * only those datasets relevant to the current showcase or view.
- *
- * @param key            - The dataset key (relation name) to test.
- * @param includeFilter  - A single substring **or** an array of substrings.
- *                         The key must contain **at least one** non-empty
- *                         substring to pass. An empty string, empty array,
- *                         or `undefined` disables the include filter.
- * @param excludeFilter  - A single substring. If the key contains this
- *                         substring it is excluded regardless of the
- *                         include filter. An empty string or `undefined`
- *                         disables the exclude filter.
- * @returns `true` if the dataset should be shown in the UI.
- *
- * @example
- * ```ts
- * isDatasetIncluded("t_2024_albopictus_predictions", "albopictus", "?");  // true
- * isDatasetIncluded("t_2024_aegypti_predictions",    "albopictus", "?");  // false
- * isDatasetIncluded("t_2024_albopictus_debug?",       "albopictus", "?"); // false (excluded)
- * isDatasetIncluded("anything",                       "",           "");  // true  (no filter)
- * ```
- */
-export function isDatasetIncluded(
-    key: string,
-    includeFilter?: string | string[],
-    excludeFilter?: string
-): boolean {
-    if (excludeFilter && excludeFilter !== "" && key.includes(excludeFilter)) {
-        return false;
-    }
-    if (!includeFilter) {
-        return true;
-    }
-    if (Array.isArray(includeFilter)) {
-        if (includeFilter.length === 0) return true;
-        return includeFilter.some((filter) => filter !== "" && key.includes(filter));
-    }
-    if (includeFilter === "") {
-        return true;
-    }
-    return key.includes(includeFilter);
+/** Success banner shown after presence data has finished loading. */
+function DataLoadSuccessAlert({ locationCount }: { locationCount: number }) {
+    return (
+        <div
+            role="alert"
+            className="flex items-start gap-3 rounded-md border border-green-300 bg-green-50 p-4 text-green-800 dark:border-green-700 dark:bg-green-950 dark:text-green-100"
+        >
+            <CheckCircle2Icon className="mt-1 h-5 w-5 text-green-500" />
+            <div className="flex flex-col">
+                <span className="font-semibold"></span>
+                <span className="text-sm text-green-700 dark:text-green-300">
+                    {locationCount > 0
+                        ? `Data loaded for ${locationCount} locations.`
+                        : "Data loaded. No new data points for the selection."}
+                </span>
+            </div>
+        </div>
+    );
 }
 
 /**
@@ -759,9 +743,13 @@ const LeafD3MapLayerComponent = ({props}: {props: LeafD3MapLayerProps}) => {
     leafProps.center = props.center;
     leafProps.isProjection_equirectangular = props.isProjection_equirectangular;
 
-    // apply data boolean flags to UI settings
-    props.mapUIsettings.isPresenceData = !props.mapDataSets.isPresenceData ? false : props.mapUIsettings.isPresenceData;
-    props.mapUIsettings.isSequenceMetaData = !props.mapDataSets.isSequenceMetaData ? false : props.mapUIsettings.isSequenceMetaData;
+    // If UI settings enable presence data or sequence metadata, ensure dataset capability flags are enabled
+    if (props.mapUIsettings.isPresenceData) {
+        props.mapDataSets.isPresenceData = true;
+    }
+    if (props.mapUIsettings.isSequenceMetaData) {
+        props.mapDataSets.isSequenceMetaData = true;
+    }
 
 
    
@@ -907,7 +895,7 @@ const baseStyle: Leaflet.PathOptions = {
             ? buildMapDatasetURL({
                 relationName: mapUIsettings.defaultDatasetName,
                 feature: mapUIsettings.defaultFeatureName,
-                aggregation_level: mapUIsettings.isCountryLevelData ? 0 : mapUIsettings.isSubregionLevelData ? 1 : undefined,
+                aggregation_level: mapUIsettings.inCovidDataView ? (mapUIsettings.isCountryLevelData ? 0 : mapUIsettings.isSubregionLevelData ? 1 : undefined) : undefined,
                 startDate: mapUIsettings.inCovidDataView && contextT.dateRange?.from && contextT.dateRange?.to
                     ? format(contextT.dateRange.from, "yyyy-MM-dd")
                     : undefined,
@@ -1038,7 +1026,6 @@ const baseStyle: Leaflet.PathOptions = {
         [leafProps.center?.[0] ?? 0, leafProps.center?.[1] ?? 0, leafProps.zoom ?? 1]
     );
     const [isTransitioning, setIsTransitioning] = useState(false);
-    const [isZooming, setIsZooming] = useState(false);
     const isZoomingRef = useRef(false);
     const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const coordsRef = useRef([latitude, longitude, zoom]);
@@ -1072,12 +1059,10 @@ const baseStyle: Leaflet.PathOptions = {
     const [min_date, setMinDate] = useState<Date>(new Date("2020-01-01"));
     const [max_date, setMaxDate] = useState<Date>(new Date("2022-02-14"));
 
-    const disabledMatcher = useMemo(() => {
-        const matchers: any[] = [];
-        if (min_date) matchers.push({ before: min_date });
-        if (max_date) matchers.push({ after: max_date });
-        return matchers;
-    }, [min_date, max_date]);
+    const disabledMatcher = useMemo(() => [
+        { before: min_date },
+        { after: max_date },
+    ], [min_date, max_date]);
 
     // mosquito data (grid data)
     const [selectedDatasetURL, setSelectedDataset] = useState<string>(initialDatasetURL);
@@ -1134,17 +1119,21 @@ const baseStyle: Leaflet.PathOptions = {
     }, [dateColumn, selectedDatasetURL]);
     const [, rawMinMaxDate] = useGetJSONData(minMaxDateURL, Boolean(minMaxDateURL));
 
+    /* eslint-disable react-hooks/set-state-in-effect -- Date bounds intentionally mirror the completed server response. */
     useEffect(() => {
         const values = (rawMinMaxDate as dbDATA | undefined)?.response;
         if (!values?.min_val || !values?.max_val) return;
+
         const parsedMin = new Date(values.min_val);
         const parsedMax = new Date(values.max_val);
         const cutoffMax = new Date("2022-02-14");
         if (!isNaN(parsedMin.getTime())) setMinDate(parsedMin);
         if (!isNaN(parsedMax.getTime())) setMaxDate(parsedMax > cutoffMax ? cutoffMax : parsedMax);
     }, [rawMinMaxDate]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     // Wait for column names and metadata to load and set default feature name if not already set
+    /* eslint-disable react-hooks/set-state-in-effect -- The first available server column initializes controlled feature state. */
     useEffect(() => {
         if (!isLoading_ColumnNames && !isLoading_Metadata && rawColumnNames && Array.isArray(rawColumnNames) && rawColumnNames.length > 0 && props.mapUIsettings.defaultFeatureName === "") {
             let selectedColumnName = "";
@@ -1172,6 +1161,7 @@ const baseStyle: Leaflet.PathOptions = {
             setSelectedFeature(selectedColumnName);
         }
     }, [isLoading_ColumnNames, isLoading_Metadata, rawColumnNames, rawMetaData]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     
 
@@ -1199,9 +1189,10 @@ const baseStyle: Leaflet.PathOptions = {
         : apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "pointtype", filterBy: "pointtype", filterValue: "point, exact location" });
     const [presenceDataURL, setPresenceDataURL] = useState<string>(defaultPresenceDataURL);
     const shouldLoadPresenceData = props.mapDataSets.isPresenceData && isPresData;
+    const shouldLoadPresenceDropdowns = (props.mapUIsettings.isPresenceData || props.mapDataSets.isPresenceData) && !props.mapUIsettings.inCovidDataView;
     const [isLoadingPresenceData, rawPresenceData] = useGetJSONData(presenceDataURL, shouldLoadPresenceData);
-    const [isLoadingP_species, rawP_species] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "species", task: "getUniqueEntries" }), shouldLoadPresenceData && !props.mapUIsettings.inCovidDataView);
-    const [isLoadingP_years, rawP_years] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "year", task: "getUniqueEntries" }), shouldLoadPresenceData && !props.mapUIsettings.inCovidDataView);
+    const [isLoadingP_species, rawP_species] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "species", task: "getUniqueEntries" }), shouldLoadPresenceDropdowns);
+    const [isLoadingP_years, rawP_years] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "year", task: "getUniqueEntries" }), shouldLoadPresenceDropdowns);
     const effectiveTargetDate = dateRange?.to
         ? format(dateRange.to, "yyyy-MM-dd")
         : dateRange?.from
@@ -1255,9 +1246,10 @@ const baseStyle: Leaflet.PathOptions = {
     )
 
     const shouldLoadSequenceData = props.mapDataSets.isSequenceMetaData && isSequenceMetaData;
+    const shouldLoadSequenceDropdowns = props.mapUIsettings.isSequenceMetaData;
     const [isLoading_sequenceMetadata, rawSequenceMetaData] = useGetJSONData(sequenceMetaDataURL, shouldLoadSequenceData);
-    const [isLoadingS_organism, rawS_organsim] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curDonutChartDatasetName, feature: sequenceColumnForDonut, task: "getUniqueEntries" }), shouldLoadSequenceData);
-    const [isLoadingS_years, rawS_years] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curDonutChartDatasetName, feature: "date", task: "getUniqueEntries" }), shouldLoadSequenceData);
+    const [isLoadingS_organism, rawS_organsim] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curDonutChartDatasetName, feature: sequenceColumnForDonut, task: "getUniqueEntries" }), shouldLoadSequenceDropdowns);
+    const [isLoadingS_years, rawS_years] = useGetJSONData( apiRoutes.fetchDbData({ relationName: contextT.curDonutChartDatasetName, feature: "date", task: "getUniqueEntries" }), shouldLoadSequenceDropdowns);
     const sequenceBreakdownURL = useMemo(() => apiRoutes.fetchDbData({
         relationName: contextT.curDonutChartDatasetName,
         feature: geoAssignmentColumn,
@@ -1291,31 +1283,33 @@ const baseStyle: Leaflet.PathOptions = {
         setSelectedCountry("");
         contextT.setSelectedCountry("");
 
-        let url = apiRoutes.fetchDbData({
-            relationName: curDatasetname.current,
-            feature: contextT.curFeature || selectedFeature || mapUIsettings.defaultFeatureName,
-            startDate: contextT.dateRange?.from ? format(contextT.dateRange.from, "yyyy-MM-dd") : undefined,
-            endDate: contextT.dateRange?.to ? format(contextT.dateRange.to, "yyyy-MM-dd") : undefined,
-            aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
-        });
-        console.log("handleResetToAllCountries", url);
+        if (mapUIsettings.inCovidDataView) {
+            let url = apiRoutes.fetchDbData({
+                relationName: curDatasetname.current,
+                feature: contextT.curFeature || selectedFeature || mapUIsettings.defaultFeatureName,
+                startDate: contextT.dateRange?.from ? format(contextT.dateRange.from, "yyyy-MM-dd") : undefined,
+                endDate: contextT.dateRange?.to ? format(contextT.dateRange.to, "yyyy-MM-dd") : undefined,
+                aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
+            });
+            console.log("handleResetToAllCountries", url);
 
-        contextT.setCurDatasetURL(url);
-        contextT.setCurPresenceDatasetURL(url);
-        contextT.setIsPresenceData(true);
-        setIsPresData(true);
-        setPresenceDataURL(url);
-        setShowSuccessCountryDropdown(true);
+            contextT.setCurDatasetURL(url);
+            contextT.setCurPresenceDatasetURL(url);
+            contextT.setIsPresenceData(true);
+            setIsPresData(true);
+            setPresenceDataURL(url);
+            setShowSuccessCountryDropdown(true);
+
+            setTimeout(() => {
+                setShowSuccessCountryDropdown(false);
+            }, 5000);
+        }
 
         if (map && highlightedCountryRef.current) {
             map.removeLayer(highlightedCountryRef.current);
             highlightedCountryRef.current = null;
         }
-
-        setTimeout(() => {
-            setShowSuccessCountryDropdown(false);
-        }, 5000);
-    }, [contextT.dateRange, contextT.curFeature, selectedFeature, mapUIsettings.defaultFeatureName, isCountryLevelData, isSubregionLevelData, map])
+    }, [mapUIsettings.inCovidDataView, contextT.dateRange, contextT.curFeature, selectedFeature, mapUIsettings.defaultFeatureName, isCountryLevelData, isSubregionLevelData, map])
 
     const handleResetToAllCountriesRef = useRef(handleResetToAllCountries);
     useEffect(() => {
@@ -1568,16 +1562,14 @@ const baseStyle: Leaflet.PathOptions = {
     // synchronize selected feature with month selection
     const syncSelectedFeatureWithMonthSelection = useCallback(() => {
         if (contextT.curMonth <= 0 || contextT.curMonth > 12) return;
-        const filterStr = props.mapUIsettings.filterStringForAvailableFeature;
-        if (
-            filterStr !== "" &&
-            colNames.filter((name) => name.includes(filterStr)).includes(`${filterStr}_${contextT.curMonth}`)
-        ) {
-            const ff = `${filterStr}_${contextT.curMonth}`;
-            if (selectedFeature !== ff) {
-                setSelectedFeature(ff);
+        const monthlyFeature = getActiveStringFilters(props.mapUIsettings.filterStringForAvailableFeature)
+            .map((filter) => `${filter}_${contextT.curMonth}`)
+            .find((feature) => colNames.includes(feature));
+        if (monthlyFeature) {
+            if (selectedFeature !== monthlyFeature) {
+                setSelectedFeature(monthlyFeature);
                 const url = buildMapDatasetURL(
-                    { relationName: curDatasetname.current, feature: ff },
+                    { relationName: curDatasetname.current, feature: monthlyFeature },
                     useCompactGridResponse,
                 );
                 setSelectedDataset(url);
@@ -1601,10 +1593,13 @@ const baseStyle: Leaflet.PathOptions = {
         }
     }, [contextT.curMonth, colNames, selectedFeature, props.mapUIsettings.filterStringForAvailableFeature]);
 
+    /* eslint-disable react-hooks/set-state-in-effect -- Month changes intentionally synchronize the selected dataset or feature. */
     useEffect(() => {
         syncSelectedFeatureWithMonthSelection();
-    }, [contextT.curMonth, syncSelectedFeatureWithMonthSelection]);
+    }, [syncSelectedFeatureWithMonthSelection]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
+    /* eslint-disable react-hooks/set-state-in-effect -- This receiver intentionally mirrors shared context into local map state. */
     useEffect(() => {
         if(props.isApplyContextData === true) {
             // Only show loading spinner if data-related context values changed
@@ -1625,6 +1620,7 @@ const baseStyle: Leaflet.PathOptions = {
         contextT.pieSize_sequenceMetaData, contextT.curLayerOpacity,
         contextT.selectedFilter, contextT.selectedCountry, contextT.dateRange,
         contextT.curSyear, contextT.curSOrgansim]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     // if isSetIntialContextDataFromComponent is true set context values from component
     useEffect(() => {
@@ -1829,7 +1825,7 @@ const baseStyle: Leaflet.PathOptions = {
         activeFeature: string,
         isCountryLevel?: boolean
     ): presDBdataT {
-        const isDE = item.country_name === "Germany" || item.country_name === "Deutschland" || (item as any).iso_3166_1_alpha_3 === "DEU" || (item as any).country_code === "DE";
+        const isDE = item.country_name === "Germany" || item.country_name === "Deutschland" || (item as any).iso_a3 === "DEU" || (item as any).country_code === "DE";
         if (!isDE || !Array.isArray(rkiResp) || rkiResp.length === 0) return { ...item };
 
         const newItem = { ...item };
@@ -1925,6 +1921,7 @@ const baseStyle: Leaflet.PathOptions = {
         return newItem;
     }
 
+    /* eslint-disable react-hooks/set-state-in-effect -- Parsed fetch results intentionally replace the rendered presence layer. */
     useEffect(() => {
         const isRkiLoading = mapUIsettings.inCovidDataView && isLoadingCOVIDData;
         if (!isLoadingPresenceData && !isRkiLoading && props.mapDataSets.isPresenceData && presenceDat?.response) {
@@ -1975,6 +1972,7 @@ const baseStyle: Leaflet.PathOptions = {
             setPresData(presDat);
         }
     }, [presenceDat, isLoadingPresenceData, rawRkiData, isLoadingCOVIDData, selectedFeature, contextT.curFeature, contextT.targetDate, dateRange, props.mapUIsettings.defaultFeatureName, isCountryLevelData]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     // ------------------------------------------------------------------
     // Zoom-dependent auto-switch between country-level and subregion-level
@@ -1983,6 +1981,7 @@ const baseStyle: Leaflet.PathOptions = {
     // when the user actually crosses the boundary.
     const prevZoomAboveThreshold = useRef<boolean | null>(null);
 
+    /* eslint-disable react-hooks/set-state-in-effect -- Crossing the zoom threshold intentionally switches aggregation state. */
     useEffect(() => {
         if (!mapUIsettings.inCovidDataView) return;
 
@@ -1993,8 +1992,8 @@ const baseStyle: Leaflet.PathOptions = {
         prevZoomAboveThreshold.current = isAboveThreshold;
 
         // Determine the new data-level flags
-        const newCountryLevel  = !isAboveThreshold;  // zoom < 4  → country
-        const newSubregionLevel = isAboveThreshold;   // zoom >= 4 → subregion
+        const newCountryLevel = !isAboveThreshold;
+        const newSubregionLevel = isAboveThreshold;
 
         // Only act if the flags actually need to change
         if (newCountryLevel === isCountryLevelData && newSubregionLevel === isSubregionLevelData) return;
@@ -2005,13 +2004,13 @@ const baseStyle: Leaflet.PathOptions = {
         contextT.setIsCountryLevelData(newCountryLevel);
         contextT.setIsSubregionLevelData(newSubregionLevel);
 
-        // Re-build the *local* presence data URL with the correct aggregation_level.
-        // We intentionally do NOT push this URL to context so that each map
-        // keeps its own zoom-appropriate aggregation_level independently.
+        // Re-build the local presence data URL with the correct aggregation level.
+        // Do not push this URL to context, so each map keeps its own
+        // zoom-appropriate aggregation level independently.
         let url = presenceDataURL;
-        // Strip any existing aggregation_level param
+        // Strip any existing aggregation_level parameter.
         url = url.replace(/&aggregation_level=[01]/g, "");
-        // Append the correct one
+        // Append the correct one.
         url += newCountryLevel ? "&aggregation_level=0" : "&aggregation_level=1";
         setPresenceDataURL(url);
 
@@ -2019,9 +2018,8 @@ const baseStyle: Leaflet.PathOptions = {
             `[Zoom-switch] zoom=${zoom}, threshold=${zoomBreakpoint}, ` +
             `country=${newCountryLevel}, subregion=${newSubregionLevel}`
         );
-
-       
     }, [zoom, mapUIsettings.inCovidDataView, isCountryLevelData, isSubregionLevelData, presenceDataURL]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
      // *** useRef *** //
     const divRef = useRef<HTMLDivElement | null>(null);
@@ -2043,16 +2041,14 @@ const baseStyle: Leaflet.PathOptions = {
         return colors;
     }, [S_organism]);
 
-// Fetch country counts for the selected countries
-const [countryCounts, setCountryCounts] = useState<{ [key: string]: any }>({});
-
-useEffect(() => {
+// Derive country counts for the selected countries
+const countryCounts = useMemo<{ [key: string]: any }>(() => {
     if (
         !shouldLoadSequenceData ||
         isLoading_sequenceMetadata ||
         isLoadingSequenceBreakdown ||
         isLoading_mapData
-    ) return;
+    ) return {};
 
     const totals = Array.isArray(sequenceMetaData?.response) ? sequenceMetaData.response : [];
     const breakdownResponse = rawSequenceBreakdown as unknown as dbDATA;
@@ -2082,7 +2078,7 @@ useEffect(() => {
         country.labels.push(item.category);
     });
 
-    setCountryCounts(counts);
+    return counts;
 }, [
     shouldLoadSequenceData,
     sequenceMetaData,
@@ -2112,25 +2108,27 @@ useEffect(() => {
 
 
 // ─── Shared hook: parse raw polygon data → Map<gridCellIndex, VisDataT> ───
-const {
-    gridData: parsedGridData,
-    parseErrors,
-    featureRange: gridFeatureRange,
-    cellSize: parsedGridCellSize,
-} = useGridDataParser({
-    isLoading: isLoading_MosquitoData || (mapUIsettings.inCovidDataView ?? false),
-    rawData: mosquitoData,
-    gridcellSizeRef: gridcellSizeLatLng,
-});
+    const {
+        gridData: parsedGridData,
+        parseErrors,
+        featureRange: gridFeatureRange,
+        cellSize: parsedGridCellSize,
+    } = useGridDataParser({
+        isLoading: isLoading_MosquitoData || (mapUIsettings.inCovidDataView ?? false),
+        rawData: mosquitoData,
+        gridcellSizeRef: gridcellSizeLatLng,
+    });
 
-useEffect(() => {
-    if (parsedGridData.size > 0) {
-        setGridData(parsedGridData);
-    }
-    if (parseErrors.length > 0) {
-        parseErrors.forEach(e => collectDataLoadingErrors.current.push(<div>{e}</div>));
-    }
-}, [parsedGridData, parseErrors]);
+    /* eslint-disable react-hooks/set-state-in-effect -- Successful parser output replaces the retained render grid. */
+    useEffect(() => {
+        if (parsedGridData.size > 0) {
+            setGridData(parsedGridData);
+        }
+        if (parseErrors.length > 0) {
+            parseErrors.forEach(e => collectDataLoadingErrors.current.push(<div>{e}</div>));
+        }
+    }, [parsedGridData, parseErrors]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
 
 
@@ -2205,7 +2203,6 @@ useEffect(() => {
      */
     function selectCountry(countryIdentifier: string) {
         if (!map) return;
-        if (props.mapInteractions.disableClick) return;
 
         // 1. Find the matching GeoJSON feature in mapData
         const matchingFeature = mapData?.features?.find(
@@ -2245,7 +2242,7 @@ useEffect(() => {
             const url = apiRoutes.fetchDbData({
                 relationName: datasetName,
                 feature: featureName,
-                filterBy: "iso_3166_1_alpha_3",
+                filterBy: COVID_COUNTRY_FILTER_COLUMN,
                 filterValue: countryCode,
                 startDate: (dateRange?.from && dateRange?.to) ? format(dateRange.from, "yyyy-MM-dd") : undefined,
                 endDate: (dateRange?.from && dateRange?.to) ? format(dateRange.to, "yyyy-MM-dd") : undefined,
@@ -2257,8 +2254,6 @@ useEffect(() => {
                 contextT.setDateRange({ from: dateRange.from, to: dateRange.to });
             }
 
-            setSelectedCountry(countryCode);
-            contextT.setSelectedCountry(countryCode);
             contextT.setCurPresenceDatasetName(datasetName);
             contextT.setCurDatasetURL(url);
             contextT.setCurPresenceDatasetURL(url);
@@ -2272,6 +2267,11 @@ useEffect(() => {
             }, 3000);
         }
 
+        setSelectedCountry(countryIdentifier);
+        if (props.mapUIsettings.isDoNotApplyCountryFromContext === false) {
+            contextT.setSelectedCountry(countryCode);
+        }
+
         // 3. Zoom/move to country bounds ONLY when explicitly configured (e.g. map-based country selection dropdown)
         if (props.mapUIsettings.isCountrySelectionDropdownMapBased && matchingFeature && L && map) {
             const bounds = L.geoJSON(matchingFeature as any).getBounds();
@@ -2280,9 +2280,7 @@ useEffect(() => {
             }
         }
 
-        if (!props.mapInteractions.disableClick) {
-            contextT.setMapSelectionObj(matchingFeature as GEOjson.Feature);
-        }
+        contextT.setMapSelectionObj(matchingFeature as GEOjson.Feature);
 
         // 4. Highlight the selected polygon with activeStyle
         // Reset all layers to baseStyle first
@@ -2317,32 +2315,6 @@ useEffect(() => {
             applyActiveStyleToSelection(matchingFeature as GEOjson.Feature);
         }
     }
-
-    /**
-     * Inline alert component rendering a green success banner that
-     * confirms how many presence-data locations were loaded after a
-     * country selection.
-     *
-     * @returns A styled `<div role="alert">` with a check-circle icon
-     *          and a contextual message.
-     */
-    function AlertSuccess() {
-        return (
-            <div
-            role="alert"
-            className="flex items-start gap-3 rounded-md border border-green-300 bg-green-50 p-4 text-green-800 dark:border-green-700 dark:bg-green-950 dark:text-green-100"
-            >
-            <CheckCircle2Icon className="h-5 w-5 mt-1 text-green-500" />
-            <div className="flex flex-col">
-                <span className="font-semibold"></span>
-                <span className="text-sm text-green-700 dark:text-green-300">
-                {presData.length > 0 ? "Data loaded for " + presData.length + " locations."  : "Data loaded. No new data points for the selection."} 
-                </span>
-            </div> 
-            </div>
-        );
-    }
-
 
     /**
      * Groups presence-data records by geographic coordinate, aggregating
@@ -2871,15 +2843,7 @@ function MapDrawLayer_Captials(capitalsData: CapitalsFeatureCollection, map: L.M
     return null;
 }
 
-const [isCapitalLabel, setIsCapitalLabel] = useState<boolean>(false);
-
-useEffect(() => {
-    if (zoom >= 3.9) {
-        setIsCapitalLabel(true);
-    } else {
-        setIsCapitalLabel(false);
-    }
-}, [zoom]);
+const isCapitalLabel = zoom >= 3.9;
 
 
 /**
@@ -3097,7 +3061,7 @@ const HandleMouseMoveX = useCallback(
             return; // No change in grid cell
         }
         //console.log("drawTooltip...")
-        curGridCell.current = [gridLat, gridLng];
+        curGridCell.current = [curSnapped.center.lat, curSnapped.center.lng];
 
         let curGridCoords = {lat: gridLat, lng: gridLng};
         curGridCellID.current = getGridCellIndex(curGridCoords, gridCellDims)-1;
@@ -3244,14 +3208,12 @@ function MapMouseEvents(isUpdate: boolean) {
 
                
            
-                // LeafletMouseEvent does not have isDragging; use map.dragging.enabled() if needed
                 if (event.originalEvent.buttons === 1) { // 1 means left mouse button is pressed
-                    setIsSettingsOpen(false);
-                    curMouseEvent.current = "null";
+                    setIsSettingsOpen((prev) => prev ? false : prev);
+                    curMouseEvent.current = "drag";
+                } else {
+                    curMouseEvent.current = "mousemove";
                 }
-
-              
-                 curMouseEvent.current = "mousemove";
                 //console.log("setMouseEvent:", curMouseEvent.current, event);
                     if (
                     typeof curMapMouseEvents.current.lastSetTime === "number" &&
@@ -3304,7 +3266,7 @@ function MapMouseEvents(isUpdate: boolean) {
                     // to show the history for a feature of one grid cell
                     contextT.setMapSelectionObj(dummyFeature);
 
-                    if (mapUIsettings.inCovidDataView || mapUIsettings.isCountrySelectionDropdown) {
+                    if (mapUIsettings.inCovidDataView) {
                         handleResetToAllCountriesRef.current();
                     }
                 }
@@ -3313,8 +3275,8 @@ function MapMouseEvents(isUpdate: boolean) {
                
             };
             const handleZoomStart = () => {
-                setIsZooming(true);
                 isZoomingRef.current = true;
+                curMouseEvent.current = "wheel";
                 if (zoomDebounceRef.current) {
                     clearTimeout(zoomDebounceRef.current);
                     zoomDebounceRef.current = null;
@@ -3327,12 +3289,13 @@ function MapMouseEvents(isUpdate: boolean) {
                 }
                 zoomDebounceRef.current = setTimeout(() => {
                     zoomDebounceRef.current = null;
-                    setIsZooming(false);
                     isZoomingRef.current = false;
-                    gridLayerRedrawRef.current?.();
                 }, 150);
             };
-            const handleZoomEnd = () => scheduleZoomSettled();
+            const handleZoomEnd = () => {
+                handleMouseEvent();
+                scheduleZoomSettled();
+            };
             const handleMoveStart = () => {
                 if (!isZoomingRef.current || !zoomDebounceRef.current) return;
                 clearTimeout(zoomDebounceRef.current);
@@ -3346,7 +3309,6 @@ function MapMouseEvents(isUpdate: boolean) {
             map.on("click", (event: L.LeafletMouseEvent) => handleMouseClick(event));
             map.on("movestart", handleMoveStart);
             map.on("moveend", handleMoveEnd);
-            map.on("zoomend", handleMouseEvent);
             map.on("zoomstart", handleZoomStart);
             map.on("zoomend", handleZoomEnd);
             map.on("mousemove", handleMouseMove);
@@ -3365,7 +3327,6 @@ function MapMouseEvents(isUpdate: boolean) {
                 map.off("zoomend", handleZoomEnd);
                 map.off("movestart", handleMoveStart);
                 map.off("moveend", handleMoveEnd);
-                map.off("zoomend", handleMouseEvent);
                 map.off("mousemove", handleMouseMove);
                 map.off("click", handleMouseClick);
                 if (mapUIsettings.inCovidDataView) {
@@ -3383,7 +3344,7 @@ useEffect(() => {
     if (!map) return;
     const container = map.getContainer();
     const handleWheel = () => {
-        setIsSettingsOpen(false);
+        setIsSettingsOpen((prev) => prev ? false : prev);
         curMouseEvent.current = "wheel";
     };
     container.addEventListener("wheel", handleWheel);
@@ -3441,7 +3402,9 @@ useEffect(() => {
                 return;
             }
             if (mouseData.event) {
-                HandleMouseMoveX(mouseData.event, map, gridData);
+                if (!(mouseData.event.originalEvent as MouseEvent)?.buttons) {
+                    HandleMouseMoveX(mouseData.event, map, gridData);
+                }
             }
         };
 
@@ -3588,6 +3551,10 @@ const [minVal, maxVal] = useMemo(() => {
         return gridFeatureRange;
     }
 }, [mosquitoData, isLoading_MosquitoData, presData, mapUIsettings.inCovidDataView, parsedGridData, gridFeatureRange]);
+
+const isColorMapLegendReady = mapUIsettings.inCovidDataView
+    ? (!isLoadingCOVIDData && !isLoadingPresenceData && presData.length > 0)
+    : (props.mapDataSets.isGridData !== false && !isLoading_MosquitoData && mosquitoData?.error == null);
 
 
 const radiusScale = useMemo(() => {
@@ -3773,9 +3740,51 @@ function MapDrawLayer_MosquitoPresenceData(presenceDrawHash: number) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null); // Reuse canvas instead of recreating
     const overlayRef = useRef<L.ImageOverlay | null>(null);
 
+    // Clean up overlay when map instance changes or component unmounts
+    useEffect(() => {
+        return () => {
+            if (map && overlayRef.current) {
+                if (map.hasLayer(overlayRef.current)) {
+                    map.removeLayer(overlayRef.current);
+                }
+                overlayRef.current = null;
+            }
+        };
+    }, [map]);
+
     useEffect(() => {
         // Don't render if map is not initialized, we are in Covid view, or presence data is disabled in datasets
-        if (!map || mapUIsettings.inCovidDataView || !props.mapDataSets.isPresenceData) return;
+        if (!map || mapUIsettings.inCovidDataView || !props.mapDataSets.isPresenceData) {
+            if (map && overlayRef.current) {
+                if (map.hasLayer(overlayRef.current)) {
+                    map.removeLayer(overlayRef.current);
+                }
+                overlayRef.current = null;
+            }
+            return;
+        }
+
+        // When presence data is toggled off, smoothly transition out the existing overlay
+        if (!isPresData) {
+            if (overlayRef.current) {
+                const prevOverlay = overlayRef.current;
+                overlayRef.current = null;
+                const prevElement = prevOverlay.getElement();
+                if (prevElement) {
+                    prevElement.style.transition = `opacity ${layerTansitionTime}ms ease-out`;
+                    prevElement.style.opacity = "0";
+                }
+                setTimeout(() => {
+                    if (map && map.hasLayer(prevOverlay)) {
+                        map.removeLayer(prevOverlay);
+                    }
+                }, layerTansitionTime);
+            }
+            L_presenceLayer.stop();
+            prev_presenceDrawHash.current = presenceDrawHash;
+            circlesSelectionRef.current = null;
+            return;
+        }
 
         function Render(){
             // Don't render if map is not initialized
@@ -3806,6 +3815,8 @@ function MapDrawLayer_MosquitoPresenceData(presenceDrawHash: number) {
                 if (!map) return;
                 L_presenceLayer.start();
 
+                const dotColor = getPresenceDataColor(curColorMapType, props.mapUIsettings.presenceDataColor);
+
                 const sortedPresDataLocal = sortedPresDataMemo;
                 for (const d of sortedPresDataLocal) {
                     if (!d.geometry) continue;
@@ -3819,8 +3830,7 @@ function MapDrawLayer_MosquitoPresenceData(presenceDrawHash: number) {
                     }
                     const x1 = coords.x;
                     const y1 = coords.y;
-                    context.fillStyle = curColorMapType !="interpolateInferno" ? 
-                    (props.mapUIsettings.presenceDataColor || "rgb(239, 23, 23)") : "rgb(239, 23, 23)";
+                    context.fillStyle = dotColor;
                     context.beginPath();
                     context.arc(x1, y1, screenDistanceOneKM.current + dotSizeConstant, 0, Math.PI * 2);
                     context.fill();
@@ -3847,16 +3857,7 @@ function MapDrawLayer_MosquitoPresenceData(presenceDrawHash: number) {
         }
 
         Render();
-
-        return () => {
-            if (map && overlayRef.current) {
-                if (map.hasLayer(overlayRef.current)) {
-                    map.removeLayer(overlayRef.current);
-                }
-                overlayRef.current = null;
-            }
-        };
-    }, [presenceDrawHash, dimensions, presData, isPresData]);
+    }, [presenceDrawHash, dimensions, presData, isPresData, curColorMapType, props.mapUIsettings.presenceDataColor]);
 
     return overlayRef.current;
 }
@@ -3962,6 +3963,7 @@ function MapDrawLayer_CovidPresenceData(presenceDrawHash: number) {
                     .on('mouseover', function() { (this as HTMLElement).style.cursor = 'pointer'; })
                     .on('mouseout', function() { (this as HTMLElement).style.cursor = 'default'; })
                     .on('click', function(event: any, d: any) {
+                        if (props.mapInteractions.disableClick) return;
                         event.stopPropagation();
                         const latlng = L ? L.latLng(+d.geometry[0], +d.geometry[1]) : { lat: 0, lng: 0 };
                         const curFeatKey = selectedFeature || contextT.curFeature || props.mapUIsettings.defaultFeatureName;
@@ -4059,25 +4061,43 @@ function MapDrawLayer_CovidPresenceData(presenceDrawHash: number) {
 function MapDrawLayer_SequenceMetadata(countryCounts: { [key: string]: any }) {
 
     useEffect(() => {
-           if (!L || !map) return;
-        // Don't render if  data is loading or rendering is disabled
-        if (isLoading_sequenceMetadata || !isSequenceMetaData || !isSequenceMetaData) return;
-
+        if (!L || !map) return;
+        // Don't render if data is loading or rendering is disabled or countryCounts is empty
+        if (
+            isLoading_sequenceMetadata ||
+            isLoadingSequenceBreakdown ||
+            !isSequenceMetaData ||
+            !countryCounts ||
+            Object.keys(countryCounts).length === 0
+        ) {
+            if (map && SVGLayer_ref.current) {
+                if (map.hasLayer(SVGLayer_ref.current)) {
+                    map.removeLayer(SVGLayer_ref.current);
+                }
+                SVGLayer_ref.current = null;
+                SVG_ref.current = undefined;
+                piesMerged.current = undefined;
+            }
+            return;
+        }
 
         createPieCharts(countryCounts, pieSize);
         updatePieCharts();
 
         // cleanup function to remove the SVG layer when component unmounts or dependencies change
-        return () => {if (map && SVGLayer_ref.current) {
-            if (map.hasLayer(SVGLayer_ref.current)) {
-                map.removeLayer(SVGLayer_ref.current);
+        return () => {
+            if (map) {
+                map.off("zoom move viewreset", updatePieCharts);
+                if (SVGLayer_ref.current && map.hasLayer(SVGLayer_ref.current)) {
+                    map.removeLayer(SVGLayer_ref.current);
+                }
             }
             SVGLayer_ref.current = null;
             SVG_ref.current = undefined;
-        }
-    };
+            piesMerged.current = undefined;
+        };
 
-    }, [countryCounts, isSequenceMetaData, pieSize, isLoading_sequenceMetadata]);
+    }, [countryCounts, isSequenceMetaData, pieSize, isLoading_sequenceMetadata, isLoadingSequenceBreakdown, map, L]);
 
     /**
      * Re-projects and re-scales all existing donut-chart `<g>` groups
@@ -4122,26 +4142,38 @@ function MapDrawLayer_SequenceMetadata(countryCounts: { [key: string]: any }) {
      * @param pieSize       - Base diameter (px) before zoom-dependent scaling.
      */
     function createPieCharts(countryCounts: { [key: string]: any }, pieSize: number) {
-            if (!L || !map || SVG_ref.current) return;
-            //if(piesMerged.current != undefined) return;
+            if (!L || !map) return;
+            if (!countryCounts || Object.keys(countryCounts).length === 0) return;
 
-            // 1) Create the Leaflet SVG renderer once
-            if (!SVG_ref.current) {
+            // Remove existing SVG layer if present to avoid duplicate layers
+            if (SVGLayer_ref.current && map.hasLayer(SVGLayer_ref.current)) {
+                map.removeLayer(SVGLayer_ref.current);
+            }
+            SVGLayer_ref.current = null;
+            SVG_ref.current = undefined;
+            piesMerged.current = undefined;
+
+            // 1) Ensure the Leaflet pane exists
+            if (!map.getPane("piesPane")) {
                 map.createPane("piesPane");
-                const piesPane = map.getPane("piesPane");
-                if (piesPane) {
-                    piesPane.style.zIndex = "650"; // Ensure it is above the base pane
-                }
-                SVGLayer_ref.current = L.svg({ pane: 'piesPane' }); // Leaflet-managed <svg>
-                SVGLayer_ref.current?.addTo(map);
-                SVG_ref.current = {
-                renderer: SVGLayer_ref.current,
-                baseZoom: map.getZoom(),
-                handlersAttached: false,
-                } as any;
+            }
+            const piesPane = map.getPane("piesPane");
+            if (piesPane) {
+                piesPane.style.zIndex = "650"; // Ensure it is above the base pane
             }
 
-            const rootSvg = d3.select(map.getPanes().piesPane).select("svg");
+            // 2) Create Leaflet SVG layer
+            SVGLayer_ref.current = L.svg({ pane: 'piesPane' });
+            SVGLayer_ref.current.addTo(map);
+            SVG_ref.current = {
+                renderer: SVGLayer_ref.current,
+                baseZoom: map.getZoom(),
+                handlersAttached: true,
+            } as any;
+
+            if (!piesPane) return;
+            const rootSvg = d3.select(piesPane).select("svg");
+            rootSvg.selectAll(`.pies-${props.chartName}`).remove();
             const piesG = rootSvg.append("g")
                 .attr("class", `pies-${props.chartName}`)
                 .style("pointer-events", "all")
@@ -4429,11 +4461,9 @@ function MapDrawLayer_SequenceMetadata(countryCounts: { [key: string]: any }) {
 
             piesMerged.current = piesEnter.merge(pies as any);
 
-            // 5) Attach handlers once (recalculate on zoom/pan)
-            if (!(SVG_ref.current as any).handlersAttached) {
-                map.on("zoom move viewreset", updatePieCharts);
-                (SVG_ref.current as any).handlersAttached = true;
-            }
+            // 5) Attach handlers (recalculate on zoom/pan)
+            map.off("zoom move viewreset", updatePieCharts);
+            map.on("zoom move viewreset", updatePieCharts);
         }
 
     return null;
@@ -4441,8 +4471,9 @@ function MapDrawLayer_SequenceMetadata(countryCounts: { [key: string]: any }) {
 
 
 
+/* eslint-disable react-hooks/set-state-in-effect -- Loaded dataset metadata initializes the controlled feature selection. */
 useEffect(() => {
-    // Initialize the selected feature when colNames are available
+    // Initialize the selected feature when column names are available.
     if (mosquitoData !== undefined && !isLoading_MosquitoData && mosquitoData.error == null && mosquitoData.header && mosquitoData.header.length > 0 && selectedFeature === "") {
         let index = Math.ceil(mosquitoData.header.length / 2)-1;
         const compactFeatureName = !Array.isArray(mosquitoData.response) &&
@@ -4457,6 +4488,7 @@ useEffect(() => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mosquitoData])
+/* eslint-enable react-hooks/set-state-in-effect */
 
     const roundTo = 1;
     const  rounder = Math.pow(10, roundTo);
@@ -4625,7 +4657,9 @@ useEffect(() => {
                 let url = buildMapDatasetURL({
                     relationName: dataset,
                     feature: mapUIsettings.defaultFeatureName,
-                    aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
+                    filterBy: mapUIsettings.inCovidDataView && selectedCountry ? COVID_COUNTRY_FILTER_COLUMN : undefined,
+                    filterValue: mapUIsettings.inCovidDataView && selectedCountry ? selectedCountry : undefined,
+                    aggregation_level: mapUIsettings.inCovidDataView ? (isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined) : undefined,
                     startDate: mapUIsettings.inCovidDataView && (dateRange && dateRange.from && dateRange.to) ? format(dateRange.from, "yyyy-MM-dd") : undefined,
                     endDate: mapUIsettings.inCovidDataView && (dateRange && dateRange.from && dateRange.to) ? format(dateRange.to, "yyyy-MM-dd") : undefined,
                 }, useCompactGridResponse);
@@ -4687,11 +4721,11 @@ useEffect(() => {
                 let url = buildMapDatasetURL({
                     relationName: curDatasetname.current,
                     feature: value,
-                    filterBy: selectedCountry ? "iso_3166_1_alpha_3" : undefined,
-                    filterValue: selectedCountry || undefined,
+                    filterBy: mapUIsettings.inCovidDataView && selectedCountry ? COVID_COUNTRY_FILTER_COLUMN : undefined,
+                    filterValue: mapUIsettings.inCovidDataView && selectedCountry ? selectedCountry : undefined,
                     startDate: mapUIsettings.inCovidDataView && (dateRange && dateRange.from && dateRange.to) ? format(dateRange.from, "yyyy-MM-dd") : undefined,
                     endDate: mapUIsettings.inCovidDataView && (dateRange && dateRange.from && dateRange.to) ? format(dateRange.to, "yyyy-MM-dd") : undefined,
-                    aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
+                    aggregation_level: mapUIsettings.inCovidDataView ? (isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined) : undefined,
                 }, useCompactGridResponse);
 
                 // get month from selection when feature includes a number after an underscore
@@ -4715,9 +4749,30 @@ useEffect(() => {
                 
                 }
                 } >
-                <SelectTrigger className="w-full text-left text-[15px] [&>span]:flex-1 [&>span]:text-left">
-                <SelectValue placeholder={"loading..."}>{selectedFeature || undefined}</SelectValue>
-                </SelectTrigger>
+                {(() => {
+                    const selectedMetadata = metaData?.[selectedFeature as keyof typeof metaData];
+                    const selectedDimension = selectedMetadata?.dimension && selectedMetadata.dimension !== "NA"
+                        ? ` [${selectedMetadata.dimension}]`
+                        : "";
+                    const selectedDescription = selectedMetadata?.description && selectedMetadata.description !== "NA"
+                        ? selectedMetadata.description
+                        : "";
+
+                    return (
+                        <SelectTrigger className="w-full text-left text-[15px]">
+                            {selectedFeature ? (
+                                <span className="truncate flex-1 text-left min-w-0 block">
+                                    <span className="text-[15px] font-medium">{selectedFeature + selectedDimension}</span>
+                                    {selectedDescription && (
+                                        <span className="ml-2 text-xs italic text-slate-500 dark:text-slate-400">{selectedDescription}</span>
+                                    )}
+                                </span>
+                            ) : (
+                                <span className="text-slate-500 text-sm">loading...</span>
+                            )}
+                        </SelectTrigger>
+                    );
+                })()}
                 <SelectContent>
                 <SelectGroup>
                     <SelectLabel></SelectLabel>
@@ -4725,8 +4780,10 @@ useEffect(() => {
                             const columnMetadata = metaData[name as keyof typeof metaData];
                             const isAvailable = (columnMetadata?.availability === "1" ||
                                 columnMetadata?.availability === undefined) && name !== "id";
-                            const filterStr = props.mapUIsettings.filterStringForAvailableFeature;
-                            const passesFilter = !filterStr || name.includes(filterStr);
+                            const passesFilter = passesStringFilters(
+                                name,
+                                props.mapUIsettings.filterStringForAvailableFeature
+                            );
                             const dimension = columnMetadata?.dimension && columnMetadata.dimension !== "NA"
                                 ? ` [${columnMetadata.dimension}]`
                                 : "";
@@ -4822,8 +4879,13 @@ useEffect(() => {
             <div className="grid grid-cols-7 gap-2">
             <div>
         <div className="flex flex-col items-center justify-center">
-            <div className='mb-1'>
+            <div className='mb-1 flex items-center justify-center relative'>
                 <MosquitoIcon size={20} />
+                <span
+                    className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border border-black/40 shadow-xs"
+                    style={{ backgroundColor: getPresenceDataColor(curColorMapType, props.mapUIsettings.presenceDataColor) }}
+                    title={curColorMapType}
+                />
             </div>
             <Checkbox
                 className="scale-140 m-1 mt-1.5"
@@ -4837,77 +4899,73 @@ useEffect(() => {
         </div>
             </div>
 
-                {P_species.response && (
-                    <div className='col-span-3'>
-                        <label htmlFor="species-select">
-                            {t.rich('presence_data.dropdownSpecies', {...t_richConfig})}:
-                        </label>
-                        <Select value={curSpecies} onValueChange={(value) => {
-                            let url = apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "pointtype", filterBy: "'pointtype','species','year'", filterValue: "'point, exact location','" + value + "','" + curYear + "'" });
-                          //  isLoadingSpinner.current = true;
-                            setCurSpecies(value);
-                            setTimeout(() => {
-                                contextT.setCurPresenceDatasetURL(url);
-                                setPresenceDataURL(url);
-                            }, 200);
-                        }}>
-                            <SelectTrigger className="w-full">
-                                <SelectValue placeholder={"loading..."} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectGroup>
-                                    <SelectLabel></SelectLabel>
-                                    <SelectItem key="ALL" value="ALL">
-                                        <b>all</b>
-                                    </SelectItem>
-                                    {Object.keys(P_species.response).map((key: string, index: number) => (
-                                        P_species.response[index] && P_species.response[index]["feature"] ? (
-                                            <SelectItem key={index} value={P_species.response[index]["feature"]}>
-                                                <b>{P_species.response[index]["feature"]}</b>
-                                            </SelectItem>
-                                        ) : null
-                                    ))}
-                                </SelectGroup>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                )}
+                <div className='col-span-3'>
+                    <label htmlFor="species-select">
+                        {t.rich('presence_data.dropdownSpecies', {...t_richConfig})}:
+                    </label>
+                    <Select value={curSpecies} onValueChange={(value) => {
+                        let url = apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "pointtype", filterBy: "'pointtype','species','year'", filterValue: "'point, exact location','" + value + "','" + curYear + "'" });
+                      //  isLoadingSpinner.current = true;
+                        setCurSpecies(value);
+                        setTimeout(() => {
+                            contextT.setCurPresenceDatasetURL(url);
+                            setPresenceDataURL(url);
+                        }, 200);
+                    }}>
+                        <SelectTrigger className="w-full" id="species-select">
+                            <SelectValue placeholder={"loading..."} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectGroup>
+                                <SelectLabel></SelectLabel>
+                                <SelectItem key="ALL" value="ALL">
+                                    <b>all</b>
+                                </SelectItem>
+                                {Array.isArray(P_species?.response) && P_species.response.map((entry, index: number) => (
+                                    entry && entry["feature"] ? (
+                                        <SelectItem key={index} value={entry["feature"]}>
+                                            <b>{entry["feature"]}</b>
+                                        </SelectItem>
+                                    ) : null
+                                ))}
+                            </SelectGroup>
+                        </SelectContent>
+                    </Select>
+                </div>
 
-                {P_years.response && (
-                    <div className='col-span-3'>
-                        <label htmlFor="year-select">
-                            {t.rich('presence_data.dropdownYear', {...t_richConfig})}:
-                        </label>
-                        <Select value={curYear} onValueChange={(value) => {
-                            let url = apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "pointtype", filterBy: "'pointtype','species','year'", filterValue: "'point, exact location','" + curSpecies + "','" + value + "'" });
-                            //isLoadingSpinner.current = true;
-                            setCurYear(value);
-                            setTimeout(() => {
-                                contextT.setCurPresenceDatasetURL(url);
-                                setPresenceDataURL(url);
-                            }, 200);
-                        }}>
-                            <SelectTrigger className="w-full">
-                                <SelectValue placeholder={"loading..."} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectGroup>
-                                    <SelectLabel></SelectLabel>
-                                    <SelectItem key="ALL" value="ALL">
-                                        <b>all</b>
-                                    </SelectItem>
-                                    {Object.keys(P_years.response).map((_: string, index: number) => (
-                                        P_years.response[index] && P_years.response[index]["feature"] ? (
-                                            <SelectItem key={index} value={P_years.response[index]["feature"]}>
-                                                <b>{P_years.response[index]["feature"]}</b>
-                                            </SelectItem>
-                                        ) : null
-                                    ))}
-                                </SelectGroup>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                )}
+                <div className='col-span-3'>
+                    <label htmlFor="year-select">
+                        {t.rich('presence_data.dropdownYear', {...t_richConfig})}:
+                    </label>
+                    <Select value={curYear} onValueChange={(value) => {
+                        let url = apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "pointtype", filterBy: "'pointtype','species','year'", filterValue: "'point, exact location','" + curSpecies + "','" + value + "'" });
+                        //isLoadingSpinner.current = true;
+                        setCurYear(value);
+                        setTimeout(() => {
+                            contextT.setCurPresenceDatasetURL(url);
+                            setPresenceDataURL(url);
+                        }, 200);
+                    }}>
+                        <SelectTrigger className="w-full" id="year-select">
+                            <SelectValue placeholder={"loading..."} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectGroup>
+                                <SelectLabel></SelectLabel>
+                                <SelectItem key="ALL" value="ALL">
+                                    <b>all</b>
+                                </SelectItem>
+                                {Array.isArray(P_years?.response) && P_years.response.map((entry, index: number) => (
+                                    entry && entry["feature"] ? (
+                                        <SelectItem key={index} value={entry["feature"]}>
+                                            <b>{entry["feature"]}</b>
+                                        </SelectItem>
+                                    ) : null
+                                ))}
+                            </SelectGroup>
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
         </div>
         )}
@@ -4966,7 +5024,6 @@ useEffect(() => {
                 </Button>
             </div>
 
-             {S_organism.response && (
                     <div className='col-span-3'>
                         <label htmlFor="organism-select">
                             {t.rich('sequence_Metadata.dropdownType', {...t_richConfig})}:
@@ -4980,7 +5037,7 @@ useEffect(() => {
                                 setSequenceMetaDataURL(url);
                             }, 200);
                         }}>
-                            <SelectTrigger className="w-full">
+                            <SelectTrigger className="w-full" id="organism-select">
                                 <SelectValue placeholder={"loading..."} />
                             </SelectTrigger>
                             <SelectContent>
@@ -4989,9 +5046,9 @@ useEffect(() => {
                                     <SelectItem key="ALL" value="ALL">
                                         <b>all</b>
                                     </SelectItem>
-                                    {Object.keys(S_organism.response).map((key: string, index: number) => (
-                                        S_organism.response[index] && S_organism.response[index]["feature"] ? (
-                                            <SelectItem key={index} value={S_organism.response[index]["feature"]}>
+                                    {Array.isArray(S_organism?.response) && S_organism.response.map((entry, index: number) => (
+                                        entry && entry["feature"] ? (
+                                            <SelectItem key={index} value={entry["feature"]}>
                                                 <b>
                                                     <span
                                                         style={{
@@ -5001,11 +5058,11 @@ useEffect(() => {
                                                             marginRight: "6px",
                                                             verticalAlign: "middle",
                                                             borderRadius: "3px",
-                                                            background: DonutColors[S_organism.response[index]["feature"]] || "#ccc",
+                                                            background: DonutColors[entry["feature"]] || "#ccc",
                                                             border: "1px solid #888"
                                                         }}
                                                     ></span>
-                                                    {S_organism.response[index]["feature"]}
+                                                    {entry["feature"]}
                                                 </b>
                                             </SelectItem>
                                         ) : null
@@ -5013,13 +5070,10 @@ useEffect(() => {
                                 </SelectGroup>
                             </SelectContent>
                         </Select>
-                        
                     </div>
-                )}
 
-                {S_years.response && (
                     <div className='col-span-3'>
-                        <label htmlFor="year-select">
+                        <label htmlFor="seq-year-select">
                             {t.rich('sequence_Metadata.dropdownYear', {...t_richConfig})}:
                         </label>
                         <Select value={cur_SYear} onValueChange={(value) => {
@@ -5031,7 +5085,7 @@ useEffect(() => {
                                 setSequenceMetaDataURL(url);
                             }, 200);
                         }}>
-                            <SelectTrigger className="w-full">
+                            <SelectTrigger className="w-full" id="seq-year-select">
                                 <SelectValue placeholder={"loading..."} />
                             </SelectTrigger>
                             <SelectContent>
@@ -5040,10 +5094,10 @@ useEffect(() => {
                                     <SelectItem key="ALL" value="ALL">
                                         <b>all</b>
                                     </SelectItem>
-                                    {Object.keys(S_years.response).map((key: string, index: number) => (
-                                        S_years.response[index] && S_years.response[index]["feature"] ? (
-                                            <SelectItem key={index} value={S_years.response[index]["feature"]}>
-                                                <b>{S_years.response[index]["feature"] == "1" ? "N/A" : S_years.response[index]["feature"]}</b>
+                                    {Array.isArray(S_years?.response) && S_years.response.map((entry, index: number) => (
+                                        entry && entry["feature"] ? (
+                                            <SelectItem key={index} value={entry["feature"]}>
+                                                <b>{entry["feature"] == "1" ? "N/A" : entry["feature"]}</b>
                                             </SelectItem>
                                         ) : null
                                     ))}
@@ -5051,8 +5105,7 @@ useEffect(() => {
                             </SelectContent>
                         </Select>
                     </div>
-                )}
-         </div>
+             </div>
           {sequenceMedatdata_colorMap && (
                             <div className="mt-0 w-full">
                                 <svg className='w-full' height={24} style={{ display: "block", width: "100%" }}>
@@ -5248,11 +5301,11 @@ useEffect(() => {
                     let url = apiRoutes.fetchDbData({
                         relationName: curDatasetname.current,
                         feature: selectedFeature || contextT.curFeature,
-                        filterBy: selectedCountry ? "iso_3166_1_alpha_3" : undefined,
-                        filterValue: selectedCountry || undefined,
+                        filterBy: mapUIsettings.inCovidDataView && selectedCountry ? COVID_COUNTRY_FILTER_COLUMN : undefined,
+                        filterValue: mapUIsettings.inCovidDataView && selectedCountry ? selectedCountry : undefined,
                         startDate: (dateRange?.from && dateRange?.to) ? format(dateRange.from, "yyyy-MM-dd") : undefined,
                         endDate: (dateRange?.from && dateRange?.to) ? format(dateRange.to, "yyyy-MM-dd") : undefined,
-                        aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
+                        aggregation_level: mapUIsettings.inCovidDataView ? (isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined) : undefined,
                     });
 
                     contextT.setCurDatasetURL(url);
@@ -5286,11 +5339,11 @@ useEffect(() => {
                     let url = apiRoutes.fetchDbData({
                         relationName: curDatasetname.current,
                         feature: selectedFeature || contextT.curFeature,
-                        filterBy: selectedCountry ? "iso_3166_1_alpha_3" : undefined,
-                        filterValue: selectedCountry || undefined,
+                        filterBy: mapUIsettings.inCovidDataView && selectedCountry ? COVID_COUNTRY_FILTER_COLUMN : undefined,
+                        filterValue: mapUIsettings.inCovidDataView && selectedCountry ? selectedCountry : undefined,
                         startDate: format(min_date, "yyyy-MM-dd"),
                         endDate: format(max_date, "yyyy-MM-dd"),
-                        aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
+                        aggregation_level: mapUIsettings.inCovidDataView ? (isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined) : undefined,
                     });
 
                     setDateRange({ from: min_date, to: max_date });
@@ -5330,11 +5383,11 @@ useEffect(() => {
                     let url = apiRoutes.fetchDbData({
                         relationName: curDatasetname.current,
                         feature: selectedFeature || contextT.curFeature,
-                        filterBy: selectedCountry ? "iso_3166_1_alpha_3" : undefined,
-                        filterValue: selectedCountry || undefined,
+                        filterBy: mapUIsettings.inCovidDataView && selectedCountry ? COVID_COUNTRY_FILTER_COLUMN : undefined,
+                        filterValue: mapUIsettings.inCovidDataView && selectedCountry ? selectedCountry : undefined,
                         startDate: format(start_date, "yyyy-MM-dd"),
                         endDate: format(end_date, "yyyy-MM-dd"),
-                        aggregation_level: isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined,
+                        aggregation_level: mapUIsettings.inCovidDataView ? (isCountryLevelData ? 0 : isSubregionLevelData ? 1 : undefined) : undefined,
                     });
                     
                     
@@ -5581,7 +5634,7 @@ useEffect(() => {
     )}
 
     {/* Declarative color map legend (replaces imperative appendColorMap) */}
-    {mapUIsettings.isColorMapLegend && !isLoading_MosquitoData && mosquitoData.error === null && (
+    {mapUIsettings.isColorMapLegend && isColorMapLegendReady && (
         <div
             style={{
                 position: "absolute",
@@ -5596,7 +5649,7 @@ useEffect(() => {
                 colorMapType={curColorMapType}
                 minVal={minVal}
                 maxVal={maxVal}
-                selectedFeature={selectedFeature}
+                selectedFeature={selectedFeature || contextT.curFeature || props.mapUIsettings.defaultFeatureName}
                 metaData={metaData}
                 layerOpacity={layerOpacity}
                 locale={locale}
@@ -5619,7 +5672,7 @@ useEffect(() => {
             }}
             className="animate-in fade-in slide-in-from-bottom-2 duration-300"
         >
-            <AlertSuccess />
+            <DataLoadSuccessAlert locationCount={presData.length} />
         </div>
     )}
    

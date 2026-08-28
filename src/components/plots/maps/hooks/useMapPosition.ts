@@ -48,6 +48,15 @@ export function useMapPosition({ map, latitude, longitude, zoom }: UseMapPositio
     useEffect(() => {
         if (!map) return;
 
+        // If the map is currently animating zoom, zooming, or being dragged by the user,
+        // do not call map.setView() — it would abort the user's gesture!
+        const isInteracting =
+            (map as any)._animatingZoom ||
+            (map as any)._zooming ||
+            Boolean(map.dragging && (map.dragging as any)._draggable && (map.dragging as any)._draggable._moving);
+
+        if (isInteracting) return;
+
         const currentCenterLat = Math.round(map.getCenter().lat * CALCER) / CALCER;
         const currentCenterLng = Math.round(map.getCenter().lng * CALCER) / CALCER;
         const currentZoom = Math.round(map.getZoom() * 100) / 100;

@@ -71,6 +71,10 @@ export interface UIContextI {
     showLegalTexts: boolean;
     /** Updates legal-text visibility. */
     setShowLegalTexts: React.Dispatch<React.SetStateAction<boolean>>;
+    /** Whether layout templates navigation and grid should be rendered. */
+    showLayoutTemplates: boolean;
+    /** Updates layout templates visibility. */
+    setShowLayoutTemplates: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 /**
@@ -126,27 +130,35 @@ function UIContextProvider({children}: any) {
     // deployment flag has explicitly enabled them.
     const [showCov, setShowCov] = useState<boolean>(false);
     const [showLegalTexts, setShowLegalTexts] = useState<boolean>(false);
+    const [showLayoutTemplates, setShowLayoutTemplates] = useState<boolean>(false);
 
     // Fetch demo mode on mount
     React.useEffect(() => {
-        fetch('/api/demoMode')
+        fetch('/api/demoMode', { cache: 'no-store' })
             .then(res => res.json())
             .then(data => setDemoMode(data.demoMode))
             .catch(err => console.error('Failed to fetch demo mode:', err));
     }, []);
 
      React.useEffect(() => {
-        fetch('/api/showCov')
+        fetch('/api/showCov', { cache: 'no-store' })
             .then(res => res.json())
             .then(data => setShowCov(data.showCov))
             .catch(err => console.error('Failed to fetch COVID visibility:', err));
     }, []);
 
      React.useEffect(() => {
-        fetch('/api/showLegalTexts')
+        fetch('/api/showLegalTexts', { cache: 'no-store' })
             .then(res => res.json())
             .then(data => setShowLegalTexts(data.showLegalTexts))
             .catch(err => console.error('Failed to fetch legal texts status:', err));
+    }, []);
+
+     React.useEffect(() => {
+        fetch('/api/showLayoutTemplates', { cache: 'no-store' })
+            .then(res => res.json())
+            .then(data => setShowLayoutTemplates(data.showLayoutTemplates))
+            .catch(err => console.error('Failed to fetch layout templates visibility:', err));
     }, []);
 
    const contextValue = {
@@ -172,7 +184,8 @@ function UIContextProvider({children}: any) {
             isDemoModeDialogOpen, setIsDemoModeDialogOpen,
             demoMode, setDemoMode,
             showCov, setShowCov,
-            showLegalTexts, setShowLegalTexts
+            showLegalTexts, setShowLegalTexts,
+            showLayoutTemplates, setShowLayoutTemplates
            }}>
             {children}
          </UIContext.Provider>

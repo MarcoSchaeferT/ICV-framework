@@ -93,15 +93,11 @@ return (
         >
           <div className=""></div>
             <h2 className="font-heading text-4xl leading-[1.1] sm:text-3xl md:text-4xl rounded-lg px-4 pt-2 ">
-            Show Cases
-            </h2>
+            {t("ShowCases")}
+          </h2>
           <ShowcaseGrid />
           <div className="h-6"></div>
-          <h2 className="font-heading text-4xl leading-[1.1] sm:text-3xl md:text-4xl rounded-lg px-4 pt-2 ">
-            Layout Templates
-          </h2>
           <LayoutTemplatesGrid />
-          <div className="h-6"></div>
         </section>
       </div>
     </div>

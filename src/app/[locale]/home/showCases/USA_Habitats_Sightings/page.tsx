@@ -62,7 +62,7 @@ let md = MDXContentProvider[locale];
   p1.mapUIsettings.isPresenceData = true;
   p1.mapUIsettings.isPresenceDataChecked = true;
   p1.mapUIsettings.presenceDataColor = "rgb(255, 128, 0)";
-  p1.mapUIsettings.isSequenceMetaData = true;
+  p1.mapUIsettings.isSequenceMetaData = false;
   p1.mapInteractions = {
     disableMouse: true,
     disableScroll: true
