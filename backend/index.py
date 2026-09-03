@@ -382,7 +382,11 @@ def get_uncertainty_svg():
     cellID = -1
     if request.method == "GET":
         filename = request.args["filename"]
-        cellID = int(request.args["cellID"])
+        raw_cell_id = request.args.get("cellID")
+        try:
+            cellID = int(raw_cell_id) if raw_cell_id and raw_cell_id != "NaN" else -1
+        except (ValueError, TypeError):
+            cellID = -1
         filename = str(cellID) + "_" + filename
     if not filename or not filename.endswith(".svg"):
         return jsonify({"ERROR": "Invalid or missing filename"}), 400
@@ -399,7 +403,16 @@ def get_uncertainty_svg():
         # Derive which plot to generate from the requested filename
         original_filename = request.args["filename"]
         if "climate_forecast" in original_filename:
-            create_ENSO_suitability_visualizations(cell_id=cellID)
+            # Optional: caller specifies which seas5_forecast_* table to read
+            # and which forecast month to highlight (e.g. "aug")
+            dataset = request.args.get("dataset")
+            month = request.args.get("month")
+            if dataset:
+                create_ENSO_suitability_visualizations(
+                    cell_id=cellID, dataset_template=dataset, active_month=month
+                )
+            else:
+                create_ENSO_suitability_visualizations(cell_id=cellID)
         else:
             if "calibration" in original_filename:
                 plot_type = "calibration"

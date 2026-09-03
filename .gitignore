@@ -56,3 +56,7 @@ db/schema.prisma
 # svg
 backend/routes/processData/results_svg/*.svg
 .DS_Store
+SEAS5_CHANGES.md
+LOCAL_DOCKER_SETUP.md
+.gitignore
+.gitignore
