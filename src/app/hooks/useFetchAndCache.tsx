@@ -100,6 +100,10 @@ function storeInCache(url: string, data: dbDATA, sizeBytes: number) {
 // Stable empty object reference — avoids creating a new {} on every render
 const EMPTY_DATA = {} as dbDATA;
 
+function isAbortError(error: unknown): boolean {
+    return error instanceof Error && error.name === "AbortError";
+}
+
 function releaseInflightRequest(url: string, request: InflightRequest) {
     const current = inflightRequests.get(url);
     if (current !== request) return;
@@ -255,6 +259,9 @@ function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boole
                             errorMSG = errorJson.error;
                         }
                     } catch (e) {
+                        if (abortController.signal.aborted || isAbortError(e)) {
+                            return undefined;
+                        }
                         // Fallback to default message
                     }
                     console.log("Expected server error gracefully caught:", errorMSG);
@@ -264,6 +271,9 @@ function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boole
                 try {
                     fetchedData = await res.json() as dbDATA;
                 } catch (parseErr) {
+                    if (abortController.signal.aborted || isAbortError(parseErr)) {
+                        return undefined;
+                    }
                     console.error("Failed to parse JSON response from:", url, parseErr);
                     fetchedData = { error: "Invalid non-JSON response from server" } as dbDATA;
                 }
@@ -293,6 +303,13 @@ function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boole
                 return fetchedData;
             })
             .then((fetchedData) => {
+                if (fetchedData === undefined) {
+                    if (isMounted) {
+                        setLoading(false);
+                    }
+                    return undefined;
+                }
+
                 // Update this component's state
                 if (isMounted) {
                     setData(fetchedData);
@@ -305,8 +322,7 @@ function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boole
             })
             .catch((error) => {
                 // Handle errors
-                if (error.name === 'AbortError') {
-                    console.log('Fetch aborted for:', url);
+                if (abortController.signal.aborted || isAbortError(error)) {
                     return undefined; // Return undefined so waiters can detect abort
                 } else {
                     const errorData: dbDATA = { error: `Fetch error: ${error.message}` } as dbDATA;

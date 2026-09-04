@@ -19,12 +19,19 @@ Endpoints:
 from flask import request, jsonify, Blueprint
 from backend.routes.setFilesToDB.db_utils import get_db_connection_params, SQL_DATATYPES
 from backend.metadata_utils import loadMetadataCSV
+from backend.routes.processData.enso_schema import (
+    enso_column_metadata,
+    is_enso_suitability_column,
+)
 import psycopg
 from psycopg import sql
 
 route_columnMetadata = Blueprint("columnMetadata", __name__)
 
 VALID_LANGS = {"en", "de"}
+_SQL_TO_METADATA_DATATYPE = {
+    sql_type.lower(): datatype for datatype, sql_type in SQL_DATATYPES.items()
+}
 
 
 def _table_name(lang: str) -> str:
@@ -120,13 +127,19 @@ def ensure_metadata_tables():
         print(f"WARNING: Could not ensure column_metadata tables: {e}")
 
 
-def populate_column_metadata(relation_name: str, column_names: list[str]):
-    """Auto-populate column_metadata_en and column_metadata_de for a new dataset.
+def populate_column_metadata(
+    relation_name: str,
+    column_names: list[str],
+    *,
+    resolved_sql_types: dict[str, str] | None = None,
+    replace_existing: bool = False,
+):
+    """Populate metadata for dataset columns.
 
-    For each column, look up a matching entry in the CSV metadata files
-    (en_metaData.csv / de_metaData.csv).  If a match is found the CSV values
-    (datatype, dimension, description, availability) are used; otherwise the
-    column is inserted with datatype='string' and empty description/dimension.
+    Exact ENSO columns use the rolling schema metadata. Other columns first use
+    the static language CSV and then the SQL type resolved during upload.
+    ``replace_existing`` is reserved for full-snapshot uploads; partial callers
+    such as country assignment keep all unrelated metadata rows.
     """
     print(f"[populate_column_metadata] Starting for relation='{relation_name}', columns={column_names}")
 
@@ -139,6 +152,11 @@ def populate_column_metadata(relation_name: str, column_names: list[str]):
         csv_meta[lang] = {sanitize_names([k.strip()])[0]: v for k, v in csv_data.items()}
         print(f"[populate_column_metadata] CSV meta for '{lang}': {len(csv_meta[lang])} entries")
 
+    resolved_types_by_column = {
+        sanitize_names([name.strip()])[0]: sql_type
+        for name, sql_type in (resolved_sql_types or {}).items()
+    }
+
     conn_params = get_db_connection_params()
     try:
         with psycopg.connect(**conn_params) as conn:
@@ -146,17 +164,44 @@ def populate_column_metadata(relation_name: str, column_names: list[str]):
                 for lang in VALID_LANGS:
                     _ensure_table(cur, lang)
                     table = _table_name(lang)
+                    if replace_existing:
+                        # Full uploads replace the dataset snapshot, including
+                        # metadata for columns no longer present in the file.
+                        cur.execute(
+                            sql.SQL(
+                                "DELETE FROM {table} WHERE relation_name = %s"
+                            ).format(table=sql.Identifier(table)),
+                            (relation_name,),
+                        )
                     for col_name in column_names:
                         sanitized_names = sanitize_names([col_name.strip()])
                         sanitized_col_name = sanitized_names[0]
                         match = csv_meta[lang].get(sanitized_col_name, {})
+                        schema_metadata = enso_column_metadata(col_name, lang)
 
-                        datatype = match.get("datatype", "string")
-                        dimension = match.get("dimension", "")
-                        description = match.get("description", "")
-                        availability = int(match.get("availability", 0))
+                        if schema_metadata:
+                            datatype = str(schema_metadata["datatype"])
+                            dimension = str(schema_metadata["dimension"])
+                            description = str(schema_metadata["description"])
+                            availability = int(schema_metadata["availability"])
+                        elif match:
+                            # A fitting metadata entry was found in the CSV
+                            datatype = match.get("datatype", "string")
+                            dimension = match.get("dimension", "")
+                            description = match.get("description", "")
+                            availability = int(match.get("availability", 0))
+                        else:
+                            sql_type = resolved_types_by_column.get(
+                                sanitized_col_name, "varchar"
+                            ).lower()
+                            datatype = _SQL_TO_METADATA_DATATYPE.get(
+                                sql_type, "string"
+                            )
+                            dimension = ""
+                            description = ""
+                            availability = 0
 
-                        print(f"[populate_column_metadata] INSERT {lang}: relation='{relation_name}', col='{sanitized_col_name}', datatype='{datatype}'")
+                        print(f"[populate_column_metadata] INSERT {lang}: relation='{relation_name}', col='{sanitized_col_name}', datatype='{datatype}', dimension='{dimension}'")
                         cur.execute(
                             sql.SQL("""
                             INSERT INTO {table}
@@ -206,7 +251,13 @@ def get_column_metadata():
                 """).format(table=sql.Identifier(table))
                 cur.execute(sql_query, (relation_name,))
                 cols = [d[0] for d in cur.description] if cur.description else []
-                rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+                rows = []
+                for r in cur.fetchall():
+                    row_dict = dict(zip(cols, r))
+                    column_name = str(row_dict.get("column_name", ""))
+                    if is_enso_suitability_column(column_name) and not row_dict.get("dimension"):
+                        row_dict["dimension"] = "%"
+                    rows.append(row_dict)
         return jsonify(rows)
     except Exception as e:
         return jsonify({"error": str(e)}), 500

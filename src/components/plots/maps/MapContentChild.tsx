@@ -118,7 +118,7 @@ const MapContentChild: React.FC<MapContentChildProps> = React.memo(
                 // Germany variant: disable interactions and create simple tooltip
                 map.dragging.disable();
                 map.scrollWheelZoom.disable();
-                toolTipRef.current = L.tooltip();
+                toolTipRef.current = L.tooltip({ permanent: true });
 
                 // Fix initial rendering layout issue
                 setTimeout(() => {
@@ -134,8 +134,20 @@ const MapContentChild: React.FC<MapContentChildProps> = React.memo(
                         customTooltipsPane.style.zIndex = '9999';
                     }
                 }
-                if (!toolTipRef.current) {
-                    toolTipRef.current = L.tooltip({ pane: 'custom-tooltips' });
+                if (
+                    !toolTipRef.current ||
+                    toolTipRef.current.options?.permanent !== true
+                ) {
+                    // Leaflet closes non-permanent tooltips on every map click.
+                    // Visibility is managed explicitly by the map's mousemove and
+                    // mouseleave handlers, so clicks should not close it.
+                    if (toolTipRef.current && map.hasLayer(toolTipRef.current)) {
+                        map.removeLayer(toolTipRef.current);
+                    }
+                    toolTipRef.current = L.tooltip({
+                        pane: 'custom-tooltips',
+                        permanent: true,
+                    });
                 }
             }
         }, [L, map, variant, toolTipRef]);

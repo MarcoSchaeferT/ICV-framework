@@ -62,6 +62,7 @@ land_use_77,float,%,Anteil der Landbedeckung Typ "Wasser",1
 geometry,string,polygon,4 Eckpunkte jeweils in Längengrad und Breitengrad: Geometrie der Gitterzelle,0
 prob_1,float,%,Wahrscheinlichkeit für geeigneten Vektorlebensraum,1
 prob_2,float,%,Invertierte Wahrscheinlichkeit für geeigneten Vektorlebensraum,1
+prob,float,%,Wahrscheinlichkeit für geeigneten Vektorlebensraum,1
 longitude,float,longitude,Koordinate,0
 latitude,float,latitude,Koordinate,0
 unnamed___0,string,NA,NA,0
@@ -148,3 +149,4 @@ NeuGenesen,int,NA,newly recovered,1
 AnzahlFall,int,NA,number of cases,1
 AnzahlTodesfall,int,NA,number of deaths,1
 AnzahlGenesen,int,NA,number of recovered,1
+

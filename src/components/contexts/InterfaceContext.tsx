@@ -1,6 +1,6 @@
 
 import { Row } from '@tanstack/react-table';
-import { createContext, useCallback, useContext, useState, useRef } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState, useRef } from 'react'
 import React from 'react';
 
 
@@ -209,14 +209,26 @@ export interface mapMouseEvents {
  * @see {@link useInterfaceContext} to consume state in child components.
  * @see {@link interfaceContextI} for complete shape of context state.
  */
-function InterfaceContextProvider({children}: any) {
+interface InterfaceContextProviderProps {
+    children: React.ReactNode;
+    /** Optional initial spatial grid key for showcases with a meaningful default cell. */
+    initialSelectedGridcellID?: number;
+    /** Optional initial database row ID corresponding to the selected spatial cell. */
+    initialDbRowIDOfSelectedGridcell?: number;
+}
+
+function InterfaceContextProvider({
+    children,
+    initialSelectedGridcellID = -1,
+    initialDbRowIDOfSelectedGridcell = 200509,
+}: InterfaceContextProviderProps) {
 
     const [selectedTableRowID, setTableRowID] = useState<number>(-1)
     const [selectedTableRow, setTableRow] = useState<Row<unknown>>({} as Row<unknown>);
     const [selectedTableName, setTableName] = useState<string>("empty")
     const [selectedStateID, setSelectedStateID] = useState<number>(-1)
-    const [selectedGridcellID, setSelectedGridcellID] = useState<number>(-1)
-    const [dbRowID_of_selectedGridcellID, setDbRowID_of_selectedGridcellID] = useState<number>(200509)
+    const [selectedGridcellID, setSelectedGridcellID] = useState<number>(initialSelectedGridcellID)
+    const [dbRowID_of_selectedGridcellID, setDbRowID_of_selectedGridcellID] = useState<number>(initialDbRowIDOfSelectedGridcell)
     const [selectedFilter, setSelectedFilter] = useState<string>("gridcell")
     const [selectedCountry, setSelectedCountry] = useState<string>("")
     const [mapSelectionObj, setMapSelectionObj] = useState<any>(0)
@@ -258,45 +270,84 @@ function InterfaceContextProvider({children}: any) {
     const [mapCoords, setMapCoords] = useState<{ latitude: number; longitude: number; zoom: number }>({ latitude: 0, longitude: 0, zoom: 0 });
     const [targetDate, setTargetDate] = useState<string | undefined>(undefined);
 
-  
+    // Memoize the context value so consumers only re-render when a state
+    // field actually changes — not on every parent render cycle.
+    // React guarantees that useState setters are referentially stable,
+    // so only the state *values* need to appear in the dependency array.
+    const contextValue = useMemo(() => ({
+        selectedTableRowID, setTableRowID,
+        selectedTableRow, setTableRow,
+        selectedTableName, setTableName,
+        selectedStateID, setSelectedStateID,
+        selectedGridcellID, setSelectedGridcellID,
+        dbRowID_of_selectedGridcellID, setDbRowID_of_selectedGridcellID,
+        selectedFilter, setSelectedFilter,
+        selectedCountry, setSelectedCountry,
+        mapSelectionObj, setMapSelectionObj,
+        curColorMap, setCurColorMap,
+        curFeature, setCurFeature,
+        curDatasetURL: curDataset, setCurDatasetURL: setCurDataset,
+        curLayerOpacity, setCurLayerOpacity,
+        curFeatureValue, setCurFeatureValue,
+        isPresenceData, setIsPresenceData,
+        isSequenceMetaData, setIsSequenceMetaData,
+        pieSize_sequenceMetaData, setPieSize_sequenceMetaData,
+        dateRange, setDateRange,
+        isCountryLevelData, setIsCountryLevelData,
+        isSubregionLevelData, setIsSubregionLevelData,
+        curMonth, setCurMonth,
+        curPresenceDatasetName, setCurPresenceDatasetName,
+        curPresenceDatasetURL, setCurPresenceDatasetURL,
+        curDonutChartDatasetName: curSequenceMetaDatasetName, setCurDonutChartDatasetName: setCurSequenceMetaDatasetName,
+        curDonutChartDataURL: curSequenceMetaDataURL, setCurDonutChartDataURL: setCurSequenceMetaDataURL,
+        curSyear, setCurSyear,
+        curSOrgansim, setCurSOrgansim,
+        donutChartSelectedColumnName, setDonutChartSelectedColumnName,
+        geoAssignmentColumnNameForDonut, setGeoAssignmentColumnNameForDonut,
+        mapCoords, setMapCoords,
+        mouseEvent, subscribeMouseEvent, notifyMouseEvent,
+        targetDate, setTargetDate,
+    }), [
+        selectedTableRowID,
+        selectedTableRow,
+        selectedTableName,
+        selectedStateID,
+        selectedGridcellID,
+        dbRowID_of_selectedGridcellID,
+        selectedFilter,
+        selectedCountry,
+        mapSelectionObj,
+        curColorMap,
+        curFeature,
+        curDataset,
+        curLayerOpacity,
+        curFeatureValue,
+        isPresenceData,
+        isSequenceMetaData,
+        pieSize_sequenceMetaData,
+        dateRange,
+        isCountryLevelData,
+        isSubregionLevelData,
+        curMonth,
+        curPresenceDatasetName,
+        curPresenceDatasetURL,
+        curSequenceMetaDatasetName,
+        curSequenceMetaDataURL,
+        curSyear,
+        curSOrgansim,
+        donutChartSelectedColumnName,
+        geoAssignmentColumnNameForDonut,
+        mapCoords,
+        mouseEvent,
+        subscribeMouseEvent,
+        notifyMouseEvent,
+        targetDate,
+    ]);
+
     return (
-        <>
-         <GinterfaceContext.Provider value={{
-            selectedTableRowID, setTableRowID,
-            selectedTableRow, setTableRow,
-            selectedTableName, setTableName,
-            selectedStateID, setSelectedStateID,
-            selectedGridcellID, setSelectedGridcellID,
-            dbRowID_of_selectedGridcellID, setDbRowID_of_selectedGridcellID,
-            selectedFilter, setSelectedFilter,
-            selectedCountry, setSelectedCountry,
-            mapSelectionObj, setMapSelectionObj,
-            curColorMap, setCurColorMap,
-            curFeature, setCurFeature,
-            curDatasetURL: curDataset, setCurDatasetURL: setCurDataset,
-            curLayerOpacity, setCurLayerOpacity,
-            curFeatureValue, setCurFeatureValue,
-            isPresenceData, setIsPresenceData,
-            isSequenceMetaData, setIsSequenceMetaData,
-            pieSize_sequenceMetaData, setPieSize_sequenceMetaData,
-            dateRange, setDateRange,
-            isCountryLevelData, setIsCountryLevelData,
-            isSubregionLevelData, setIsSubregionLevelData,
-            curMonth, setCurMonth,
-            curPresenceDatasetName, setCurPresenceDatasetName,
-            curPresenceDatasetURL, setCurPresenceDatasetURL,
-            curDonutChartDatasetName: curSequenceMetaDatasetName, setCurDonutChartDatasetName: setCurSequenceMetaDatasetName,
-            curDonutChartDataURL: curSequenceMetaDataURL, setCurDonutChartDataURL: setCurSequenceMetaDataURL,
-            curSyear, setCurSyear,
-            curSOrgansim, setCurSOrgansim,
-            donutChartSelectedColumnName, setDonutChartSelectedColumnName,
-            geoAssignmentColumnNameForDonut, setGeoAssignmentColumnNameForDonut,
-            mapCoords, setMapCoords,
-            mouseEvent, subscribeMouseEvent, notifyMouseEvent,
-            targetDate, setTargetDate,}}>
+        <GinterfaceContext.Provider value={contextValue}>
             {children}
-         </GinterfaceContext.Provider>
-         </>
+        </GinterfaceContext.Provider>
     )
 }
 

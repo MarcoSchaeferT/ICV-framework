@@ -1,4 +1,6 @@
 
+import { isEnsoSuitabilityColumn } from "@/app/[locale]/home/showCases/ENSO_Suitability/schema";
+
 /**
  * Metadata dictionary mapping feature column names to physical dimension units, descriptions, and dataset availability metadata.
  *
@@ -31,7 +33,6 @@ export type metaDataT = {
 };
 
 const warnedFeatures = new Set<string>();
-
 /**
  * Aligns raw dataset numerical features to human-readable physical units (e.g. Kelvin to Celsius, meters to millimeters).
  *
@@ -66,6 +67,8 @@ export function alignFeature_to_Metadata(value: number, featureName: string, met
   let unit = "";
   let d = value;
 
+  const isSuitability = isEnsoSuitabilityColumn(featureName);
+
   if (metaData && metaData[featureName] != undefined) {
     unit = metaData[featureName].dimension;
   } else {
@@ -77,7 +80,15 @@ export function alignFeature_to_Metadata(value: number, featureName: string, met
         warnedFeatures.add(featureName);
       }
     }
+    if (isSuitability) {
+      unit = "%";
+      d = Math.round(Number(d) * 100);
+    }
     return { value: d, unit };
+  }
+
+  if (isSuitability && (!unit || unit === "NA")) {
+    unit = "%";
   }
 
 
@@ -90,7 +101,7 @@ export function alignFeature_to_Metadata(value: number, featureName: string, met
       value = Math.round(Number(d) * 1000 * 10) / 10;
     }
 
-    unit = "mm";
+    unit = unit === "m/day" ? "mm/day" : "mm";
     // round percentage values to whole numbers
   } else if (unit === "%") {
     value = Math.round(Number(d) * 100);

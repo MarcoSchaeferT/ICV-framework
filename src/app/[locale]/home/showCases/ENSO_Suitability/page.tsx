@@ -16,6 +16,19 @@ import { t_richConfig } from "@/app/const_store";
 import { useUIContext } from '@/components/contexts/UIContext';
 import { availableColorMapsNames } from '@/components/plots/maps/constants';
 import { useLoadingTask, LoadingSpinnerAnimation } from '@/components/plots/maps/utils/loadingSpinner';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  parseEnsoForecastColumn,
+  referenceColumnForForecast,
+} from "./schema";
 
 const isSWAPY = true;
 
@@ -26,37 +39,31 @@ const SPECIES: Record<SpeciesKey, string> = {
   aegypti: "Aedes aegypti",
 };
 
+/** Representative, data-complete 0.25° cell near Medellín, Colombia. */
+const DEFAULT_ENSO_CELL = {
+  dbRowId: 48292,
+  gridCellId: 300625,
+} as const;
+
 /** One consolidated DB table per species (all 6 forecast months in it). */
 function tableName(species: SpeciesKey): string {
   return `seas5_forecast_${species}_habitat_probability`;
 }
 
-// Sanitized forecast suitability columns, e.g. forecast___aug_2026
-// (CSV header "Forecast: Aug 2026" — see parseCSVdata.sanitize_names)
-const FC_COL_RE = /^forecast_([a-z]{3})_(\d{4})$/;
-const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-/** Pretty label for a forecast column: forecast___aug_2026 -> "Forecast: Aug 2026". */
-function prettyFcLabel(col: string): string {
-  const m = FC_COL_RE.exec(col);
-  if (!m) return col;
-  return `Forecast: ${m[1][0].toUpperCase()}${m[1].slice(1)} ${m[2]}`;
-}
-
-/** Reference suitability column (2000-2025 mean) of the same calendar month. */
-function refColumnForFcCol(col: string): string {
-  const m = FC_COL_RE.exec(col);
-  if (!m) return "";
-  return `referenz_${m[1]}_2000_2025`;
+/** Pretty label for a forecast column: forecast_aug_2026 -> "Forecast: Aug 2026". */
+function prettyFcLabel(col: string, prefix = "Forecast", monthLabel?: string): string {
+  const forecast = parseEnsoForecastColumn(col);
+  if (!forecast) return col;
+  const month = monthLabel ?? forecast.month[0].toUpperCase() + forecast.month.slice(1);
+  return `${prefix}: ${month} ${forecast.year}`;
 }
 
 /** (year, month) sort key for a forecast column; last if it doesn't match. */
 function fcColSortKey(col: string): [number, number] {
-  const m = FC_COL_RE.exec(col);
-  if (!m) return [Infinity, Infinity];
-  const monIdx = MONTH_ABBR.findIndex((x) => x.toLowerCase() === m[1]);
-  return [parseInt(m[2], 10), monIdx + 1];
+  const forecast = parseEnsoForecastColumn(col);
+  return forecast
+    ? [forecast.year, forecast.monthIndex]
+    : [Infinity, Infinity];
 }
 
 /**
@@ -85,8 +92,6 @@ export default function Home() {
   // Load the forecast columns of the current table (drives the month selector)
   useEffect(() => {
     let cancelled = false;
-    setFcColumns([]);
-    setFcIdx(0);
     (async () => {
       try {
         const res = await fetch(
@@ -95,13 +100,16 @@ export default function Home() {
         if (!res.ok) return;
         const cols: string[] = await res.json();
         const fc = cols
-          .filter((c) => FC_COL_RE.test(c))
+          .filter((c) => parseEnsoForecastColumn(c) !== null)
           .sort((a, b) => {
             const [ya, ma] = fcColSortKey(a);
             const [yb, mb] = fcColSortKey(b);
             return ya - yb || ma - mb;
           });
-        if (!cancelled) setFcColumns(fc);
+        if (!cancelled) {
+          setFcColumns(fc);
+          setFcIdx((prev) => Math.min(prev, Math.max(0, fc.length - 1)));
+        }
       } catch {
         // table missing / backend down — selector stays empty, maps self-select
       }
@@ -110,23 +118,24 @@ export default function Home() {
   }, [currentTableName]);
 
   const activeFcCol = fcColumns[fcIdx] ?? "";
-  const activeRefCol = refColumnForFcCol(activeFcCol);
-  const activeMonthAbbr = FC_COL_RE.exec(activeFcCol)?.[1] ?? "";
+  const activeRefCol = referenceColumnForForecast(activeFcCol);
+  const activeMonthAbbr = parseEnsoForecastColumn(activeFcCol)?.month ?? "";
 
   // ── 1. Forecast Map Props (Left Map) ──
   let forecastMapProps = LeafD3MapLayerProps();
   forecastMapProps.chartName = 'map_Forecast';
   forecastMapProps.mapDataURL = apiRoutes.FETCH_MAP_DATA.WORLD_MAP;
-  forecastMapProps.center = [14, 15.6];
-  forecastMapProps.zoom = 2.2;
+  forecastMapProps.center = [6.4, -75.3];
+  forecastMapProps.zoom = 3.1;
   forecastMapProps.isSetIntialContextDataFromComponent = true;
+  forecastMapProps.mapUIsettings.areSettingsOpen = true;
   forecastMapProps.mapUIsettings.isLongitudeSlider = false;
   forecastMapProps.mapUIsettings.isLatitudeSlider = false;
   forecastMapProps.mapUIsettings.isZoomSlider = false;
   forecastMapProps.mapUIsettings.isLatLngZoomOverlay = true;
   forecastMapProps.mapUIsettings.isColorMapSelectionDropdown = true;
-  forecastMapProps.mapUIsettings.isFeatureSelectionDropdown = true;
-  forecastMapProps.mapUIsettings.isDatasetSelectionDropdown = true;
+  forecastMapProps.mapUIsettings.isFeatureSelectionDropdown = false;
+  forecastMapProps.mapUIsettings.isDatasetSelectionDropdown = false;
   forecastMapProps.mapUIsettings.isDistanceLegend = true;
   forecastMapProps.mapUIsettings.isColorMapLegend = true;
   forecastMapProps.mapUIsettings.isCountrySelectionDropdown = false;
@@ -142,14 +151,16 @@ export default function Home() {
   forecastMapProps.mapUIsettings.defaultDatasetName = currentTableName;
   forecastMapProps.mapUIsettings.defaultFeatureName = activeFcCol; // "" → map self-selects
   forecastMapProps.mapUIsettings.defaultFeatureColorMap = availableColorMapsNames.interpolateInferno;
-  forecastMapProps.mapUIsettings.areSettingsOpen = true;
   forecastMapProps.mapDataSets.isCityNames = false;
   forecastMapProps.mapUIsettings.defaultLayerOpacity = 0.8;
+  // Overlay controls live on the forecast map; the reference map mirrors them.
   forecastMapProps.mapUIsettings.isPresenceData = false;
+  forecastMapProps.mapUIsettings.isSequenceMetaData = false;
   forecastMapProps.isSyncMapCoordsOnTheFly_SETTER = true;
   forecastMapProps.isSyncMapCoordsOnTheFly_RECIEVER = false;
   forecastMapProps.mapStyles.backgroundColor = "rgb(215, 234, 245)";
   forecastMapProps.mapInteractions = { disableMouse: false, disableScroll: false };
+  forecastMapProps.mapDataSets.isCityNames = true;
 
   // ── 2. Reference Map Props (Right Map) ──
   let referenceMapProps = LeafD3MapLayerProps();
@@ -161,10 +172,10 @@ export default function Home() {
   referenceMapProps.mapUIsettings.isLongitudeSlider = false;
   referenceMapProps.mapUIsettings.isLatitudeSlider = false;
   referenceMapProps.mapUIsettings.isZoomSlider = false;
-  referenceMapProps.mapUIsettings.isLatLngZoomOverlay = true;
-  referenceMapProps.mapUIsettings.isColorMapSelectionDropdown = true;
-  referenceMapProps.mapUIsettings.isFeatureSelectionDropdown = true;
-  referenceMapProps.mapUIsettings.isDatasetSelectionDropdown = true;
+  referenceMapProps.mapUIsettings.isLatLngZoomOverlay = false;
+  referenceMapProps.mapUIsettings.isColorMapSelectionDropdown = false;
+  referenceMapProps.mapUIsettings.isFeatureSelectionDropdown = false;
+  referenceMapProps.mapUIsettings.isDatasetSelectionDropdown = false;
   referenceMapProps.mapUIsettings.isDistanceLegend = true;
   referenceMapProps.mapUIsettings.isColorMapLegend = true;
   referenceMapProps.mapUIsettings.isCountrySelectionDropdown = false;
@@ -184,10 +195,19 @@ export default function Home() {
   referenceMapProps.mapDataSets.isCityNames = false;
   referenceMapProps.mapUIsettings.defaultLayerOpacity = 0.8;
   referenceMapProps.mapUIsettings.isPresenceData = false;
+  referenceMapProps.mapUIsettings.isSequenceMetaData = false;
+  referenceMapProps.mapDataSets.isCityNames = true;
+  referenceMapProps.contextSync = {
+    colorMap: true,
+    layerOpacity: true,
+    presenceData: true,
+    sequenceMetaData: true,
+  };
   referenceMapProps.isSyncMapCoordsOnTheFly_SETTER = false;
   referenceMapProps.isSyncMapCoordsOnTheFly_RECIEVER = true;
   referenceMapProps.mapStyles.backgroundColor = "rgb(215, 234, 245)";
-  referenceMapProps.mapInteractions = { disableMouse: false, disableScroll: false };
+  referenceMapProps.mapInteractions = { disableMouse: true, disableScroll: true, disableClick: false };
+  
 
   const getTranslation = (key: string, fallback: string) => {
     try {
@@ -200,24 +220,39 @@ export default function Home() {
     return fallback;
   };
 
+  const formatForecastLabel = (column: string) => {
+    const forecast = parseEnsoForecastColumn(column);
+    const fallbackMonth = forecast
+      ? forecast.month[0].toUpperCase() + forecast.month.slice(1)
+      : "";
+    const monthLabel = forecast
+      ? getTranslation(`svg.months.${forecast.month}`, fallbackMonth)
+      : undefined;
+    return prettyFcLabel(
+      column,
+      getTranslation("forecast", "Forecast"),
+      monthLabel,
+    );
+  };
+
   // ── Card Titles & Props ──
   let climateFactorsCardProps = CardPropsClass(
-    getTranslation('climateFactorsPlot', 'Climatic Factors'),
+    "enso_climate_factors",
     getTranslation('climateFactorsPlot', 'Climatic Factors'),
     "", ""
   );
   climateFactorsCardProps.infoCard = { content: MDX.DummyContent, footer: undefined };
 
   let forecastMapCardProps = CardPropsClass(
-    getTranslation('forecastMapTitle', 'Habitat Suitability Forecast'),
-    getTranslation('forecastMapTitle', 'Habitat Suitability Forecast'),
+    "enso_fc_map",
+    getTranslation('forecastMap', 'Forecast Map'),
     "", ""
   );
   forecastMapCardProps.infoCard = { content: MDX.DummyContent, footer: undefined };
 
   let referenceMapCardProps = CardPropsClass(
-    getTranslation('referenceMapTitle', 'Historical Baseline'),
-    getTranslation('referenceMapTitle', 'Historical Baseline'),
+    "enso_ref_map",
+    getTranslation('referenceMap', 'Reference Map'),
     "", ""
   );
   referenceMapCardProps.infoCard = { content: MDX.DummyContent, footer: undefined };
@@ -249,79 +284,140 @@ export default function Home() {
   return (
     <>
       <main className="flex max-h-fit flex-col items-center justify-between" style={{ paddingTop: layoutSizes.gapSize }}>
-        <InterfaceContextProvider>
+        <InterfaceContextProvider
+          initialSelectedGridcellID={DEFAULT_ENSO_CELL.gridCellId}
+          initialDbRowIDOfSelectedGridcell={DEFAULT_ENSO_CELL.dbRowId}
+        >
           <ViewMainInfoComponent heading={mainInfoHeading} mdxContent={MDX.pages.ShowCases.ENSO_Suitability} />
 
-        {/* ** Species & Forecast Month Selector ** */}
-          <div className="flex items-center gap-4 px-4 py-2">
-            <label htmlFor="species-select" className="text-sm font-medium text-slate-700">Species:</label>
-            <select
-              id="species-select"
-              value={species}
-              onChange={(e) => setSpecies(e.target.value as SpeciesKey)}
-              className="border border-slate-300 rounded px-2 py-1 text-sm bg-white"
+          <div
+            className="flex min-h-0 w-full flex-col"
+            style={{
+              height: `calc(99.5dvh - ${layoutSizes.topNavbarHeight}px - ${layoutSizes.gapSize}px)`,
+            }}
+          >
+            {/* ── Species & Forecast Month Controls ── */}
+            <div
+              className="mb-2 mt-[-7pt] flex w-full shrink-0 flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-200/80 bg-white/70 px-4 py-2.5 shadow-xs backdrop-blur-xs dark:border-slate-800 dark:bg-slate-900/70 pointer-events-none"
+              style={{
+                marginLeft: `${layoutSizes.gapSize}px`,
+                marginRight: `${layoutSizes.gapSize}px`,
+                width: `calc(100% - ${layoutSizes.gapSize * 2}px )`,
+              }}
             >
-              {Object.entries(SPECIES).map(([key, name]) => (
-                <option key={key} value={key}>{name}</option>
-              ))}
-            </select>
+              <div className="flex flex-wrap items-center gap-6 pointer-events-auto">
+                {/* Species Selector */}
+                <div className="flex items-center gap-2 pointer-events-auto">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    {getTranslation("species", "Species")}:
+                  </span>
+                  <Select value={species} onValueChange={(val) => setSpecies(val as SpeciesKey)}>
+                    <SelectTrigger className="w-[200px] h-8 text-xs font-medium bg-white dark:bg-slate-800 pointer-events-auto">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel></SelectLabel>
+                        {Object.entries(SPECIES).map(([key, name]) => (
+                          <SelectItem key={key} value={key} className="text-xs">
+                            {name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <label htmlFor="forecast-month-select" className="text-sm font-medium text-slate-700">Forecast month:</label>
-            <select
-              id="forecast-month-select"
-              value={fcIdx}
-              onChange={(e) => setFcIdx(Number(e.target.value))}
-              disabled={fcColumns.length === 0}
-              className="border border-slate-300 rounded px-2 py-1 text-sm bg-white"
-            >
-              {fcColumns.length === 0 ? (
-                <option value={0}>—</option>
-              ) : (
-                fcColumns.map((col, i) => (
-                  <option key={col} value={i}>{prettyFcLabel(col)}</option>
-                ))
-              )}
-            </select>
-          </div>
+                {/* Forecast Month Selector */}
+                <div className="flex items-center gap-2 pointer-events-auto">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    {getTranslation("forecastMonth", "Forecast Month")}:
+                  </span>
+                  <Select
+                    value={String(fcIdx)}
+                    onValueChange={(val) => setFcIdx(Number(val))}
+                    disabled={fcColumns.length === 0}
+                  >
+                    <SelectTrigger className="w-[220px] h-8 text-xs font-medium bg-white dark:bg-slate-800 pointer-events-auto">
+                      <SelectValue
+                        placeholder={
+                          fcColumns.length === 0
+                            ? getTranslation("noForecastMonths", "No forecast months available")
+                            : undefined
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel></SelectLabel>
+                        {fcColumns.length === 0 ? (
+                          <SelectItem value="0" disabled className="text-xs">
+                            {getTranslation("noForecastMonths", "No forecast months available")}
+                          </SelectItem>
+                        ) : (
+                          fcColumns.map((col, i) => (
+                            <SelectItem key={col} value={String(i)} className="text-xs">
+                              {formatForecastLabel(col)}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-          {/*** START: grid layout ***/}
-          <div ref={swapContainerRef} className={`grid grid-cols-6 w-full`} style={{
-            gridTemplateRows: `repeat(auto-fill, minmax(${layoutSizes.rowSpanSize}vh, ${layoutSizes.rowSpanSize}vh))`,
-            gap: `${layoutSizes.gapSize}px`,
-            height: `calc(130vh - ${layoutSizes.topNavbarHeight}px - ${layoutSizes.gapSize}px)`,
-            paddingRight: `${layoutSizes.gapSize}px`,
-            paddingLeft: `${layoutSizes.gapSize}px`,
-          }}>
+              {/* Active Status Badge */}
+              <div className="flex items-center gap-2 pointer-events-auto">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200/60 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800/60">
+                  {activeFcCol ? formatForecastLabel(activeFcCol) : currentTableName}
+                </span>
+              </div>
+            </div>
 
-            {/*** Top Card: 4 Climatic Factors + Suitability (Backend SVG) ***/}
-            <SGridPlotCard rowColSpan={[4, 6]} cardProps={climateFactorsCardProps}>
-              <ClimateForecastStaticChartComponent
-                fileName="climate_forecast_cell.svg"
-                dataset={currentTableName}
-                month={activeMonthAbbr}
-              />
-            </SGridPlotCard>
+            {/*** START: grid layout ***/}
+            <div ref={swapContainerRef} className="grid min-h-0 w-full flex-1 grid-cols-6" style={{
+              gridTemplateRows: "repeat(9, minmax(0, 1fr))",
+              gap: `${layoutSizes.gapSize}px`,
+              paddingRight: `${layoutSizes.gapSize}px`,
+              paddingLeft: `${layoutSizes.gapSize}px`,
+            }}>
 
-            {/*** Bottom Left Card: Forecast Map (Prediction) with Overview Minimap ***/}
-            <SGridPlotCard rowColSpan={[5, 3]} cardProps={forecastMapCardProps}>
-              {/* key forces a remount when species or forecast month changes —
-                  LeafD3Map only applies defaultDatasetName/defaultFeatureName at mount */}
-              <LeafD3MapLayerComponent key={`fc-map-${currentTableName}-${activeFcCol}`} props={forecastMapProps} />
-              <MiniMapOverlay
-                mapProps={forecastMapProps}
-                height={115}
-                zoom={-0.95}
-                bottom={50}
-                left={4}
-                label="Overview"
-              />
-            </SGridPlotCard>
+              {/*** Top Card: 4 Climatic Factors + Suitability (Backend SVG) ***/}
+              <SGridPlotCard rowColSpan={[4, 6]} cardProps={climateFactorsCardProps}>
+                <ClimateForecastStaticChartComponent
+                  fileName="climate_forecast_cell.svg"
+                  dataset={currentTableName}
+                  month={activeMonthAbbr}
+                />
+              </SGridPlotCard>
 
-            {/*** Bottom Right Card: Reference Map ***/}
-            <SGridPlotCard rowColSpan={[5, 3]} cardProps={referenceMapCardProps}>
-              <LeafD3MapLayerComponent key={`ref-map-${currentTableName}-${activeRefCol}`} props={referenceMapProps} />
-            </SGridPlotCard>
+              {/*** Bottom Left Card: Forecast Map (Prediction) with Overview Minimap ***/}
+              <SGridPlotCard rowColSpan={[5, 3]} cardProps={forecastMapCardProps}>
+                {activeFcCol && (
+                  <>
+                    {/* Stable key preserves map viewport and zoom across dataset / month switches */}
+                    <LeafD3MapLayerComponent key="fc-map" props={forecastMapProps} />
+                    <MiniMapOverlay
+                      mapProps={{ ...forecastMapProps, center: [12, 20] }}
+                      height={115}
+                      zoom={-0.9}
+                      bottom={50}
+                      left={4}
+                      label={getTranslation("overview", "Overview")}
+                    />
+                  </>
+                )}
+              </SGridPlotCard>
 
+              {/*** Bottom Right Card: Reference Map ***/}
+              <SGridPlotCard rowColSpan={[5, 3]} cardProps={referenceMapCardProps}>
+                {activeFcCol && (
+                  <LeafD3MapLayerComponent key="ref-map" props={referenceMapProps} />
+                )}
+              </SGridPlotCard>
+
+            </div>
           </div>
         </InterfaceContextProvider>
       </main>
@@ -341,11 +437,45 @@ function ClimateForecastStaticChartComponent({
   dataset?: string;
   month?: string;
 }) {
+  const t = useTranslations("page_home.ShowCases.page_ENSO_Suitability");
+  const svgLocale = useLocale() === "de" ? "de" : "en";
   const contexT = useInterfaceContext();
   const rowID = contexT.dbRowID_of_selectedGridcellID;
+  const requestedSrc = rowID !== -1
+    ? apiRoutes.getUncertaintySvg({ filename: fileName, cellID: rowID, dataset, month, locale: svgLocale })
+    : "";
+  const [displayedSrc, setDisplayedSrc] = useState("");
 
-  const [isLoading, setIsLoading] = useState(false);
+  return (
+    <StaticSvgChart
+      key={requestedSrc || "empty"}
+      requestedSrc={requestedSrc}
+      displayedSrc={displayedSrc}
+      onLoaded={setDisplayedSrc}
+      alt={t("svg.alt")}
+      emptyLabel={t("selectCellPrompt")}
+    />
+  );
+}
+
+function StaticSvgChart({
+  requestedSrc,
+  displayedSrc,
+  onLoaded,
+  alt,
+  emptyLabel,
+}: {
+  requestedSrc: string;
+  displayedSrc: string;
+  onLoaded: (src: string) => void;
+  alt: string;
+  emptyLabel: string;
+}) {
+  const [isLoading, setIsLoading] = useState(
+    Boolean(requestedSrc && requestedSrc !== displayedSrc),
+  );
   const L_svgLoader = useLoadingTask('Climate Forecast Chart');
+  const shownSrc = requestedSrc ? displayedSrc : "";
 
   useEffect(() => {
     if (isLoading) {
@@ -355,72 +485,35 @@ function ClimateForecastStaticChartComponent({
     }
   }, [isLoading, L_svgLoader]);
 
-  const initialSrc = rowID !== -1
-    ? apiRoutes.getUncertaintySvg({ filename: fileName, cellID: rowID, dataset, month })
-    : "";
-  const [displayedSrc, setDisplayedSrc] = useState(initialSrc);
-  const prevRowID = useRef(rowID);
-  const loadKey = useRef(0);
-
-  useEffect(() => {
-    if (rowID !== prevRowID.current && rowID !== -1) {
-      prevRowID.current = rowID;
-      loadKey.current += 1;
-      setIsLoading(true);
-    }
-  }, [rowID]);
-
-  // Also reload when the dataset or the highlighted month changes (selectors)
-  const prevDataset = useRef(dataset);
-  const prevMonth = useRef(month);
-  useEffect(() => {
-    if ((dataset !== prevDataset.current || month !== prevMonth.current) && rowID !== -1) {
-      prevDataset.current = dataset;
-      prevMonth.current = month;
-      loadKey.current += 1;
-      setIsLoading(true);
-    }
-  }, [dataset, month, rowID]);
-
-  const pendingSrc = (isLoading && rowID !== -1)
-    ? apiRoutes.getUncertaintySvg({ filename: fileName, cellID: rowID, dataset, month })
-    : "";
-
-  const currentKey = loadKey.current;
-
   return (
     <div className="relative w-full h-full">
-      {displayedSrc ? (
+      {shownSrc ? (
+        // The SVG is generated dynamically by the backend and has no fixed size.
+        // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={displayedSrc}
-          alt={fileName}
+          src={shownSrc}
+          alt={alt}
           style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '8px' }}
-          className={isLoading ? "opacity-40 transition-opacity duration-300" : "transition-opacity duration-300"}
+          className={isLoading ? "opacity-40 blur-[1px] transition-all duration-300" : "transition-all duration-300"}
         />
       ) : (
         <div className="flex items-center justify-center h-full text-slate-400 text-sm italic">
-          Select a grid cell on the map to load static climate factor & forecast plots
+          {emptyLabel}
         </div>
       )}
 
-      {isLoading && pendingSrc && (
+      {isLoading && requestedSrc && (
+        // Preload the new SVG while the previous one remains visible.
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          key={currentKey}
-          src={pendingSrc}
+          src={requestedSrc}
           alt=""
           className="hidden"
           onLoad={() => {
-            if (loadKey.current === currentKey) {
-              setDisplayedSrc(pendingSrc);
-              setIsLoading(false);
-            }
+            onLoaded(requestedSrc);
+            setIsLoading(false);
           }}
-          onError={() => {
-            if (loadKey.current === currentKey) {
-              setIsLoading(false);
-            }
-          }}
+          onError={() => setIsLoading(false)}
         />
       )}
 

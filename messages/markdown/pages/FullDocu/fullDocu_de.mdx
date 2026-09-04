@@ -11,6 +11,7 @@ import DengueSerotypeCounts from "../../MapUI/dengueSerotypeCounts_de.mdx"
 import CalendarTargetDate from "../../MapUI/calendarTargetDate_de.mdx"
 import CalendarTimeRange from "../../MapUI/calendarTimeRange_de.mdx"
 import CountrySelection from "../../MapUI/countrySelection_de.mdx"
+import ShowCovGuard from "@/components/ShowCovGuard"
 
  {/* Data Set Details */}
 import DengueSerotypeCounts_dataset from "../../DataSetDetails/Mosquito/DengueSerotypeCounts_de.mdx"
@@ -54,7 +55,7 @@ export const rawDatasetsStyle = "bg-white border-l-4 border-l-fuchsia-800 border
          - [Farbschema](#ColorMap)
          - [Mücken-Sichtungsdaten](#MosquitoPresenceData)
          - [Dengue Serotyp Zählungen](#DengueSerotypeCounts)
-         - [Kalender (Zieldatum)](#CalendarTargetDate)
+         <ShowCovGuard><span style={{display:"list-item", listStyleType:"disc", marginLeft:"2.5em"}}><a href="#CalendarTargetDate">Kalender (Zieldatum)</a></span></ShowCovGuard>
          - [Kalender (Zeitbereich)](#CalendarTimeRange)
          - [Länder-Auswahl](#CountrySelection)
    - [Datensatz Details](#DataSetDetails)
@@ -120,7 +121,9 @@ export const rawDatasetsStyle = "bg-white border-l-4 border-l-fuchsia-800 border
 <span className={rawDatasetsStyle} id="ColorMap"><ColorMap/></span>
 <span className={rawDatasetsStyle} id="MosquitoPresenceData"><MosquitoPresenceData/></span>
 <span className={rawDatasetsStyle} id="DengueSerotypeCounts"><DengueSerotypeCounts/></span>
+<ShowCovGuard>
 <span className={rawDatasetsStyle} id="CalendarTargetDate"><CalendarTargetDate/></span>
+</ShowCovGuard>
 <span className={rawDatasetsStyle} id="CalendarTimeRange"><CalendarTimeRange/></span>
 <span className={rawDatasetsStyle} id="CountrySelection"><CountrySelection/></span>
 -------

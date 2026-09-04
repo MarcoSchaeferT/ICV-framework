@@ -180,10 +180,44 @@
                 },
                 "forecastMap": "Forecast Map",
                 "referenceMap": "Reference Map",
-                "climateFactorsPlot": "Climatic Factors & Forecast Sanity Check",
+                "climateFactorsPlot": "Climatic Factors & Habitat Suitability",
                 "coefficientMap": "Global Coefficient of Variation Map",
                 "temporalUncertaintyPlot": "Temporal Uncertainty",
-                "calibrationPlot": "Probabilistic Calibration Plot"
+                "calibrationPlot": "Probabilistic Calibration Plot",
+                "species": "Species",
+                "forecastMonth": "Forecast Month",
+                "forecast": "Forecast",
+                "overview": "Overview",
+                "selectCellPrompt": "Select a grid cell on the map to load static climate factor & forecast plots",
+                "noForecastMonths": "No forecast months available",
+                "svg": {
+                    "alt": "Climate factors and habitat suitability forecast for the selected grid cell",
+                    "months": {
+                        "jan": "Jan",
+                        "feb": "Feb",
+                        "mar": "Mar",
+                        "apr": "Apr",
+                        "may": "May",
+                        "jun": "Jun",
+                        "jul": "Jul",
+                        "aug": "Aug",
+                        "sep": "Sep",
+                        "oct": "Oct",
+                        "nov": "Nov",
+                        "dec": "Dec"
+                    },
+                    "climateVariables": {
+                        "t2m": "Temperature at 2 m [°C]",
+                        "d2m": "Dewpoint Temperature [°C]",
+                        "si10": "Wind Speed [m/s]",
+                        "tp": "Total Precipitation [mm/day]"
+                    },
+                    "suitability": "Habitat Suitability [%]",
+                    "title": "SEAS5 Forecast vs. ERA5 2000–2025 (mean ±1 standard deviation)",
+                    "reference_legend": "ERA5 Mean (2000–2025)",
+                    "forecast_legend": "SEAS5 Forecast",
+                    "no_data": "No data for cell ID={cell_id}\ntable={dataset}"
+                }
             }
         }
     },
@@ -231,7 +265,7 @@
         "disable": "Disable Component Swap"
     },
     "component_infoCard": {
-        "openFullDocs": "Open in Documentation",
+        "openFullDocs": "Open Documentation",
         "headingInteractions": "Info",
         "headingComponentInfo": "Info"
     },
@@ -270,7 +304,9 @@
         "tooltipDonut": {
             "total": "Total",
             "country": "Country",
-            "relative": "Relative"
+            "relative": "Relative",
+            "disclaimer": "Serotype counts cannot be treated as real dengue cases / incidence. The distribution of serotypes primarily reflects the sequencing and upload activity of individual laboratories and regions, not the actual infection situation on site.",
+            "disclaimerLink": "Full disclaimer"
         },
         "covid19_world_data": {
             "complete_data": "Show Complete Data",

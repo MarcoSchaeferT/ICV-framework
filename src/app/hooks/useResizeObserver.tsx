@@ -1,5 +1,5 @@
 
-import React, { use, useEffect, useMemo } from 'react';
+import React from 'react';
 
 
 // modified version of: https://www.npmjs.com/package/@react-hook/resize-observer
@@ -22,48 +22,17 @@ export interface Size {
 }
 
 /**
- * Internal helper hook listening to DOM element `ResizeObserver` events.
- *
- * @param element - Target DOM HTMLElement to observe.
- * @returns Element size object matching {@link Size}, or undefined if element is null.
- *
- * @see {@link useSizeWatchDebounced} for debounced observer variant.
- * @see {@link SizeHook} for React component wrapper.
- */
-const useSizeWatch = (element: HTMLElement | null): Size | undefined => {
-    const [size, setSize] = React.useState<Size>();
-
-    React.useLayoutEffect(() => {
-        if (element) {
-            setSize(element.getBoundingClientRect());
-        }
-    }, [element]);
-
-    useResizeObserver(element, (entry) => setSize(entry.contentRect));
-
-    return size;
-};
-
-
-/**
  * Debounced `ResizeObserver` hook for tracking DOM element dimensions with 1000 ms delay.
  *
  * @param element - Target DOM HTMLElement to observe.
  * @returns Element size object matching {@link Size}, or undefined if element is null.
  *
- * @see {@link useSizeWatch} for synchronous observer variant.
  * @see {@link useChartResizer} for plot card resizing pipeline integration.
  */
 export const useSizeWatchDebounced = (element: HTMLElement | null): Size | undefined => {
     const [size, setSize] = React.useState<Size>();
 
     const onResize = useDebounceCallback(setSize, 1000);
-
-    useEffect(() => {
-        if (element) {
-            setSize(element.getBoundingClientRect());
-        }
-    }, [element]);
 
     useResizeObserver(element, (entry) => onResize(entry.contentRect));
 
@@ -92,17 +61,35 @@ export const useSizeWatchDebounced = (element: HTMLElement | null): Size | undef
  * <SizeHook element={element} sizeRef={sizeRef} setSize={setSizes} />
  * ```
  */
-const SizeHook = ({element, sizeRef, setSize}: {element: HTMLElement | null, sizeRef: any, setSize: any})  => {
+const SizeHook = ({
+    element,
+    sizeRef,
+    setSize,
+}: {
+    element: HTMLElement | null;
+    sizeRef: React.MutableRefObject<Size | undefined>;
+    setSize: React.Dispatch<React.SetStateAction<Size>>;
+}) => {
+    const handleResize = React.useCallback((entry: ResizeObserverEntry) => {
+        const nextSize = {
+            width: entry.contentRect.width,
+            height: entry.contentRect.height,
+        };
+        const previousSize = sizeRef.current;
 
-    sizeRef.current = useSizeWatch(element);
+        if (
+            previousSize?.width === nextSize.width &&
+            previousSize?.height === nextSize.height
+        ) {
+            return;
+        }
 
-    useEffect(() => {
-        sizeRef.current = sizeRef.current
-        setSize(sizeRef.current);
-    });
+        sizeRef.current = nextSize;
+        setSize(nextSize);
+    }, [setSize, sizeRef]);
 
-    return(<></>);
-
+    useResizeObserver(element, handleResize);
+    return null;
 };
 
 /** Default export for the ResizeObserver bridge used by dashboard visualizations. */

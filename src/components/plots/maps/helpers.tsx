@@ -136,7 +136,7 @@ export function snapToGrid(coords:{lat: number, lng: number}, gridCellDims:{lat:
 
     // add the offset to get the top-left corner of the grid cell (transfrom back to original grid)
     let topLeft= {lat:gridLat+gridOffset.lat, lng:gridLng+gridOffset.lng};
-    let center = {lat:topLeft.lat - gridCellDims.lat/2, lng:topLeft.lng - gridCellDims.lng/2};
+    let center = {lat:topLeft.lat - gridCellDims.lat/2, lng:topLeft.lng + gridCellDims.lng/2};
 
     return {topLeft, center};
 }

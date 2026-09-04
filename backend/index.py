@@ -30,9 +30,15 @@ from backend.routes.columnMetadata.route_columnMetadata import route_columnMetad
 from backend.routes.manageDB.route_manageDB import route_manageDB
 from backend import metadata_utils
 from backend.metadata_utils import getMetaDataPath, loadMetadataCSV
-from backend.routes.processData.uncertaintyVis import create_uncertainty_visualizations
-from backend.routes.processData.ensoSuitability import create_ENSO_suitability_visualizations
+from backend.routes.processData.uncertaintyVis import render_uncertainty_svgs
+from backend.routes.processData.ensoSuitability import (
+    normalize_enso_locale,
+    render_ENSO_suitability_svg,
+)
+from backend.routes.processData.svg_utils import SVG_RENDER_LOCK
 from backend.routes.processData.route_processData import route_processData
+from backend.cache import response_cache
+from backend.routes.processData.enso_schema import is_enso_suitability_column
 import json
 
 
@@ -322,10 +328,15 @@ def _load_metadata_from_db(lang: str, relation_name: str = "") -> dict:
                 cur.execute(query)
             for row in cur.fetchall():
                 col_name, datatype, dimension, description, availability = row
+                dim = dimension or ""
+                is_suit = is_enso_suitability_column(col_name)
+                if is_suit and not dim:
+                    dim = "%"
+                dt = datatype or ("float" if is_suit else "string")
                 data[col_name] = {
                     "valuename": col_name,
-                    "datatype": datatype or "string",
-                    "dimension": dimension or "",
+                    "datatype": dt,
+                    "dimension": dim,
                     "description": description or "",
                     "availability": str(availability) if availability is not None else "0",
                 }
@@ -376,72 +387,83 @@ def get_image():
 
 @app.route("/api/get_uncertainty_svg", methods=["GET"])
 def get_uncertainty_svg():
-    """Serve an SVG file from the uncertainty visualization output directory."""
+    """Render and serve an ENSO or UQ SVG without shared temporary files."""
+    filename = request.args.get("filename", "")
+    raw_cell_id = request.args.get("cellID")
+    try:
+        cell_id = int(raw_cell_id) if raw_cell_id and raw_cell_id != "NaN" else -1
+    except (ValueError, TypeError):
+        cell_id = -1
+    if cell_id < 0:
+        return jsonify({"ERROR": "Invalid or missing cellID"}), 400
 
-    filename = ""
-    cellID = -1
-    if request.method == "GET":
-        filename = request.args["filename"]
-        raw_cell_id = request.args.get("cellID")
-        try:
-            cellID = int(raw_cell_id) if raw_cell_id and raw_cell_id != "NaN" else -1
-        except (ValueError, TypeError):
-            cellID = -1
-        filename = str(cellID) + "_" + filename
-    if not filename or not filename.endswith(".svg"):
-        return jsonify({"ERROR": "Invalid or missing filename"}), 400
-
-    svg_dir = Path(__file__).parent / "routes" / "processData" / "results_svg"
-    svg_path = svg_dir / filename
-
-
-    # Prevent path traversal
-    if not svg_path.resolve().is_relative_to(svg_dir.resolve()):
-        return jsonify({"ERROR": "Invalid path"}), 400
-
-    if not svg_path.exists():
-        # Derive which plot to generate from the requested filename
-        original_filename = request.args["filename"]
-        if "climate_forecast" in original_filename:
-            # Optional: caller specifies which seas5_forecast_* table to read
-            # and which forecast month to highlight (e.g. "aug")
-            dataset = request.args.get("dataset")
-            month = request.args.get("month")
-            if dataset:
-                create_ENSO_suitability_visualizations(
-                    cell_id=cellID, dataset_template=dataset, active_month=month
-                )
-            else:
-                create_ENSO_suitability_visualizations(cell_id=cellID)
-        else:
-            if "calibration" in original_filename:
-                plot_type = "calibration"
-            elif "uncertainty" in original_filename:
-                plot_type = "uncertainty"
-            else:
-                plot_type = "both"
-
-            create_uncertainty_visualizations(
-                out_dir=None,
-                grid_start=cellID,
-                grid_end=cellID,
-                dataset_template="t_2024_monthly_mean_{month}_ocsvm_aegypti_predictions_2023_mod_sim",
-                months_range=range(1, 13),
-                plot_type=plot_type,
-            )
-        # wait until the file is created (max 10 seconds)
-        start_time = time.time()
-        while not svg_path.exists() and time.time() - start_time < 10:
-            time.sleep(1)
-        if not svg_path.exists():
-            return jsonify({"ERROR": f"File not found: {filename}"}), 404
+    uq_plot_types = {
+        "seasonal_uncertainty_cell.svg": "uncertainty",
+        "seasonal_calibration_cell.svg": "calibration",
+    }
 
     try:
-        with open(svg_path, "rb") as f:
-            svg_data = f.read()
-        return svg_data, 200, {"Content-Type": "image/svg+xml"}
-    except Exception as e:
-        return jsonify({"ERROR": str(e)}), 500
+        if filename == "climate_forecast_cell.svg":
+            dataset = request.args.get(
+                "dataset",
+                "seas5_forecast_albopictus_habitat_probability",
+            )
+            month = request.args.get("month")
+            locale = normalize_enso_locale(request.args.get("locale"))
+            normalized_month = month.lower() if month else "all"
+            cache_key = f"svg:enso:v6:{locale}:{dataset}:{cell_id}:{normalized_month}"
+            svg_data = response_cache.get(cache_key)
+            if svg_data is None:
+                with SVG_RENDER_LOCK:
+                    svg_data = response_cache.get(cache_key)
+                    if svg_data is None:
+                        svg_data = render_ENSO_suitability_svg(
+                            cell_id=cell_id,
+                            dataset_template=dataset,
+                            active_month=month,
+                            locale=locale,
+                        )
+                        response_cache.set(
+                            cache_key,
+                            svg_data,
+                            scopes=(dataset,),
+                            size_bytes=len(svg_data),
+                        )
+        elif filename in uq_plot_types:
+            plot_type = uq_plot_types[filename]
+            dataset_template = "t_2024_monthly_mean_{month}_ocsvm_aegypti_predictions_2023_mod_sim"
+            cache_key = f"svg:uq:v1:{cell_id}:{plot_type}"
+            svg_data = response_cache.get(cache_key)
+            if svg_data is None:
+                with SVG_RENDER_LOCK:
+                    svg_data = response_cache.get(cache_key)
+                    if svg_data is None:
+                        rendered = render_uncertainty_svgs(
+                            row_id=cell_id,
+                            dataset_template=dataset_template,
+                            months_range=range(1, 13),
+                        )
+                        scopes = tuple(dataset_template.format(month=m) for m in range(1, 13))
+                        for rendered_type, rendered_svg in rendered.items():
+                            rendered_key = f"svg:uq:v1:{cell_id}:{rendered_type}"
+                            response_cache.set(
+                                rendered_key,
+                                rendered_svg,
+                                scopes=scopes,
+                                size_bytes=len(rendered_svg),
+                            )
+                        svg_data = rendered.get(plot_type)
+            if svg_data is None:
+                return jsonify({"ERROR": f"No data found for cellID {cell_id}"}), 404
+        else:
+            return jsonify({"ERROR": "Invalid or missing filename"}), 400
+    except Exception:
+        app.logger.exception("SVG generation failed")
+        return jsonify({"ERROR": "SVG generation failed"}), 500
+
+    response = Response(svg_data, mimetype="image/svg+xml")
+    response.headers["Cache-Control"] = "no-cache"
+    return response
 
 @app.route('/health')
 def health():
@@ -450,8 +472,6 @@ def health():
 
 
 # --- Cache management endpoints ---
-from backend.cache import response_cache
-
 @app.route("/api/cache/stats", methods=["GET"])
 def cache_stats():
     """Return current cache statistics (hits, misses, size, etc.)."""

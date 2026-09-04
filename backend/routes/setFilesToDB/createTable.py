@@ -9,6 +9,7 @@ import os
 # custom modules
 from backend.routes.setFilesToDB.parseCSVdata import ParsedData, stream_csv_rows
 from backend.routes.setFilesToDB.db_utils import get_db_connection_params, SQL_DATATYPES
+from backend.routes.processData.enso_schema import is_enso_numeric_column
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +154,11 @@ def prepare_column_types(data: ParsedData) -> tuple[dict[str, str], list[str]]:
 # ---------------------------------------------------------------------------
 
 async def createTable(data: ParsedData) -> dict:
+    """Replace the dataset table with a schema derived from the uploaded file.
+
+    ``DROP`` and ``CREATE`` run in the same transaction.  If creation fails,
+    PostgreSQL rolls the drop back and keeps the previous table intact.
+    """
     try:
         conn_params = get_db_connection_params()
     except Exception as e:
@@ -170,56 +176,35 @@ async def createTable(data: ParsedData) -> dict:
 
     try:
         from psycopg import sql
+
+        columns_sql = []
+        for index, col in enumerate(sanitized_column_names):
+            column_type = column_sql_types[index] or "VARCHAR"
+            columns_sql.append(
+                sql.SQL("{} {}").format(
+                    sql.Identifier(col),
+                    sql.SQL(column_type),
+                )
+            )
+
+        drop_query = sql.SQL("DROP TABLE IF EXISTS {}").format(
+            sql.Identifier(db_name)
+        )
+        create_query = sql.SQL(
+            "CREATE TABLE {} (id SERIAL PRIMARY KEY, {})"
+        ).format(
+            sql.Identifier(db_name),
+            sql.SQL(", ").join(columns_sql),
+        )
+
         with psycopg.connect(**conn_params) as conn:
             with conn.cursor() as cur:
-                # Check if table exists (already using parameterization)
-                cur.execute("""
-                    SELECT EXISTS (
-                        SELECT 1 FROM pg_tables 
-                        WHERE schemaname = 'public' 
-                        AND tablename = %s
-                    )
-                """, (db_name,))
-                result = cur.fetchone()
-                exists = result[0] if result else False
-                print("Table exists check:", exists)
-                
-                if exists:
-                    print(f"Table '{db_name}' already exists")
-                    return {"ERROR": "Table already exists"}
-                else:
-                    columns_sql = []
-                    for index, col in enumerate(sanitized_column_names):
-                        column_type = column_sql_types[index]
-                        # if the column type is not found, default to VARCHAR
-                        if column_type is None:
-                            column_type = "VARCHAR"
-                        
-                        # Use sql.Identifier for column name and sql.SQL for type
-                        columns_sql.append(
-                            sql.SQL("{} {}").format(
-                                sql.Identifier(col),
-                                sql.SQL(column_type)
-                            )
-                        )
-                    
-                    # Construct and execute CREATE TABLE query safely
-                    create_query = sql.SQL("CREATE TABLE {} (id SERIAL PRIMARY KEY, {})").format(
-                        sql.Identifier(db_name),
-                        sql.SQL(", ").join(columns_sql)
-                    )
-                    
-                    print("create_query", create_query.as_string(conn))
-                    try:
-                        cur.execute(create_query)
-                        conn.commit()
-                    except Exception as e:
-                        print(f"ERROR creating table '{db_name}': {e}")
-                        return {"ERROR": f"ERROR creating table: {str(e)}"}
+                cur.execute(drop_query)
+                cur.execute(create_query)
 
     except Exception as e:
-        print("ERROR in createTable", e)
-        return {"ERROR": "ERROR in createTable: " + str(e)}
+        print(f"ERROR replacing table '{db_name}': {e}")
+        return {"ERROR": "ERROR replacing table: " + str(e)}
 
     return None
 
@@ -260,6 +245,11 @@ def getColumnSQLdataType(orignalCol: str, inferred_types: Optional[dict[str, str
     if orignalCol in metadata:
         raw_column_type = metadata[orignalCol]
         return SQL_DATATYPES.get(raw_column_type, "varchar")
+
+    # Exact ENSO suitability and climate columns remain numeric even when a
+    # sparse upload sample cannot infer their type.
+    if is_enso_numeric_column(orignalCol):
+        return SQL_DATATYPES.get("float", "float4")
 
     # 2. Inferred type lookup
     if inferred_types and orignalCol in inferred_types:

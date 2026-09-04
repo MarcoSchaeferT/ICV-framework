@@ -176,14 +176,48 @@
             },
             "page_ENSO_Suitability": {
                 "mainInfo": {
-                    "heading": "ENSO-Eignung"
+                    "heading": "ENSO-Habitateignung"
                 },
-                "forecastMap": "Vorhersagekarte (Forecast)",
-                "referenceMap": "Referenzkarte (Reference)",
-                "climateFactorsPlot": "Klimafaktoren & Prognose-Plausibilitätsprüfung",
+                "forecastMap": "Vorhersagekarte",
+                "referenceMap": "Referenzkarte",
+                "climateFactorsPlot": "Klimafaktoren & Habitateignung",
                 "coefficientMap": "Globale Variationskoeffizienten-Karte",
                 "temporalUncertaintyPlot": "Temporale Unsicherheit",
-                "calibrationPlot": "Probabilistische Kalibrierungskurve"
+                "calibrationPlot": "Probabilistische Kalibrierungskurve",
+                "species": "Spezies",
+                "forecastMonth": "Vorhersagemonat",
+                "forecast": "Vorhersage",
+                "overview": "Übersicht",
+                "selectCellPrompt": "Wählen Sie eine Gitterzelle auf der Karte aus, um Klimafaktoren- und Vorhersagediagramme zu laden",
+                "noForecastMonths": "Keine Vorhersagemonate verfügbar",
+                "svg": {
+                    "alt": "Klimafaktoren und vorhergesagte Habitateignung für die ausgewählte Gitterzelle",
+                    "months": {
+                        "jan": "Jan",
+                        "feb": "Feb",
+                        "mar": "Mär",
+                        "apr": "Apr",
+                        "may": "Mai",
+                        "jun": "Jun",
+                        "jul": "Jul",
+                        "aug": "Aug",
+                        "sep": "Sep",
+                        "oct": "Okt",
+                        "nov": "Nov",
+                        "dec": "Dez"
+                    },
+                    "climateVariables": {
+                        "t2m": "Temperatur in 2 m Höhe [°C]",
+                        "d2m": "Taupunkttemperatur [°C]",
+                        "si10": "Windgeschwindigkeit [m/s]",
+                        "tp": "Gesamtniederschlag [mm/Tag]"
+                    },
+                    "suitability": "Habitateignung [%]",
+                    "title": "SEAS5-Vorhersage vs. ERA5 2000–2025 (Mittelwert ±1 Standardabweichung)",
+                    "reference_legend": "ERA5-Mittelwert (2000–2025)",
+                    "forecast_legend": "SEAS5-Vorhersage",
+                    "no_data": "Keine Daten für Zellen-ID={cell_id}\nTabelle={dataset}"
+                }
             }
         }
     },
@@ -270,7 +304,9 @@
         "tooltipDonut": {
             "total": "Gesamt",
             "country": "Land",
-            "relative": "Anteil"
+            "relative": "Anteil",
+            "disclaimer": "Serotyp-Zählungen können nicht als reale Dengue-Fälle / Inzidenz behandelt werden. Die Verteilung der Serotypen spiegelt primär die Sequenzierungs- und Upload-Aktivität einzelner Labore und Regionen wider, nicht das reale Infektionsgeschehen vor Ort.",
+            "disclaimerLink": "Vollständiger Haftungsausschluss"
         },
         "covid19_world_data": {
             "complete_data": "gesamten Datensatz anzeigen",

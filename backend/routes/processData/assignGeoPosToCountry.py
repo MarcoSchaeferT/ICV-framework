@@ -25,6 +25,15 @@ load_dotenv(dotenv_path=dotenv_path)
 _BATCH_SIZE = 10_000
 _TEMP_UPDATE_TABLE = "country_assignment_updates"
 
+# Polygons with more than this many vertices are skipped during country
+# assignment — they are typically county/municipality boundaries that
+# blow up memory when parsed into Shapely C-level geometry objects.
+_MAX_VERTEX_COUNT = 10
+# Fast pre-filter: a polygon with 10 vertices is at most ~300 chars of
+# WKT.  Strings longer than this threshold are guaranteed to exceed the
+# vertex limit and are skipped without parsing.
+_MAX_GEOM_STR_LEN = 1_000
+
 
 def get_db_connection_params() -> dict:
     database_url = os.getenv("DATABASE_URL", "")
@@ -41,7 +50,7 @@ def get_db_connection_params() -> dict:
         host = host_port
         port = "5432"
 
-    if os.getenv("IS_DOCKER", "false").lower() != "true" and host == "icv-database":
+    if os.getenv("IS_DOCKER", "false").lower() != "true" and host == "davis-db":
         host = "localhost"
 
     return {
@@ -117,6 +126,8 @@ def _vectorized_updates(rows, tree, iso_codes, admin_names):
         geometry_text = str(geometry_value).strip()
         if not geometry_text:
             continue
+        if len(geometry_text) > _MAX_GEOM_STR_LEN:
+            continue
         if geometry_text.startswith("{"):
             geojson_positions.append(position)
             geojson_values.append(geometry_text)
@@ -134,6 +145,7 @@ def _vectorized_updates(rows, tree, iso_codes, admin_names):
         )
 
     valid_mask = ~shapely.is_missing(geometries) & ~shapely.is_empty(geometries)
+    valid_mask &= shapely.get_num_coordinates(geometries) <= _MAX_VERTEX_COUNT
     valid_positions = np.flatnonzero(valid_mask)
     if valid_positions.size == 0:
         return []
@@ -164,6 +176,8 @@ def _scalar_updates(
     for row_id, geometry_value in rows:
         row_geometry = parse_geometry(geometry_value)
         if row_geometry is None:
+            continue
+        if shapely.get_num_coordinates(row_geometry) > _MAX_VERTEX_COUNT:
             continue
         point = (
             row_geometry.representative_point()

@@ -240,6 +240,7 @@ class apiRoutes {
         cellID: number;
         dataset?: string;  // optional: seas5_forecast_* table name
         month?: string;    // optional: highlight this forecast month (e.g. "aug")
+        locale?: "en" | "de"; // optional: locale for backend-rendered labels
     }): string {
         return buildUrl(`${apiRoutes.API_URL}/get_uncertainty_svg`, params);
     }

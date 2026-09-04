@@ -466,6 +466,22 @@ export interface LeafD3MapLayerProps {
     isApplyContextData: boolean;
 
     /**
+     * Selectively subscribe to shared visual overlays without inheriting the
+     * context dataset or selected feature. Full `isApplyContextData` sync takes
+     * precedence when enabled.
+     */
+    contextSync?: {
+        /** Mirror the shared color-map selection. */
+        colorMap?: boolean;
+        /** Mirror the shared grid and overlay opacity. */
+        layerOpacity?: boolean;
+        /** Mirror presence visibility, filters, and data URL. */
+        presenceData?: boolean;
+        /** Mirror serotype/sequence-count visibility, filters, URL, and size. */
+        sequenceMetaData?: boolean;
+    };
+
+    /**
      * If `true`, the component writes its initial local state (dataset URL,
      * feature, color map, layer opacity, etc.) into `InterfaceContext` on mount.
      * Use this on the "primary" map in a multi-view layout to seed defaults.
@@ -884,6 +900,12 @@ const baseStyle: Leaflet.PathOptions = {
 
     // initialize component variables
     let contextT = useInterfaceContext();
+    const syncAllContext = props.isApplyContextData;
+    const syncColorMap = syncAllContext || props.contextSync?.colorMap === true;
+    const syncLayerOpacity = syncAllContext || props.contextSync?.layerOpacity === true;
+    const syncPresenceData = syncAllContext || props.contextSync?.presenceData === true;
+    const syncSequenceMetaData = syncAllContext || props.contextSync?.sequenceMetaData === true;
+    const hasContextSync = syncColorMap || syncLayerOpacity || syncPresenceData || syncSequenceMetaData;
     let collectDataLoadingErrors =  useRef<React.ReactNode[]>([]);
     let chart:string = props.chartName;
 
@@ -1019,12 +1041,17 @@ const baseStyle: Leaflet.PathOptions = {
     const inheritedDatasetURL = props.isApplyContextData ? contextT.curDatasetURL : "";
     const initialDatasetURL = inheritedDatasetURL || resolvedDefaultDatasetURL;
     const initialFeature = (props.isApplyContextData ? contextT.curFeature : "") || props.mapUIsettings.defaultFeatureName || "";
-    const initialColorMap = (props.isApplyContextData ? contextT.curColorMap : "") || props.mapUIsettings.defaultFeatureColorMap || defaultColorMap;
+    const initialColorMap = (syncColorMap ? contextT.curColorMap : "") || props.mapUIsettings.defaultFeatureColorMap || defaultColorMap;
     const initialRelationName = getRelationNameFromDatasetURL(initialDatasetURL) || props.mapUIsettings.defaultDatasetName || "";
 
-    const [[latitude, longitude, zoom], setCoordinates] = useState<[number, number, number]>(
-        [leafProps.center?.[0] ?? 0, leafProps.center?.[1] ?? 0, leafProps.zoom ?? 1]
-    );
+    const initialCoords: [number, number, number] = (
+        (props.isSyncMapCoordsOnTheFly_SETTER || props.isSyncMapCoordsOnTheFly_RECIEVER) &&
+        (contextT.mapCoords.latitude !== 0 || contextT.mapCoords.longitude !== 0 || contextT.mapCoords.zoom !== 0)
+    )
+        ? [contextT.mapCoords.latitude, contextT.mapCoords.longitude, contextT.mapCoords.zoom]
+        : [leafProps.center?.[0] ?? 0, leafProps.center?.[1] ?? 0, leafProps.zoom ?? 1];
+
+    const [[latitude, longitude, zoom], setCoordinates] = useState<[number, number, number]>(initialCoords);
     const [isTransitioning, setIsTransitioning] = useState(false);
     const isZoomingRef = useRef(false);
     const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1033,7 +1060,7 @@ const baseStyle: Leaflet.PathOptions = {
     const [isUpdate, setisUpdate] = useState(false);
     const [curColorMapType, setColorMapType] = useState<string>(initialColorMap);
     const [layerOpacity, setLayerOpacity] = useState(
-        props.isApplyContextData ? contextT.curLayerOpacity : props.mapUIsettings.defaultLayerOpacity || contextT.curLayerOpacity
+        syncLayerOpacity ? contextT.curLayerOpacity : props.mapUIsettings.defaultLayerOpacity || contextT.curLayerOpacity
     );
     const [selectedFilter, setSelectedFilter] = useState<string>("")
     const [dateRange, setDateRange] = useState<{ from: Date | undefined; to?: Date | undefined; } | undefined>(contextT.dateRange);
@@ -1069,7 +1096,10 @@ const baseStyle: Leaflet.PathOptions = {
 
     // ── Loading task hooks (replace old isLoadingSpinner ref) ──
     const L_dataLoading = useLoadingTask('Data');
-    const L_contextSync = useLoadingTask('Context Sync');
+    const {
+        start: startContextSync,
+        stop: stopContextSync,
+    } = useLoadingTask('Context Sync');
     const L_presenceLayer = useLoadingTask('Presence Layer');
     const L_presenceLayerCovid = useLoadingTask('Presence Layer Covid');
     const L_debounceLoading = useLoadingTask('Debounce Render');
@@ -1163,6 +1193,43 @@ const baseStyle: Leaflet.PathOptions = {
     }, [isLoading_ColumnNames, isLoading_Metadata, rawColumnNames, rawMetaData]);
     /* eslint-enable react-hooks/set-state-in-effect */
 
+    // Synchronize dataset and feature when mapUIsettings change dynamically without remounting
+    /* eslint-disable react-hooks/set-state-in-effect -- Prop changes intentionally replace the active map request. */
+    useEffect(() => {
+        const nextDataset = props.mapUIsettings.defaultDatasetName;
+        const nextFeature = props.mapUIsettings.defaultFeatureName;
+
+        let needsUpdate = false;
+        let targetDataset = curDatasetname.current;
+        let targetFeature = selectedFeature;
+
+        if (nextDataset && nextDataset !== curDatasetname.current) {
+            curDatasetname.current = nextDataset;
+            setSelectedDatasetKey(nextDataset);
+            targetDataset = nextDataset;
+            needsUpdate = true;
+        }
+
+        if (nextFeature !== undefined && nextFeature !== "" && nextFeature !== selectedFeature) {
+            setSelectedFeature(nextFeature);
+            targetFeature = nextFeature;
+            needsUpdate = true;
+        }
+
+        if (needsUpdate && targetDataset) {
+            const url = buildMapDatasetURL(
+                { relationName: targetDataset, feature: targetFeature },
+                useCompactGridResponse,
+            );
+            setSelectedDataset(url);
+            if (props.isSetIntialContextDataFromComponent) {
+                contextT.setCurDatasetURL(url);
+                contextT.setCurFeature(targetFeature);
+            }
+        }
+    }, [props.mapUIsettings.defaultDatasetName, props.mapUIsettings.defaultFeatureName]);
+    /* eslint-enable react-hooks/set-state-in-effect */
+
     
 
     // COVID layers are rendered from the date- and aggregation-filtered
@@ -1182,11 +1249,17 @@ const baseStyle: Leaflet.PathOptions = {
 
 
     // presence data
-    const [isPresData, setIsPresData] = useState(props.mapUIsettings.isPresenceDataChecked || mapUIsettings.inCovidDataView || false);
+    const [isPresData, setIsPresData] = useState(
+        props.mapUIsettings.isPresenceDataChecked ||
+        mapUIsettings.inCovidDataView ||
+        (syncPresenceData && contextT.isPresenceData) ||
+        false
+    );
     const [presData, setPresData] = useState<{geometry: [number, number], feature: string, latLng?: [number, number], country_name?: string, subregion_name?: string;}[]>([]);
     const defaultPresenceDataURL = mapUIsettings.inCovidDataView
         ? resolvedDefaultDatasetURL
-        : apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "pointtype", filterBy: "pointtype", filterValue: "point, exact location" });
+        : (syncPresenceData && contextT.curPresenceDatasetURL) ||
+          apiRoutes.fetchDbData({ relationName: contextT.curPresenceDatasetName, feature: "pointtype", filterBy: "pointtype", filterValue: "point, exact location" });
     const [presenceDataURL, setPresenceDataURL] = useState<string>(defaultPresenceDataURL);
     const shouldLoadPresenceData = props.mapDataSets.isPresenceData && isPresData;
     const shouldLoadPresenceDropdowns = (props.mapUIsettings.isPresenceData || props.mapDataSets.isPresenceData) && !props.mapUIsettings.inCovidDataView;
@@ -1232,17 +1305,19 @@ const baseStyle: Leaflet.PathOptions = {
     const sequenceColumnForDonut = contextT.donutChartSelectedColumnName || "species";
     const geoAssignmentColumn = contextT.geoAssignmentColumnNameForDonut || "country";
     const [isSequenceMetaData, setIsSequenceMetaData] = useState(
-        props.mapUIsettings.isSequenceMetaDataChecked || (props.isApplyContextData && contextT.isSequenceMetaData) || false
+        props.mapUIsettings.isSequenceMetaDataChecked ||
+        (syncSequenceMetaData && contextT.isSequenceMetaData) ||
+        false
     );
     const [sequenceMetaDataURL, setSequenceMetaDataURL] = useState<string>(
-        (props.isApplyContextData ? contextT.curDonutChartDataURL : "") ||
+        (syncSequenceMetaData ? contextT.curDonutChartDataURL : "") ||
         apiRoutes.fetchDbData({ relationName: contextT.curDonutChartDatasetName, feature: geoAssignmentColumn, task: "getCount" })
     );
     const [cur_Sorgansim, setCur_SOrgansim] = useState<string>(
-        props.isApplyContextData ? contextT.curSOrgansim : "ALL"
+        syncSequenceMetaData ? contextT.curSOrgansim : "ALL"
     )
     const [cur_SYear, setCur_SYear] = useState<string>(
-        props.isApplyContextData ? contextT.curSyear : "ALL"
+        syncSequenceMetaData ? contextT.curSyear : "ALL"
     )
 
     const shouldLoadSequenceData = props.mapDataSets.isSequenceMetaData && isSequenceMetaData;
@@ -1264,7 +1339,7 @@ const baseStyle: Leaflet.PathOptions = {
     );
 
     const [pieSize, setPieSize] = useState<number>(
-        props.isApplyContextData ? contextT.pieSize_sequenceMetaData : props.mapUIsettings.defaultDonutSize || 40
+        syncSequenceMetaData ? contextT.pieSize_sequenceMetaData : props.mapUIsettings.defaultDonutSize || 40
     );
     const [isCountryLevelData, setIsCountryLevelData] = useState(props.mapUIsettings.isCountryLevelData);
     const [isSubregionLevelData, setIsSubregionLevelData] = useState(props.mapUIsettings.isSubregionLevelData);
@@ -1448,10 +1523,9 @@ const baseStyle: Leaflet.PathOptions = {
     /**
      * Synchronises local component state with the shared `InterfaceContext`.
      *
-     * Called inside a `useEffect` that depends on `isApplyContextData`.
-     * Each field is compared individually and only updated when the
-     * context value has actually changed, preventing feedback loops
-     * between SETTER and RECEIVER map instances.
+     * Full receivers mirror every linked field. Selective receivers mirror
+     * only the configured visual overlays, preserving their local dataset and
+     * feature selection.
      *
      * @remarks
      * In COVID view, the incoming `presenceDatasetURL` from the context
@@ -1459,10 +1533,10 @@ const baseStyle: Leaflet.PathOptions = {
      * re-apply the correct level for **this** map's current zoom.
      */
     const applyGlobalContext = useCallback(() => {
-        if(curColorMapType != contextT.curColorMap){
+        if(syncColorMap && curColorMapType != contextT.curColorMap){
             setColorMapType(contextT.curColorMap);
         }
-        if(selectedDatasetURL !== contextT.curDatasetURL && contextT.curDatasetURL != ""){
+        if(syncAllContext && selectedDatasetURL !== contextT.curDatasetURL && contextT.curDatasetURL != ""){
             const relationName = getRelationNameFromDatasetURL(contextT.curDatasetURL);
             if (relationName) {
                 curDatasetname.current = relationName;
@@ -1470,34 +1544,34 @@ const baseStyle: Leaflet.PathOptions = {
             }
             setSelectedDataset(contextT.curDatasetURL);
         }
-        if(isPresData != contextT.isPresenceData && contextT.isPresenceData !== undefined){
+        if(syncPresenceData && isPresData != contextT.isPresenceData && contextT.isPresenceData !== undefined){
             
             setIsPresData(contextT.isPresenceData);
            
         }
-        if(isSequenceMetaData != contextT.isSequenceMetaData && contextT.isSequenceMetaData !== undefined){
+        if(syncSequenceMetaData && isSequenceMetaData != contextT.isSequenceMetaData && contextT.isSequenceMetaData !== undefined){
             setIsSequenceMetaData(contextT.isSequenceMetaData);
         }
-        if(pieSize != contextT.pieSize_sequenceMetaData && contextT.pieSize_sequenceMetaData !== undefined){
+        if(syncSequenceMetaData && pieSize != contextT.pieSize_sequenceMetaData && contextT.pieSize_sequenceMetaData !== undefined){
             setPieSize(contextT.pieSize_sequenceMetaData);
         }
-        if(cur_SYear != contextT.curSyear && contextT.curSyear !== undefined){
+        if(syncSequenceMetaData && cur_SYear != contextT.curSyear && contextT.curSyear !== undefined){
             setCur_SYear(contextT.curSyear);
         }
-        if(cur_Sorgansim != contextT.curSOrgansim && contextT.curSOrgansim !== undefined){
+        if(syncSequenceMetaData && cur_Sorgansim != contextT.curSOrgansim && contextT.curSOrgansim !== undefined){
             setCur_SOrgansim(contextT.curSOrgansim);
         }
-        if(layerOpacity != contextT.curLayerOpacity){
-            setTimeout(() => {
-                setLayerOpacity(contextT.curLayerOpacity);
-            }, 50);
+        if(syncLayerOpacity && layerOpacity != contextT.curLayerOpacity){
+            setLayerOpacity(contextT.curLayerOpacity);
         }
-        if (sequenceMetaDataURL !== contextT.curDonutChartDataURL &&
+        if (syncSequenceMetaData &&
+            sequenceMetaDataURL !== contextT.curDonutChartDataURL &&
             contextT.curDonutChartDataURL !== undefined &&
             contextT.curDonutChartDataURL !== "") {
             setSequenceMetaDataURL(contextT.curDonutChartDataURL);
         }
-        if (presenceDataURL !== contextT.curPresenceDatasetURL &&
+        if (syncPresenceData &&
+            presenceDataURL !== contextT.curPresenceDatasetURL &&
             contextT.curPresenceDatasetURL !== undefined &&
             contextT.curPresenceDatasetURL !== "") {
             // In COVID view, the receiving map must enforce its own
@@ -1515,17 +1589,20 @@ const baseStyle: Leaflet.PathOptions = {
             }
         }
 
-        if(selectedFeature != contextT.curFeature && contextT.curFeature != "") {
+        if(syncAllContext && selectedFeature != contextT.curFeature && contextT.curFeature != "") {
             setSelectedFeature(contextT.curFeature);
         }
             
 
-        setSelectedFilter(contextT.selectedFilter);
-        if (props.mapUIsettings.isDoNotApplyCountryFromContext === false)
-            setSelectedCountry(contextT.selectedCountry);
+        if (syncAllContext) {
+            setSelectedFilter(contextT.selectedFilter);
+            if (props.mapUIsettings.isDoNotApplyCountryFromContext === false) {
+                setSelectedCountry(contextT.selectedCountry);
+            }
             setDateRange(contextT.dateRange);
+        }
 
-         L_contextSync.stop();
+         stopContextSync();
     }, [
         contextT.curColorMap,
         contextT.curDatasetURL,
@@ -1539,23 +1616,28 @@ const baseStyle: Leaflet.PathOptions = {
         contextT.selectedFilter,
         contextT.selectedCountry,
         contextT.dateRange,
-        contextT.curFeature,
+        contextT.curSyear,
+        contextT.curSOrgansim,
         curColorMapType,
-        curDatasetname.current,
         isPresData,
         isSequenceMetaData,
         cur_SYear,
+        cur_Sorgansim,
         layerOpacity,
+        pieSize,
         sequenceMetaDataURL,
         presenceDataURL,
         selectedFeature,
-        selectedFilter,
-        selectedCountry,
-        dateRange,
         selectedDatasetURL,
-        isCountryLevelData,
-        isSubregionLevelData,
-        props.mapUIsettings.isDoNotApplyCountryFromContext
+        props.mapUIsettings.isDoNotApplyCountryFromContext,
+        mapUIsettings.inCovidDataView,
+        zoom,
+        stopContextSync,
+        syncAllContext,
+        syncColorMap,
+        syncLayerOpacity,
+        syncPresenceData,
+        syncSequenceMetaData
     ]);
 
 
@@ -1601,19 +1683,22 @@ const baseStyle: Leaflet.PathOptions = {
 
     /* eslint-disable react-hooks/set-state-in-effect -- This receiver intentionally mirrors shared context into local map state. */
     useEffect(() => {
-        if(props.isApplyContextData === true) {
+        if(hasContextSync) {
             // Only show loading spinner if data-related context values changed
-            const needsLoading = 
-                selectedDatasetURL !== contextT.curDatasetURL ||
-                selectedFeature !== contextT.curFeature ||
-                presenceDataURL !== contextT.curPresenceDatasetURL ||
-                sequenceMetaDataURL !== contextT.curDonutChartDataURL;
+            const needsLoading =
+                (syncAllContext && (
+                    selectedDatasetURL !== contextT.curDatasetURL ||
+                    selectedFeature !== contextT.curFeature
+                )) ||
+                (syncPresenceData && presenceDataURL !== contextT.curPresenceDatasetURL) ||
+                (syncSequenceMetaData && sequenceMetaDataURL !== contextT.curDonutChartDataURL);
             if (needsLoading) {
-                L_contextSync.start();
+                startContextSync();
             }
             applyGlobalContext();
         }
-    }, [props.isApplyContextData, applyGlobalContext,
+    }, [hasContextSync, syncAllContext, syncColorMap, syncLayerOpacity, syncPresenceData, syncSequenceMetaData, applyGlobalContext,
+        startContextSync, presenceDataURL, selectedDatasetURL, selectedFeature, sequenceMetaDataURL,
         contextT.curDatasetURL, contextT.curFeature, 
         contextT.curPresenceDatasetURL, contextT.curDonutChartDataURL,
         contextT.curColorMap, contextT.isPresenceData, contextT.isSequenceMetaData,
@@ -3057,27 +3142,26 @@ const HandleMouseMoveX = useCallback(
         if (!Number.isFinite(gridLat) || !Number.isFinite(gridLng)) return;
 
         // avoid unnecessary updates
-        if (curGridCell.current[0] === gridLat && curGridCell.current[1] === gridLng) {
+        if (curGridCell.current[0] === curSnapped.center.lat && curGridCell.current[1] === curSnapped.center.lng) {
             return; // No change in grid cell
         }
         //console.log("drawTooltip...")
         curGridCell.current = [curSnapped.center.lat, curSnapped.center.lng];
 
-        let curGridCoords = {lat: gridLat, lng: gridLng};
-        curGridCellID.current = getGridCellIndex(curGridCoords, gridCellDims)-1;
+        curGridCellID.current = getGridCellIndex(curSnapped.center, gridCellDims);
         curGridCellFeature.current = NaN; // Use NaN to indicate an invalid or uninitialized state
 
         // get gridCell Data
-        let curGridCellDat = gridData.get(curGridCellID.current)
+        let curGridCellDat = gridData.get(curGridCellID.current);
         curGridCellFeature.current = curGridCellDat?.feature ?? NaN;
 
         // get rowID
         let rowID = curGridCellDat?.rowID ?? NaN;
-        curGridCellRowID.current = rowID-1;
+        curGridCellRowID.current = rowID;
 
         // Compute the bottom-right corner of the grid cell
-        const gridLatBottom = gridLat +  gridcellSizeLatLng.current.lat;
-        const gridLngRight = gridLng +  gridcellSizeLatLng.current.lng;
+        const gridLatBottom = gridLat - gridcellSizeLatLng.current.lat;
+        const gridLngRight = gridLng + gridcellSizeLatLng.current.lng;
 
         // Convert grid coordinates to layer points for correct placement
         const topLeft = map.latLngToLayerPoint([gridLat , gridLng]);
