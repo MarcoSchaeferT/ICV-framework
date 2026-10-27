@@ -2,41 +2,42 @@
 "use client";;
 import * as React from "react";
 import Image from "next/image";
-import { Menu, Home } from "lucide-react";
+import { ChevronDown, Menu, Home } from "lucide-react";
 //import Link from "next/link"
-import {Link} from '@/i18n/routing';
+import {Link, useRouter} from '@/i18n/routing';
 import { Button } from "@/components/ui/button";
-import {LINKS, LINK} from '@messages/navbarContent';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { LINKS, LINK, Group } from '@messages/navbarContent';
 import { useEffect, useState, type JSX } from "react";
 import LocalizationSwitcher from "./localizationSwitcher/localizationSwitcher";
 import { useUIContext } from "../contexts/UIContext";
-import {Group} from '@messages/navbarContent';
 import { layoutSizes, t_richConfig } from "@/app/const_store";
-import { useLocale, useTranslations } from 'next-intl';
-import { useRouter } from "next/navigation";
+import { useTranslations } from 'next-intl';
 
 
-function LinkDirectOpen({ link }: { link: string }) {
-  const router = useRouter();
-  const locale = useLocale();
-  const target = `/${locale}/${link}`;
-  const handleClick = () => {
-    console.log("Navigating to:", target);
-    router.push(target);
-  };
-
-  React.useEffect(() => {
-    if(locale == undefined) return;
-    setTimeout(() => {
-      handleClick();
-    }, 100);
-  }, [locale, target]);
-}
-
-/** Localized navigation links and initial expanded-state hint. */
+/**
+ * Localized navigation links and initial expanded-state hint.
+ *
+ * @example
+ * ```ts
+ * const dengueNav: nav = {
+ *   navLinks: [{ icon: null, title: "Dengue Vis. Interface", href: "/worldView", group: "dengue" }],
+ *   isOpen: true,
+ * };
+ * ```
+ */
 interface nav {
+    /** Entries available to the top navigation. */
     navLinks: LINK[];
+    /** Initial expanded-state hint. */
     isOpen: boolean;
+    /** Optional callback used when the navigation closes. */
     onClose?: () => void;
 }
 
@@ -62,7 +63,7 @@ export function NavList(props: nav): JSX.Element {
           href="/"
           className="flex items-center gap-x-2 px-3 py-1.5 hover:text-amber-500 text-sm font-semibold text-[#279BBA] rounded-md transition-colors w-full"
           onClick={() => {
-            UI_contextT.curDocsNameRef.current = "Home";
+            UI_contextT.setCurDocsName("Home");
             props.onClose?.();
           }}
         >
@@ -73,27 +74,75 @@ export function NavList(props: nav): JSX.Element {
       {/* Mobile-only divider */}
       <li className="flex lg:hidden h-px w-full bg-white/20 my-1" />
 
-      {filterednavLinks.map(({ icon: Icon, title, href, group }, idx) =>
+      {filterednavLinks.map(({ icon: Icon, title, href, menu }, idx) =>
        (
            <React.Fragment key={title}>
           <li className="flex items-center">
-            <Link
-              href={href}
-              className="flex items-center gap-x-1 px-3 py-1 hover:text-amber-500 text-sm"
-              onClick={() => {
-                UI_contextT.curDocsNameRef.current = title;
-                props.onClose?.();
-              }}
-            >
-              {Icon !== null && (
-                title === "ICV-Docs"
-                  ? <Icon className="h-4 w-4 outline outline-offset-2 outline-orange-600" />
-                  : title === "shdcn/ui-Docs"
-                    ? <Icon className="h-4 w-4 outline outline-offset-2 outline-purple-600" />
-                    : <Icon className="h-6 w-6" />
-              )}
-              {title}
-            </Link>
+            {menu === "help" ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-x-1 rounded-md px-3 py-1 text-sm hover:text-amber-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500"
+                  >
+                    {Icon && <Icon className="h-6 w-6" aria-hidden="true" />}
+                    {title}
+                    <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="z-[1500] min-w-60">
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href={href}
+                      onClick={() => {
+                        UI_contextT.setCurDocsName(title);
+                        props.onClose?.();
+                      }}
+                    >
+                      {t("helpMenu.quickHelp")}
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/docs/user-guide" locale="en" onClick={props.onClose}>
+                      {t("helpMenu.userGuide")}
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/docs/developer-guide" locale="en" onClick={props.onClose}>
+                      {t("helpMenu.developerGuide")}
+                    </Link>
+                  </DropdownMenuItem>
+                  {process.env.NODE_ENV === "development" && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link href="/apiDocs" onClick={props.onClose}>
+                          {t("helpMenu.swaggerUi")}
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Link
+                href={href}
+                className="flex items-center gap-x-1 px-3 py-1 hover:text-amber-500 text-sm"
+                onClick={() => {
+                  UI_contextT.setCurDocsName(title);
+                  props.onClose?.();
+                }}
+              >
+                {Icon !== null && (
+                  title === "ICV-Docs"
+                    ? <Icon className="h-4 w-4 outline outline-offset-2 outline-orange-600" />
+                    : title === "shdcn/ui-Docs"
+                      ? <Icon className="h-4 w-4 outline outline-offset-2 outline-purple-600" />
+                      : <Icon className="h-6 w-6" />
+                )}
+                {title}
+              </Link>
+            )}
 
           </li>
           {idx < filterednavLinks.length - 1 && (
@@ -102,7 +151,7 @@ export function NavList(props: nav): JSX.Element {
             </li>
           )}
         </React.Fragment>
-
+       
       ))}
     </ul>
   );
@@ -118,44 +167,32 @@ export default function NavbarTop(props: nav): JSX.Element  {
 
   const UI_contextT = useUIContext();
   const t = useTranslations("navbar_top");
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
    const oldDiesease = React.useRef("");
 
   let selectedGroup = UI_contextT.sidebarSelection.group;
   if (selectedGroup === undefined || selectedGroup === "")  selectedGroup = Group.all;
   const filterednavLinks = props.navLinks.filter(link => !link.group || link.group === selectedGroup || link.group === Group.all);
+  const disease = UI_contextT.sidebarSelection.disease;
+  const redirectHref = filterednavLinks[0]?.href;
 
-  const RedirectHandler = () => {
-  const router = useRouter();
-  const locale = useLocale();
+  useEffect(() => {
+    if (oldDiesease.current === "" || disease === "") {
+      oldDiesease.current = disease;
+      return;
+    }
+    if (oldDiesease.current === disease) return;
 
-
-    useEffect(() => {
-
-      if (oldDiesease.current === "" ) {
-        oldDiesease.current = UI_contextT.sidebarSelection.disease;
-        return;
-      }
-      if(UI_contextT.sidebarSelection.disease == "" ){
-        oldDiesease.current = UI_contextT.sidebarSelection.disease;
-        return;
-      }
-      if (oldDiesease.current === UI_contextT.sidebarSelection.disease)return;
-
-      oldDiesease.current = UI_contextT.sidebarSelection.disease;
-
-      const target = `/${locale}/${filterednavLinks[0].href}`;
-      router.push(target);
-    }, [filterednavLinks, UI_contextT.sidebarSelection]);
-    return null;
-};
+    oldDiesease.current = disease;
+    if (redirectHref) router.push(redirectHref);
+  }, [disease, redirectHref, router]);
 
 
   // AI powered  Views for Pandemics
   return (
     <>
-     <RedirectHandler />
-    <div className="sticky top-0 z-1100 float-none ">
+    <div id="app-topbar" className="sticky top-0 z-1100 float-none ">
       <nav id="navbarTop" className={`max-w-fit mx-auto min-h-[45px] bg-secondary-dark text-secondary-light transition-all duration-300 rounded-lg`}>
 
       <div className="flex lg:items-center items-start px-4 py-2 flex-wrap lg:flex-nowrap gap-y-2">
@@ -196,7 +233,7 @@ export default function NavbarTop(props: nav): JSX.Element  {
         </Button>
 
         <hr className="ml-1 mr-1.5 hidden h-5 w-px border-l border-t-0 border-secondary-dark lg:block" />
-
+        
         {/* Nav links container */}
         <div className="w-full lg:w-auto lg:block items-center transition-all duration-350">
           <div className={`transition-all ${isOpen ? 'duration-350 max-h-96 opacity-100 mt-2 lg:mt-0' : 'max-lg:duration-0 max-h-0 opacity-0 overflow-hidden'} lg:max-h-60 lg:opacity-100`}>

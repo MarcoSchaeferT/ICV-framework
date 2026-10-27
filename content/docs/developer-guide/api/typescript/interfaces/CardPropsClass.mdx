@@ -1,0 +1,104 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: CardPropsClass
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Presentation and contextual-help contract for one Vis. Interface card.
+
+## Example
+
+```tsx
+import type { CardPropsClass } from "@/framework";
+
+const habitatCard: CardPropsClass = {
+  id: "albopictus-habitat-map",
+  headline: "Aedes albopictus habitat suitability",
+  description: "Monthly model mean for July 2024",
+  footer: "Source: ICV habitat model",
+  bgColor: "bg-surface-light",
+};
+```
+
+## Properties
+
+### id
+
+> **id**: `string`
+
+Stable DOM and Swapy slot identifier.
+
+***
+
+### headline
+
+> **headline**: `string`
+
+Visible card heading.
+
+***
+
+### description
+
+> **description**: `string`
+
+Short description displayed below the heading.
+
+***
+
+### footer
+
+> **footer**: `string`
+
+Attribution or supporting text displayed below the content.
+
+***
+
+### bgColor
+
+> **bgColor**: `string`
+
+Tailwind background utility applied to the card shell.
+
+***
+
+### infoCard?
+
+> `optional` **infoCard?**: `object`
+
+Optional MDX-backed explanation of the visualization.
+
+#### content?
+
+> `optional` **content?**: `FC`\<`any`\>
+
+Main informational content component.
+
+#### footer?
+
+> `optional` **footer?**: `FC`\<`any`\>
+
+Optional informational footer component.
+
+***
+
+### infoCardInteraction?
+
+> `optional` **infoCardInteraction?**: `object`
+
+Optional MDX-backed explanation of available interactions.
+
+#### content?
+
+> `optional` **content?**: `FC`\<`any`\>
+
+Main interaction-help component.
+
+#### footer?
+
+> `optional` **footer?**: `FC`\<`any`\>
+
+Optional interaction-help footer component.

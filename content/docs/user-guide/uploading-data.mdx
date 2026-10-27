@@ -1,0 +1,55 @@
+---
+title: Upload data
+description: Prepare a CSV dataset, follow its upload status, and complete its metadata.
+---
+
+## Prepare the CSV file
+
+The [Upload page](/en/upload) accepts CSV files. Before selecting a file, check that it:
+
+- uses UTF-8 encoding, commas between fields, and one header row;
+- has unique column names without unintended leading or trailing spaces;
+- uses consistent values within each column, an unambiguous date format, and a period for decimal numbers (for example, `12.34`);
+- contains only data you are authorized to process.
+
+The upload form accepts filenames ending in `.csv`, rejects files larger than 2,500 MB, and requires filenames shorter than 70 characters. You can select multiple files; the form processes them one at a time. ICV creates a record ID for each row, so leave an `id` column out of a new CSV file.
+
+<Callout type="warn">
+  An upload is a complete dataset snapshot. If its filename resolves to an existing dataset name, the upload replaces that dataset. Check the filename and file contents before uploading.
+</Callout>
+
+## Add geometry for grid-based views
+
+For the grid datasets described on the Upload page, include exactly one column named `geometry`. Each value should be a quoted WKT `POLYGON` describing a rectangle. Use longitude first and latitude second. List the four corners and repeat the first corner to close the polygon. The quotes keep the commas inside the geometry value from becoming CSV separators.
+
+For example, this CSV has one rectangular grid cell and one numeric feature:
+
+```csv
+geometry,precipitation
+"POLYGON ((10 50, 11 50, 11 51, 10 51, 10 50))",22.5
+```
+
+The Upload page also lists filename conventions that help map filters find datasets:
+
+- **Probability data:** include `probability` in the filename, such as `mosquito_habitat_probability_2020.csv`.
+- **Training data:** include `named` and exclude `probability`, such as `mosquito_training_data_named_2020.csv`.
+
+Other CSV datasets can be uploaded without `geometry`; they do not get a country-assignment step and cannot supply the rectangular grid geometry required by map views. A matching filename alone does not make a dataset usable in a view: it also needs the columns that view expects.
+
+## Upload and check the result
+
+1. Open [Upload](/en/upload) from the main navigation.
+2. Drag files into the upload area or click it to select files. Remove any mistaken selection with the **X** button beside its filename.
+3. Select **Upload Files**. The form shows transfer progress for the current file, followed by **db integration**. If the file has a `geometry` column, it also shows **country assignment**.
+4. Keep the page open until the form reports **Files uploaded successfully!** or shows an error. With multiple files, wait for each file to finish.
+5. Check that the new dataset appears in the relevant view. If it does not, review the filename convention, geometry, and any error shown by the form.
+
+In demo mode, the upload form opens a restriction dialog instead of saving a file.
+
+## Complete the column metadata
+
+After a successful upload, open the [Metadata Editor](/en/metadataEditor). Select the dataset and language, then review each column's **Data Type**, **Dimension**, **Description**, and **Visible** setting. Choose **Save All** when finished. Repeat for another language if that dataset needs localized metadata.
+
+<Callout type="warn">
+  If the form says that upload status could not be retrieved, processing may still be running. Do not repeatedly upload the same file while its outcome is unknown; check whether the dataset appears or ask an administrator to verify it.
+</Callout>

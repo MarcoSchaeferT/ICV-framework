@@ -4,11 +4,26 @@ import {SquareChevronDown, SquareChevronUp} from "lucide-react"
 import { useTranslations } from 'next-intl';
 
 
-/** DOM anchor identifier targeted by a smooth-scroll control. */
+/**
+ * DOM anchor identifier targeted by a smooth-scroll control.
+ *
+ * @example
+ * ```ts
+ * const props: ScrollToTopButtonProps = { scrollToAnchor: "features" };
+ * ```
+ */
 interface ScrollToTopButtonProps {
+  /** ID of the existing DOM element to scroll into view. */
   scrollToAnchor: string;
 }
 
+/**
+ * Shows an upward control that scrolls to an existing DOM anchor.
+ *
+ * @param scrollToAnchor - Target element ID, such as `features`.
+ * @returns A localized smooth-scroll button.
+ * @remarks The click handler performs no scroll when the target is absent.
+ */
 const ScrollToButtonUp: React.FC<ScrollToTopButtonProps> = ({ scrollToAnchor }) => {
 const t = useTranslations("component_scrollToButton");
   return (
@@ -28,6 +43,13 @@ const t = useTranslations("component_scrollToButton");
   );
 };
 
+/**
+ * Shows a downward control that scrolls to an existing DOM anchor.
+ *
+ * @param scrollToAnchor - Target element ID, such as `showcases`.
+ * @returns A localized smooth-scroll button.
+ * @remarks The click handler performs no scroll when the target is absent.
+ */
 const ScrollToButtonDown: React.FC<ScrollToTopButtonProps> = ({ scrollToAnchor }) => {
 const t = useTranslations("component_scrollToButton");
   return (
@@ -47,5 +69,5 @@ const t = useTranslations("component_scrollToButton");
   );
 };
 
-/** Public smooth-scroll controls for navigating between dashboard sections. */
+/** Public smooth-scroll controls for navigating between Vis. Interface sections. */
 export { ScrollToButtonUp, ScrollToButtonDown };

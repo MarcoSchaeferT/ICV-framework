@@ -1,0 +1,33 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: PieChart
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **PieChart**(`props`): `Element`
+
+Chooses the generic or linked categorical pie-chart implementation.
+
+## Parameters
+
+### props
+
+Pie-chart configuration, including the optional data mode.
+
+#### ChartProps
+
+[`PieChartProps`](../interfaces/PieChartProps)
+
+## Returns
+
+`Element`
+
+A generic row-oriented chart or the linked category breakdown.
+
+## Remarks
+
+Defaults to `dataMode = "linked"` when omitted. Generic mode reads the shared relation from `ChartDatasetProvider`;
+linked mode consumes the configured URL or bundled demonstration records.

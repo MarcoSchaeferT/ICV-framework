@@ -1,0 +1,85 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: VisDataT
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Parsed spatial grid cell visualization data record.
+
+Represents an individual 2D geographical grid cell extracted from raw SQL spatial payloads (`geometry` column string).
+
+## See
+
+ - [useGridDataParser](../functions/useGridDataParser) for ingesting raw SQL payloads into `VisDataT`.
+ - [useWebGLGridLayer](../functions/useWebGLGridLayer) for GPU rendering consuming `VisDataT`.
+
+## Example
+
+```ts
+import type { VisDataT } from "@/framework";
+
+const habitatCell: VisDataT = {
+  geometry: [[52, 13], [52, 13.25], [51.75, 13.25], [51.75, 13], [52, 13]],
+  feature: 0.73,
+  rowID: 200509,
+};
+```
+
+## Properties
+
+### geometry?
+
+> `optional` **geometry?**: \[`number`, `number`\][]
+
+Optional polygon boundary as `[latitude, longitude]` pairs.
+
+***
+
+### topLeft?
+
+> `optional` **topLeft?**: \[`number`, `number`\]
+
+Compact north-west cell anchor used by map-grid-v1 responses.
+
+***
+
+### bounds?
+
+> `optional` **bounds?**: \[`number`, `number`, `number`, `number`\]
+
+Exact `[north, south, west, east]` bounds for projection-aware compact grids.
+
+***
+
+### corners?
+
+> `optional` **corners?**: \[`number`, `number`, `number`, `number`, `number`, `number`, `number`, `number`\]
+
+Four source polygon corners as flat `[lat0,lng0,...,lat3,lng3]`.
+
+***
+
+### feature
+
+> **feature**: `number`
+
+Numerical feature value (e.g. vector species density, temperature, or occurrence probability)
+
+***
+
+### visDatIdx?
+
+> `optional` **visDatIdx?**: `number`
+
+Original zero-based data index in raw response array
+
+***
+
+### rowID?
+
+> `optional` **rowID?**: `number`
+
+Database primary key row identifier

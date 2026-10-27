@@ -1,0 +1,60 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: DataTable
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **DataTable**(`props`): `Element`
+
+Renders a searchable, sortable, and paginated data table backed by a database relation.
+
+Fetches all columns (`feature: "ALL"`) for `relationName` via [useGetJSONData](useGetJSONData) and
+aligns numeric feature values with localized physical units from [alignFeature\_to\_Metadata](alignFeature_to_Metadata).
+
+## Parameters
+
+### props
+
+[`DataTableProps`](../interfaces/DataTableProps)
+
+Relation, card, and optional linked-selection settings defined in [dataTableComponentT](../interfaces/DataTableProps).
+
+## Returns
+
+`Element`
+
+A rendered table view with debounced global search, column sorting, pagination, and linked row selection.
+
+## Remarks
+
+When `selectedRowColumn` and `selectedRowValue` match a row in the dataset, the table
+automatically switches to the page containing that record and scrolls the row into view.
+
+## See
+
+ - [dataTableComponentT](../interfaces/DataTableProps) for configuration options.
+ - [dataTableFeatures](../variables/dataTableFeatures) for the registered TanStack Table feature bundle.
+
+## Example
+
+```tsx
+import { CardPropsClass, DataTable } from "@/framework";
+
+const cardProps = CardPropsClass(
+  "surveillance-table",
+  "Dengue Surveillance Records",
+  "Click a row to inspect regional observations",
+  "Source: ECDC / WHO",
+);
+
+<DataTable
+  relationName="dengue_serotypes"
+  cardProps={cardProps}
+  selectedRowColumn="country"
+  selectedRowValue="Brazil"
+  onClickEvent={(row, rowKey) => console.log(rowKey, row.original)}
+/>
+```

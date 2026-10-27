@@ -1,3 +1,5 @@
+"""Read uploaded CSV headers and stream rows without materializing the file."""
+
 import csv
 import io
 from pathlib import Path
@@ -7,7 +9,21 @@ from typing import Generator, Optional, Union
 csv.field_size_limit(10485760)
 
 class ParsedData:
-    """Metadata about the CSV file without loading all rows into memory"""
+    """CSV header and upload metadata shared by schema creation and COPY.
+
+    ``column_names`` preserves source headers; ``sanitized_column_names``
+    aligns by index with them and names the PostgreSQL columns. ``file_size``
+    is measured in bytes for progress reporting. Rows remain on disk.
+
+    Example:
+        ```python
+        parsed = ParsedData()
+        parsed.db_name = "dengue_serotype_counts"
+        parsed.column_names = ["Country", "Year", "Serotype Count"]
+        parsed.sanitized_column_names = ["country", "year", "serotype_count"]
+        parsed.file_size = 18432
+        ```
+    """
     db_name: str
     column_names: list[str]
     sanitized_column_names: list[str]
@@ -17,6 +33,7 @@ class ParsedData:
     column_sql_types: list[str]
 
     def __init__(self):
+        """Initialize empty header, type, path, and size metadata."""
         self.db_name: str = ""
         self.column_names: list[str] = []
         self.sanitized_column_names: list[str] = []
@@ -27,7 +44,12 @@ class ParsedData:
 
 
 async def parseCSVdata(file_path: Path) -> Union[ParsedData, dict]:
-    """Parse CSV metadata without loading all rows into memory"""
+    """Read a UTF-8 CSV header and derive its PostgreSQL relation name.
+
+    Returns a ``ParsedData`` instance without scanning rows, or a
+    ``{"error": ...}`` dictionary if reading or parsing fails. The caller
+    checks that error result before creating a table.
+    """
     filename = file_path.name
     parsedCSVdata = ParsedData()
     try:
@@ -50,18 +72,24 @@ async def parseCSVdata(file_path: Path) -> Union[ParsedData, dict]:
             return parsedCSVdata
     except Exception as e:
         print("ERROR reading CSV file", e)
-        data = {"ERROR": "ERROR reading CSV file:" + str(e)}
+        data = {"error": "ERROR reading CSV file: " + str(e)}
         return data
 
 
 def stream_csv_rows(file_path: Path) -> Generator[tuple[dict, int], None, None]:
-    """Generator that yields (row, bytes_consumed) pairs one at a time without
-    loading the entire file into memory.
+    """Yield ``(row, bytes_consumed)`` pairs one at a time without loading the file into memory.
 
-    bytes_consumed is the byte offset the underlying reader has consumed so
-    far — used together with ParsedData.file_size for progress reporting
-    (slightly ahead of the parsed row due to read buffering, which is fine
-    for a progress bar).
+    Args:
+        file_path: Path to a UTF-8 (or UTF-8 with BOM) CSV file on disk.
+
+    Yields:
+        Tuples of ``(row_dict, bytes_consumed)`` where ``bytes_consumed`` is the
+        underlying binary stream offset read so far (used with
+        ``ParsedData.file_size`` for upload progress reporting).
+
+    Raises:
+        OSError: If ``file_path`` cannot be opened or read.
+        csv.Error: If the CSV stream contains malformed fields exceeding the 10 MB limit.
     """
     try:
         with open(file_path, mode="rb") as rawfile:
@@ -80,6 +108,12 @@ _PG_NAMEDATALEN = 63
 
 # Sanitize column names to have allowed strings for PostgreSQL
 def sanitize_names(column_names) -> list[str]:
+    """Convert non-empty CSV names to PostgreSQL-compatible identifiers.
+
+    Spaces, hyphens, colons, and dots are replaced; leading digits receive
+    ``t_``. Identifiers are truncated to PostgreSQL's 63-character limit.
+    The function does not resolve collisions between sanitized names.
+    """
     sanitized_column_names: list[str] = []
     for name in column_names:
         sanitized_name: str = (
@@ -98,24 +132,13 @@ def sanitize_names(column_names) -> list[str]:
     return sanitized_column_names
 
 
-def snanitize_values(column_values) -> list[str]:
-    sanitized_column_values: list[str] = []
-    for value in column_values:
-        sanitized_value: str = snanitize_value(value)
-        sanitized_column_values.append(sanitized_value)
-
-    return sanitized_column_values
-
-def snanitize_value(column_value) -> str:
-    
-    sanitized_column_value: str = (
-          column_value.replace("'", "`")
-        )
-
-    return sanitized_column_value
-
-
 def snanitize_date(column_value) -> str:
+    """Normalize legacy incomplete date text before database ingestion.
+
+    Unknown year and month markers become ``0001`` and ``01``. For a slash-
+    separated value, only the final segment is kept; missing components are
+    filled with the first month or day.
+    """
     
     sanitized_column_value: str = (
           column_value.replace("XXXX", "0001")

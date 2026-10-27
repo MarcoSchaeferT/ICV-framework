@@ -36,6 +36,9 @@ import GenericCartesianChart from '../generic/GenericCartesianChart';
  * 
  * @example
  * ```tsx
+ * import { apiRoutes, type LinechartProps } from "@/framework";
+ *
+ * // Replace the relation name with one available in your deployment.
  * const props: LinechartProps = {
  *   chartName: "albopictus-monthly-habitat",
  *   dataURL: apiRoutes.fetchDbData({
@@ -45,7 +48,6 @@ import GenericCartesianChart from '../generic/GenericCartesianChart';
  *     filterValue: "200509",
  *   }),
  *   locale: "en",
- *   translations: useTranslations("prediction_view_linechart"),
  *   yDomain: [0, 1],
  * };
  * ```
@@ -55,11 +57,11 @@ export interface LinechartProps {
     chartName: string;
     /** URL produced by `apiRoutes.fetchDbData`. */
     dataURL: string;
-    /** Locale used for value and metadata formatting. @default "en" */
+    /** Locale used for value and metadata formatting. @defaultValue "en" */
     locale?: string;
     /** `next-intl` translator for chart labels and tooltips. */
     translations?: any;
-    /** Uses bundled demonstration data instead of the backend. @default false */
+    /** Uses bundled demonstration data instead of the backend. @defaultValue false */
     isDummyMode?: boolean;
     /** Optional fixed numeric extent for the Y axis. */
     yDomain?: [number, number];
@@ -78,11 +80,9 @@ export interface LinechartProps {
  * @param translations - `next-intl` translator for the chart namespace.
  * @param isDummyMode - Uses bundled demonstration data.
  * @param yDomain - Optional fixed Y-axis extent.
+ * @param dataMode - `linked` uses the Vis. Interface selection; `generic` uses the shared dataset chart.
+ * @param rowLimit - Optional maximum rows for generic mode.
  * @returns Configuration accepted by `LinechartComponent`.
- * @default dataURL ""
- * @default locale "en"
- * @default translations {}
- * @default isDummyMode false
  */
 export function LinechartProps(
     chartName: string,
@@ -106,20 +106,52 @@ export function LinechartProps(
     };
 }
 
-/** Geometry and temporal feature arrays consumed by the line-chart adapter. */
+/**
+ * Geometry and temporal feature arrays consumed by the line-chart adapter.
+ *
+ * @example
+ * ```ts
+ * const countrySeries: dbData = {
+ *   geometry: ["COL"],
+ *   features: [[24.1, 24.6, 25.0]],
+ * };
+ * ```
+ */
 type dbData = {
+  /** Source geometry or location identifiers in response order. */
   geometry: string[];
+  /** Time-series values aligned with the source rows. */
   features: number[][];
 };
 
 
-/** Recharts-ready temporal observations. */
+/**
+ * Recharts-ready temporal observations.
+ *
+ * @example
+ * ```ts
+ * const temperatures: lineChartData = [
+ *   { name: "2026-08-01", feature: 24.1 },
+ *   { name: "2026-08-02", feature: 24.6 },
+ * ];
+ * ```
+ */
 type lineChartData = {
   name: string;
   feature: number;
 }[];
 
 
+/**
+ * Renders a temporal line chart linked to the Vis. Interface's spatial selection.
+ *
+ * @param props - Chart configuration including dataset URL and optional Y domain.
+ * @returns A responsive time-series chart with loading and error feedback.
+ *
+ * @remarks Fetches data and localized metadata through `useGetJSONData`.
+ * Selected grid cell, country, and filter mode come from `InterfaceContext`;
+ * a card-level loading task tracks the asynchronous queries.
+ */
 const LinkedLinechartComponent = ({chartProps}: {chartProps: LinechartProps}) => {
 
   let t = chartProps.translations;
@@ -149,7 +181,7 @@ const LinkedLinechartComponent = ({chartProps}: {chartProps: LinechartProps}) =>
   /********************
   * *** LOAD DATA *** *
   *********************/
-  let collectDataLoadingErrors: string[] = [];
+  let collectDataLoadingErrors: (string | undefined)[] = [];
   const params = useMemo(() => getParamsOfURL(props.dataURL), [props.dataURL]);
   const feature = useMemo(() => params['feature']?.replace(/[_*]/g, ''), [params]);
 
@@ -360,7 +392,8 @@ const [xLabel, yLabel] = useMemo(() => {
 }
 
 
-const ChartHeader = ({ ErrorData, props }: { ErrorData: string[], props: LinechartProps }) => {
+/** Displays linked-chart loading errors and the geographic aggregation selector. */
+const ChartHeader = ({ ErrorData, props }: { ErrorData: (string | undefined)[], props: LinechartProps }) => {
   //const t = useTranslations("common");
   let c = useInterfaceContext();
   let debug = true;
@@ -457,6 +490,15 @@ function getParamsOfURL(url: string) {
 
 
 
+/**
+ * Switches a linked line chart between grid-cell and country-average filtering.
+ *
+ * @param params - Shared interface state and localized chart configuration.
+ * @returns A localized filter-mode selector.
+ *
+ * @remarks Writes `selectedFilter` to `InterfaceContext`, so other linked
+ * views can use the same geographic aggregation mode.
+ */
 const SelectFilterElement = ({ interfacContext, props }: { interfacContext: interfaceContextI, props: LinechartProps }) => {
    let c = interfacContext;
    const locale = useLocale();
@@ -518,6 +560,15 @@ useEffect(() => {
 
 
 
+/**
+ * Chooses the generic or spatially linked line-chart implementation.
+ *
+ * @param props - Chart configuration; `dataMode` selects the implementation.
+ * @returns A generic row-oriented chart or a linked time-series chart.
+ *
+ * @remarks Defaults to `dataMode = "linked"` when omitted. Generic mode uses the relation shared by `ChartDatasetProvider`;
+ * linked mode uses the supplied data URL and `InterfaceContext` selections.
+ */
 const LinechartComponent = ({ chartProps }: { chartProps: LinechartProps }) => {
   if (chartProps.dataMode === "generic") {
     return (

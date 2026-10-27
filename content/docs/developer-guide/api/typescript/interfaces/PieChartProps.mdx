@@ -1,0 +1,144 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: PieChartProps
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Configuration contract for `PieChartComponent`.
+
+## Remarks
+
+The categorical pie chart presents discrete frequency or ratio distributions.
+When `isDummyMode` is `true`, it renders demonstration data with built-in color maps and tooltips.
+When `dataURL` is specified and `isDummyMode` is `false`, it queries the database through `useGetJSONData`
+and registers task execution with `useLoadingTask` for coordinated card spinner rendering.
+
+## Example
+
+```tsx
+import type { PieChartProps } from "@/framework";
+
+const props: PieChartProps = {
+  chartName: "dengue-serotype-distribution",
+  data: [
+    { name: "DENV-1", value: 128 },
+    { name: "DENV-2", value: 94 },
+    { name: "DENV-3", value: 37 },
+  ],
+  locale: "en",
+  isDummyMode: false,
+};
+```
+
+## Properties
+
+### chartName
+
+> **chartName**: `string`
+
+Stable chart/container identifier.
+
+***
+
+### dataURL?
+
+> `optional` **dataURL?**: `string`
+
+Encoded backend database API URL.
+
+#### Default Value
+
+```ts
+""
+```
+
+***
+
+### feature?
+
+> `optional` **feature?**: `string`
+
+Target feature name for data parsing.
+
+#### Default Value
+
+```ts
+""
+```
+
+***
+
+### data?
+
+> `optional` **data?**: `object`[]
+
+Discrete category labels and numeric counts.
+
+#### name
+
+> **name**: `string`
+
+#### value
+
+> **value**: `number`
+
+#### Default Value
+
+```ts
+[]
+```
+
+***
+
+### locale?
+
+> `optional` **locale?**: `string`
+
+Locale used for value formatting.
+
+#### Default Value
+
+```ts
+"en"
+```
+
+***
+
+### translations?
+
+> `optional` **translations?**: `any`
+
+`next-intl` translator for chart labels and tooltips.
+
+***
+
+### isDummyMode?
+
+> `optional` **isDummyMode?**: `boolean`
+
+Uses bundled demonstration data.
+
+#### Default Value
+
+```ts
+false
+```
+
+***
+
+### dataMode?
+
+> `optional` **dataMode?**: `"linked"` \| `"generic"`
+
+Selects the reusable row-oriented chart adapter used by layout templates.
+
+***
+
+### rowLimit?
+
+> `optional` **rowLimit?**: `number` \| `null`
+
+Maximum number of generic dataset rows rendered before truncation.

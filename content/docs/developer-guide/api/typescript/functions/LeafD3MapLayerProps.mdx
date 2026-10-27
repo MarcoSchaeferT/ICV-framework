@@ -1,0 +1,149 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: LeafD3MapLayerProps
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **LeafD3MapLayerProps**(`chartName?`, `mapDataURL?`, `dataURL?`, `mapUIsettings?`, `mapInteractions?`, `mapDataSets?`, `center?`, `zoom?`, `mapStyles?`, `isStaticAutoFitFullSize?`, `isApplySelectionsAndTransitions?`, `isApplyTransitions?`, `isProjection_equirectangular?`, `isSyncMapCoordsOnTheFly_SETTER?`, `isSyncMapCoordsOnTheFly_RECIEVER?`, `isSetContextData?`): [`LeafD3MapLayerProps`](../interfaces/LeafD3MapLayerProps)
+
+Factory function that creates a fully-defaulted LeafD3MapLayerProps
+object.
+
+Every nested settings group is shallow-merged with sensible ICV defaults,
+so callers only need to specify the overrides they care about.
+
+## Parameters
+
+### chartName?
+
+`string` = `"D3mapLayer"`
+
+Unique chart / DOM id.
+
+### mapDataURL?
+
+`string` = `apiRoutes.FETCH_MAP_DATA.WORLD_MAP`
+
+URL for the base GeoJSON boundaries.
+
+### dataURL?
+
+`string`
+
+Optional data-layer URL override.
+
+### mapUIsettings?
+
+`any` = `{}`
+
+Partial UI settings merged onto defaults.
+
+### mapInteractions?
+
+`any` = `{}`
+
+Partial interaction guards merged onto defaults.
+
+### mapDataSets?
+
+`any` = `{}`
+
+Partial data-layer toggles merged onto defaults.
+
+### center?
+
+\[`number`, `number`\] = `...`
+
+Initial `[lat, lng]` viewport centre.
+
+### zoom?
+
+`number` = `2`
+
+Initial zoom level.
+
+### mapStyles?
+
+`any` = `{}`
+
+Partial polygon / background styles merged onto defaults.
+
+### isStaticAutoFitFullSize?
+
+`boolean` = `false`
+
+Auto-fit viewport to GeoJSON bounds on mount.
+
+### isApplySelectionsAndTransitions?
+
+`boolean` = `true`
+
+Subscribe to global `InterfaceContext`.
+
+### isApplyTransitions?
+
+`boolean` = `false`
+
+Enable `flyTo` transitions on selection change.
+
+### isProjection\_equirectangular?
+
+`boolean` = `false`
+
+Use equirectangular projection for distance calcs.
+
+### isSyncMapCoordsOnTheFly\_SETTER?
+
+`boolean` = `false`
+
+Broadcast viewport coords to context.
+
+### isSyncMapCoordsOnTheFly\_RECIEVER?
+
+`boolean` = `false`
+
+Mirror viewport coords from context.
+
+### isSetContextData?
+
+`boolean` = `false`
+
+Seed `InterfaceContext` from this component on mount.
+
+## Returns
+
+[`LeafD3MapLayerProps`](../interfaces/LeafD3MapLayerProps)
+
+A complete, ready-to-render `LeafD3MapLayerProps` object.
+
+## Example
+
+```tsx
+import { apiRoutes, LeafD3MapLayerProps, LeafletGridLayer } from "@/framework";
+
+const props = LeafD3MapLayerProps(
+  "dengue-map",
+  apiRoutes.FETCH_MAP_DATA.WORLD_MAP,
+  undefined,
+  {
+    defaultDatasetName: "dengue_serotype_counts",
+    defaultFeatureName: "country",
+    isSequenceMetaData: true,
+    isSequenceMetaDataChecked: true,
+    defaultDonutSize: 60,
+  },
+  {},
+  { isSequenceMetaData: true },
+  [10.0, 8.0],
+  3,
+);
+
+<LeafletGridLayer props={props} />
+```
+
+## See
+
+LeafD3MapLayerProps (interface)

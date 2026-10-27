@@ -1,0 +1,44 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: LeafletMapProps
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Props for the SSR-safe Leaflet container.
+
+## Example
+
+```tsx
+import type { LeafletMapProps } from "@/framework";
+import { LeafletComponentProps } from "@/framework";
+
+const props: LeafletMapProps = {
+  chartProps: LeafletComponentProps(
+    "berlin-vector-map",
+    "/api/getMapData?mapName=world_map",
+    null,
+    [52.52, 13.405],
+    4,
+  ),
+  children: <></>,
+};
+```
+
+## Properties
+
+### children
+
+> **children**: `ReactNode`
+
+Leaflet layers and controls.
+
+***
+
+### chartProps
+
+> **chartProps**: [`LeafletComponentProps`](LeafletComponentProps)
+
+Map-container configuration.

@@ -1,0 +1,39 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: useWebGLGridLayer
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **useWebGLGridLayer**(`params`): `void`
+
+Adds a WebGL2 grid and country-polygon canvas to a Leaflet map.
+
+## Parameters
+
+### params
+
+[`UseWebGLGridLayerParams`](../interfaces/UseWebGLGridLayerParams)
+
+Leaflet instance, grid data, styling, and interaction callbacks.
+
+## Returns
+
+`void`
+
+Nothing; the hook manages its canvas and listeners through effects.
+
+## Remarks
+
+The canvas is positioned inside Leaflet's container but ignores pointer
+events, leaving gestures under Leaflet's control. It renders grid cells,
+country fills and borders, and optional stencil-based land masking. Map
+movement updates projection state in animation frames; geometry is uploaded
+when relevant inputs change. Country hit testing uses retained polygon rings
+on the CPU, with hover and selection styles rendered by shaders.
+
+WebGL context restoration invalidates every program and buffer. The latest
+inputs are therefore mirrored in refs and replayed into a fresh renderer by
+`hydrateRendererRef`.

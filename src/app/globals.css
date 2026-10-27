@@ -1,4 +1,11 @@
 @import 'tailwindcss';
+@import 'fumadocs-ui/css/emerald.css';
+@import 'fumadocs-ui/css/preset.css';
+
+@source '../../node_modules/fumadocs-ui/dist/**/*.js';
+@source '../../content/**/*.{md,mdx}';
+@source '../../messages/**/*.{js,ts,jsx,tsx,md,mdx}';
+
 /* Import Leaflet CSS for map styling */
 @import 'leaflet/dist/leaflet.css';
 
@@ -42,11 +49,13 @@
 }
 
 @plugin "tailwindcss-animate";
-@plugin "@tailwindcss/typography";
+
+@plugin "@tailwindcss/typography" {
+  className: legacy-mdx;
+}
 
 /* ============================================================
    Tailwind v4 — CSS-first theme configuration
-   (replaces tailwind.config.ts theme.extend)
    ============================================================ */
 
 /* Dark mode: class-based (.dark) */
@@ -181,12 +190,26 @@
 */
 @layer base {
 
+  /* FumaDocs' base body rule must not recolor the application shell. */
+  html body {
+    color: var(--color-text-default);
+    background-color: var(--color-surface-default);
+  }
+
   *,
   ::after,
   ::before,
   ::backdrop,
   ::file-selector-button {
     border-color: var(--color-gray-200, currentColor);
+  }
+
+  /* FumaDocs' neutral palette is inherited only inside the portal. */
+  .fumadocs-portal,
+  .fumadocs-portal *,
+  .fumadocs-portal ::before,
+  .fumadocs-portal ::after {
+    border-color: var(--color-fd-border, currentColor);
   }
 }
 
@@ -262,10 +285,27 @@ body {
   --github-alert-important-color: #8250df;
   --github-alert-warning-color: #bf8700;
   --github-alert-caution-color: #cf222e;
+  --github-alert-info-color: #0969da;
+  --github-alert-danger-color: #cf222e;
+  --github-alert-error-color: #cf222e;
+  --github-alert-success-color: #2da44e;
 
   padding: 0.5rem 1rem;
   margin-bottom: 16px;
   border-left: 0.25em solid var(--github-alert-default-color);
+}
+
+.dark .markdown-alert {
+  --github-alert-default-color: #8b949e;
+  --github-alert-note-color: #2f81f7;
+  --github-alert-tip-color: #3fb950;
+  --github-alert-important-color: #a371f7;
+  --github-alert-warning-color: #d29922;
+  --github-alert-caution-color: #f85149;
+  --github-alert-info-color: #2f81f7;
+  --github-alert-danger-color: #f85149;
+  --github-alert-error-color: #f85149;
+  --github-alert-success-color: #3fb950;
 }
 
 .markdown-alert>:first-child {
@@ -296,10 +336,24 @@ body {
   border-left-color: var(--github-alert-caution-color);
 }
 
+.markdown-alert-info {
+  border-left-color: var(--github-alert-info-color);
+}
+
+.markdown-alert-danger,
+.markdown-alert-error {
+  border-left-color: var(--github-alert-danger-color);
+}
+
+.markdown-alert-success {
+  border-left-color: var(--github-alert-success-color);
+}
+
 .markdown-alert-title {
   display: flex;
   margin-bottom: 4px;
   align-items: center;
+  font-weight: 600;
 }
 
 .markdown-alert-title>svg {
@@ -326,10 +380,82 @@ body {
   color: var(--github-alert-caution-color);
 }
 
+.markdown-alert-info .markdown-alert-title {
+  color: var(--github-alert-info-color);
+}
+
+.markdown-alert-danger .markdown-alert-title,
+.markdown-alert-error .markdown-alert-title {
+  color: var(--github-alert-danger-color);
+}
+
+.markdown-alert-success .markdown-alert-title {
+  color: var(--github-alert-success-color);
+}
+
+/* Keep legacy documentation table text away from the outer table edge. */
+.legacy-mdx :where(th:first-child, td:first-child) {
+  padding-left: 0.875rem;
+}
+
+/* Legacy MDX hover cards use their own surface colors. Fumadocs' global
+   typography table background otherwise clashes with prose-invert text. */
+.legacy-mdx-info-card {
+  --legacy-table-bg: #ffffff;
+  --legacy-table-head-bg: #f1f5f9;
+  --legacy-table-text: #0f172a;
+  --legacy-table-border: #cbd5e1;
+}
+
+.dark .legacy-mdx-info-card {
+  --legacy-table-bg: #0f172a;
+  --legacy-table-head-bg: #1e293b;
+  --legacy-table-text: #f8fafc;
+  --legacy-table-border: #475569;
+}
+
+.legacy-mdx-tooltip {
+  --legacy-table-bg: #111827;
+  --legacy-table-head-bg: #1f2937;
+  --legacy-table-text: #f9fafb;
+  --legacy-table-border: #4b5563;
+}
+
+.legacy-mdx-info-card .legacy-mdx,
+.legacy-mdx-tooltip {
+  --tw-prose-body: var(--legacy-table-text);
+  --tw-prose-headings: var(--legacy-table-text);
+  --tw-prose-bold: var(--legacy-table-text);
+  --tw-prose-th-borders: var(--legacy-table-border);
+  --tw-prose-td-borders: var(--legacy-table-border);
+  color: var(--legacy-table-text);
+}
+
+.legacy-mdx-info-card .legacy-mdx :where(table),
+.legacy-mdx-tooltip :where(table) {
+  background: var(--legacy-table-bg);
+  color: var(--legacy-table-text);
+  border-color: var(--legacy-table-border);
+}
+
+.legacy-mdx-info-card .legacy-mdx :where(th),
+.legacy-mdx-tooltip :where(th) {
+  background: var(--legacy-table-head-bg);
+  color: var(--legacy-table-text);
+  border-color: var(--legacy-table-border);
+}
+
+.legacy-mdx-info-card .legacy-mdx :where(td),
+.legacy-mdx-tooltip :where(td) {
+  background: var(--legacy-table-bg);
+  color: var(--legacy-table-text);
+  border-color: var(--legacy-table-border);
+}
+
 /* Reduce line spacing between list items */
 
 
-li {
+.legacy-mdx li {
   margin: 0.1em 0;
   /* reduce gap between items */
   line-height: 1.8;
@@ -337,29 +463,51 @@ li {
 }
 
 /* Style second-level bullets differently */
-ul ul {
+.legacy-mdx ul ul {
   list-style-type: circle;
   /* hollow circle for level 2 */
   margin-top: 0.1em;
   margin-bottom: 0.1em;
 }
 
-ul ul ul {
+.legacy-mdx ul ul ul {
   list-style-type: square;
 
-  /* small square for level 3 */
-  /* Optional: if you want numbered lists to look consistent */
-  ol {
-    list-style-type: decimal;
-  }
+}
 
-  ol ol {
-    list-style-type: lower-alpha;
-    /* a, b, c for nested numbers */
-  }
+.legacy-mdx ol {
+  list-style-type: decimal;
+}
 
+.legacy-mdx ol ol {
+  list-style-type: lower-alpha;
+}
 
+/* FumaDocs uses this offset for its sticky sidebar, header, and table of contents. */
+.fumadocs-portal {
+  --fd-banner-height: 4.5rem;
+}
 
-  background: transparent !important;
-  box-shadow: none !important;
+body:has(.fumadocs-portal) #app-topbar {
+  background-color: var(--fd-portal-surface, var(--color-surface-default));
+}
+
+/* Let the sticky app navigation follow long documentation pages. */
+body:has(.fumadocs-portal) #app-shell {
+  height: auto;
+  min-height: 100dvh;
+}
+
+/* The application footer sits outside the FumaDocs page layout. */
+body:has(.fumadocs-portal) #app-footer {
+  display: none;
+}
+
+.fumadocs-portal :is(h1, h2, h3, h4, h5, h6)[id] {
+  scroll-margin-top: calc(var(--fd-docs-row-3, var(--fd-banner-height)) + 1rem);
+}
+
+/* The mobile drawer is fixed to the viewport, outside FumaDocs' sticky rows. */
+.fumadocs-portal #nd-sidebar-mobile {
+  top: var(--fd-banner-height);
 }

@@ -24,7 +24,14 @@ import {
 
 import type { Swapy } from "swapy";
 
-/** Supported chart types that can be dynamically spawned into the sidebar. */
+/**
+ * Supported chart types that can be dynamically spawned into the sidebar.
+ *
+ * @example
+ * ```ts
+ * const dengueView: ChartType = "map";
+ * ```
+ */
 export type ChartType = "line" | "bar" | "pie" | "map";
 
 /** Definition of one dynamically spawned chart instance in the right sidebar. */
@@ -88,7 +95,17 @@ function createRegistryMapProps(chartName: string, datasetName: string) {
   );
 }
 
-/** Props accepted by {@link SidebarRight}. */
+/**
+ * Props accepted by {@link SidebarRight}.
+ *
+ * @example
+ * ```ts
+ * const sidebarProps: SidebarRightProps = {
+ *   pageId: "covid-dashboard",
+ *   defaultOpen: true,
+ * };
+ * ```
+ */
 interface SidebarRightProps {
   /** Page-level prefix to namespace Swapy slot and item IDs. */
   pageId: string;

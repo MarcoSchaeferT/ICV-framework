@@ -1,20 +1,33 @@
-# Use an official PostgreSQL image as the base
-FROM postgres:17.5-alpine
+# Keep production pinned while allowing a same-major rollback image to be
+# built explicitly with --build-arg POSTGRES_VERSION=17.5.
+ARG POSTGRES_VERSION=17.11
+FROM postgres:${POSTGRES_VERSION}-alpine
 
 
 # Tag the image
 LABEL org.opencontainers.image.title="icv-database"
-LABEL org.opencontainers.image.description="ICV db"
+LABEL org.opencontainers.image.description="ICV Database"
 LABEL org.opencontainers.image.version="latest"
 LABEL org.opencontainers.image.source="https://github.com/MarcoSchaeferT/ICV-framework"
+
+# Install the repeatable extension/index bootstrap. The official PostgreSQL
+# entrypoint runs it for new volumes; existing volumes can apply it with
+# `npm run db-optimize` after the container has started.
+COPY db/performance.sql /docker-entrypoint-initdb.d/20-performance.sql
 
 # Expose the port that the db will run on
 EXPOSE 5333
 
 # Command to start the db with the desired port and tuned settings for indexing
 CMD ["postgres", "-c", "port=5333", \
+  "-c", "shared_buffers=2GB", \
   "-c", "random_page_cost=1.1", \
-  "-c", "effective_cache_size=1GB", \
-  "-c", "work_mem=64MB", \
-  "-c", "maintenance_work_mem=256MB", \
-  "-c", "effective_io_concurrency=200"]
+  "-c", "effective_cache_size=8GB", \
+  "-c", "work_mem=16MB", \
+  "-c", "maintenance_work_mem=512MB", \
+  "-c", "effective_io_concurrency=200", \
+  "-c", "max_wal_size=2GB", \
+  "-c", "checkpoint_completion_target=0.9", \
+  "-c", "track_io_timing=on", \
+  "-c", "compute_query_id=auto", \
+  "-c", "shared_preload_libraries=pg_stat_statements"]

@@ -7,16 +7,25 @@ import {
     getGridOffset,
     snapToGrid,
     roundLatLng,
+    renderStandardTooltipHTML,
 } from './helpers';
 import {LoadingSpinnerProvider, useLoadingTask, LoadingSpinnerAnimation} from './utils/loadingSpinner';
+import { type metaDataT } from '../MetaDataHandler';
 import {
-    metaDataT,
-} from '../MetaDataHandler';
-import {availableColorMaps, availableColorMapsNames} from './constants';
+    availableColorMaps,
+    availableColorMapsNames,
+    RANGE_LAT,
+    RANGE_LONG,
+    MAX_ZOOM,
+    MIN_ZOOM,
+    ZOOM_STEP,
+    CALCER,
+} from './constants';
 import * as d3 from 'd3';
-import {useInterfaceContext} from '@/components/contexts/InterfaceContext';
+import { useInterfaceContext } from '@/components/contexts/InterfaceContext';
 import { apiRoutes } from '@/app/api_routes';
-import { PrintDataLoadingErrors, handleLoadDataError } from '@/app/helpers';
+import { aggregateRKI } from '@/app/api_commands';
+import stateMappersGermany, { PrintDataLoadingErrors, handleLoadDataError } from '@/app/helpers';
 import { useGetJSONData, clearDataCache } from '@/app/hooks/useFetchAndCache';
 import SizeHook from '@/app/hooks/useResizeObserver';
 import {
@@ -29,13 +38,11 @@ import {
     SelectValue,
   } from "@/components/ui/select";
 import { useLocale ,useTranslations } from "next-intl";
-import { t_richConfig, dbDATA } from '@/app/const_store';
+import { t_richConfig, type dbDATA } from '@/app/const_store';
 import { Locale } from '@/i18n/routing';
 import useChartResizer from '@/app/hooks/useChartResizer';
-import { renderStandardTooltipHTML } from './helpers';
 
-import stateMappersGermany from '@/app/helpers';
-import LeafletMapComponent, {LeafletComponentProps} from './BaseMap';
+import LeafletMapComponent, { LeafletComponentProps } from './BaseMap';
 import { Settings } from 'iconoir-react';
 import ColorMapLegend from './overlays/ColorMapLegend';
 import { format } from "date-fns";
@@ -58,21 +65,21 @@ import {
     useMapDistance,
     useMapTransition,
     useGridDataParser,
-    useCanvasGridLayer,
     useLayerUpdateDebounce,
     useTooltipCleanup,
     useDynamicSettingsTop,
 } from './hooks';
 import { clampCoordinates, resetTimeout, removeReusedTooltip, getParamsOfURL } from './utils/mapUtils';
 import MapContentChild from './MapContentChild';
-import { RANGE_LAT, RANGE_LONG, MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, CALCER } from './constants';
 
 
 
 
-let leafProps = LeafletComponentProps("LeafletMap1", apiRoutes.FETCH_MAP_DATA.GERMANY_MAP_STATES, "exampleVar");
-leafProps.center = [-20, 25.8];
-leafProps.zoom = 1.5;
+const defaultLeafProps = {
+    ...LeafletComponentProps("LeafletMap1", apiRoutes.FETCH_MAP_DATA.GERMANY_MAP_STATES, "exampleVar"),
+    center: [-20, 25.8] as [number, number],
+    zoom: 1.5,
+};
 
 const duration_mapTransition = 1800;
 
@@ -81,9 +88,17 @@ const legendDistanceToMapBorderY = 15;
 
 const defaultColorMap = availableColorMapsNames.interpolateViridis;
 
-// controls if the layer is drawn with canvas or svg
-const isLayerDrawnCanvas = true;
-
+/**
+ * Loads the available report-date range for Germany COVID-19 observations.
+ *
+ * @param selectedTargetDate - Optional selected day used to derive a seven-day lookback.
+ * @returns Loading state, date bounds, calendar limits, and optional lookback range.
+ *
+ * @remarks The `getMinMax` database task runs through `useGetJSONData`.
+ * Calendar bounds fall back to January 2020–January 2023 while the request is
+ * pending or lacks dates; the disabled matcher excludes dates outside the
+ * reported range once it is available.
+ */
 function useDatasetDateBounds(selectedTargetDate?: Date) {
     const [isLoadingDateBounds, rawDateBounds] = useGetJSONData(
         apiRoutes.fetchDbData({
@@ -166,27 +181,20 @@ function useDatasetDateBounds(selectedTargetDate?: Date) {
  *
  * @example
  * ```tsx
- * const germanyConfig: LeafD3MapGermanyProps = {
- *   chartName: "germany-covid-map",
- *   mapDataURL: apiRoutes.FETCH_MAP_DATA.GERMANY_MAP_STATES,
- *   dataURL: "/api/db/getDataFromDB?dataset=germany_covid_cases",
- *   center: [9.7, 52],
- *   zoom: 2,
- *   mapUIsettings: {
- *     isLongitudeSlider: false,
- *     isLatitudeSlider: false,
- *     isZoomSlider: false,
- *     isColorMapSelectionDropdown: true,
- *     isFeatureSelectionDropdown: true,
- *     isDatasetSelectionDropdown: false,
- *     isDistanceLegend: true,
- *     isColorMapLegend: true,
- *     isDatePicker: true,
- *     defaultFeatureName: "cases_per_100k",
- *   },
- *   isApplySelectionsTransition: true,
- *   isStaticAutoFitFullSize: false,
- * };
+ * import { apiRoutes } from "@/app/api_routes";
+ * import { LeafD3MapGermanyProps } from "@/components/plots/maps/LeafD3MapGermanyCovid";
+ *
+ * const germanyConfig: LeafD3MapGermanyProps = LeafD3MapGermanyProps(
+ *   "germany-covid-map",
+ *   apiRoutes.FETCH_MAP_DATA.GERMANY_MAP_STATES,
+ *   apiRoutes.fetchDbData({
+ *     relationName: "aktuell_deutschland_sarscov2_infektionen",
+ *     feature: "accuCasesPerWeek",
+ *   }),
+ *   { defaultFeatureName: "accuCasesPerWeek", isDatePicker: true },
+ *   [52, 9.7],
+ *   6,
+ * );
  * ```
  */
 export interface LeafD3MapGermanyProps {
@@ -196,7 +204,7 @@ export interface LeafD3MapGermanyProps {
     mapDataURL: any;
     /** Dataset URL endpoint for regional COVID-19 metrics */
     dataURL: any;
-    /** Viewport center coordinates `[longitude, latitude]` */
+    /** Viewport center coordinates `[latitude, longitude]` for Leaflet. */
     center: [number, number];
     /** Viewport zoom level */
     zoom: number;
@@ -213,9 +221,13 @@ export interface LeafD3MapGermanyProps {
         isDatePicker?: boolean;
         defaultFeatureName?: string;
     };
+    /** Whether linked selection changes animate the map view. */
     isApplySelectionsTransition: boolean;
+    /** Whether a static render fills the available map container. */
     isStaticAutoFitFullSize: boolean;
+    /** Whether the map uses an equirectangular CRS. */
     isProjection_equirectangular?: boolean;
+    /** Whether the map seeds initial values into linked-view context. */
     isSetIntialContextDataFromComponent?: boolean;
 }
 
@@ -226,7 +238,7 @@ export interface LeafD3MapGermanyProps {
  * @param mapDataURL - German state-boundary GeoJSON endpoint.
  * @param dataURL - Epidemiological dataset endpoint.
  * @param mapUIsettings - Partial overrides for map-control visibility and default feature.
- * @param center - Initial `[longitude, latitude]` center used by the component contract.
+ * @param center - Initial `[latitude, longitude]` center used by Leaflet.
  * @param zoom - Initial Leaflet zoom.
  * @param mapBaseColor - Legacy base-color argument retained for compatibility.
  * @param isStaticAutoFitFullSize - Fits static rendering to the complete available container.
@@ -235,13 +247,9 @@ export interface LeafD3MapGermanyProps {
  * @param isSetContextData - Seeds linked-view context values from this map.
  * @returns A configuration accepted by `LeafD3MapGermanyComponent`.
  *
- * @default chartName "D3mapLayer"
- * @default center [9.7, 52]
- * @default zoom 2
- * @default isStaticAutoFitFullSize false
- * @default isApplySelectionsAndTransitions false
- * @default isProjection_equirectangular false
- * @default isSetContextData false
+ * @remarks The factory currently defaults `center` to `[9.7, 52]`, which is
+ * outside Germany in Leaflet's latitude-first order. Germany Vis. Interfaces
+ * should pass an explicit center such as `[52, 9.7]`.
  */
 export function LeafD3MapGermanyProps(
     chartName = "D3mapLayer",
@@ -250,7 +258,7 @@ export function LeafD3MapGermanyProps(
     mapUIsettings: any = {},
     center: [number, number] = [9.7, 52],
     zoom = 2,
-    mapBaseColor?: any,
+    _mapBaseColor?: any,
     isStaticAutoFitFullSize = false,
     isApplySelectionsAndTransitions = false,
     isProjection_equirectangular = false,
@@ -283,12 +291,25 @@ export function LeafD3MapGermanyProps(
 }
 
 
+/**
+ * Composes the Germany COVID-19 Leaflet map and linked epidemiological layers.
+ *
+ * @param props - Fully defaulted Germany map configuration.
+ * @returns The map body, temporal controls, and data-layer overlays.
+ *
+ * @remarks Reads shared selections from `InterfaceContext`; date bounds and
+ * spatial data arrive through `useGetJSONData`. The outer component supplies
+ * a card-local loading provider before rendering this body.
+ */
 const LeafD3MapGermanyComponentInner = ({props}: {props: LeafD3MapGermanyProps}) => {
   
     let c = useInterfaceContext();
-    leafProps.zoom = props.zoom;
-    leafProps.center = props.center;
-    leafProps.isProjection_equirectangular = props.isProjection_equirectangular;
+    const leafProps = {
+        ...defaultLeafProps,
+        zoom: props.zoom,
+        center: props.center,
+        isProjection_equirectangular: props.isProjection_equirectangular,
+    };
 
     const URLparams = useMemo(() => getParamsOfURL(props.dataURL), [props.dataURL]);
 
@@ -320,15 +341,6 @@ const LeafD3MapGermanyComponentInner = ({props}: {props: LeafD3MapGermanyProps})
             posX: mapSvgWidth - colMapWidth - legendDistanceToMapBorderX,
             posY: mapSvgHeight - colMapHeight - legendDistanceToMapBorderY
         };
-    // distance legend
-        const scaleLegHeight = 35;
-        const scaleLegWidth = 200;
-        const scaleLegDims = {
-            width: scaleLegWidth,
-            height: scaleLegHeight,
-            posX: legendDistanceToMapBorderX,
-            posY: legendDistanceToMapBorderY
-        };
 
 
     // initialize component variables
@@ -338,42 +350,38 @@ const LeafD3MapGermanyComponentInner = ({props}: {props: LeafD3MapGermanyProps})
     
    const mapUIsettings = { ...props.mapUIsettings };
 
-    /** Render-ready German administrative geometry and active epidemiological value. */
-    type visDataT = {
-        geometry?: [number, number][];
-        topLeft?: [number, number];
-        bounds?: [number, number, number, number];
-        corners?: [number, number, number, number, number, number, number, number];
-        feature: number;
-        visDatIdx?: number;
-        rowID?: number;
-    }
-
-
     // *** useState *** //
     const [[latitude, longitude, zoom], setCoordinates] = useState<[number, number, number]>(
         [leafProps.center?.[0] ?? 0, leafProps.center?.[1] ?? 0, leafProps.zoom ?? 1]
     );
     const [isUpdate, setisUpdate] = useState(false);
-    const [isMouseEvent, setIsMouseEvent] = useState(false);
     const curMouseEvent = useRef<string>("null");
     const screenDistanceOneKM = useRef<number>(0);
-    const [selectedDataset, setSelectedDataset] = useState<string>("");
-    const [curColorMapType, setColorMapType] = useState<string>(defaultColorMap);
-    const [layerOpacity, setLayerOpacity] = useState(1.0);
-    const [visData, setVisData] = useState<Map<number, visDataT>>(new Map<number, visDataT>());
-    const [selectedFeature, setSelectedFeature] = useState<string>(props.mapUIsettings.defaultFeatureName || "")
+    const initialDataset = props.dataURL && props.mapUIsettings.defaultFeatureName && URLparams["relationName"]
+        ? apiRoutes.fetchDbData({
+            relationName: URLparams["relationName"],
+            feature: props.mapUIsettings.defaultFeatureName,
+        })
+        : props.dataURL || "";
+    const [localSelectedDataset, setSelectedDataset] = useState(initialDataset);
+    const [localColorMapType, setColorMapType] = useState<string>(defaultColorMap);
+    const [localLayerOpacity, setLayerOpacity] = useState(1.0);
+    const [localSelectedFeature, setSelectedFeature] = useState<string>(props.mapUIsettings.defaultFeatureName || "")
+    const selectedDataset = props.isApplySelectionsTransition && contextT.curDatasetURL
+        ? contextT.curDatasetURL : localSelectedDataset;
+    const curColorMapType = props.isApplySelectionsTransition
+        ? contextT.curColorMap : localColorMapType;
+    const layerOpacity = props.isApplySelectionsTransition
+        ? contextT.curLayerOpacity : localLayerOpacity;
     const [selectedTargetDate, setSelectedTargetDate] = useState<Date | undefined>(undefined);
     const [isAggregating, setIsAggregating] = useState<boolean>(false);
-    console.log("tmp selectedFeature",selectedFeature)
-    const curDatasetname = useRef<string>("");
+    const curDatasetname = useRef<string>(URLparams["relationName"] || "");
     const curPropertyNames = useRef<string>("");
     const curGridCell = useRef<[number, number]>([0, 0]);
     const curGridCellFeature = useRef<number>(0);
     const curGridCellID = useRef<number>(0);
     const hoverCountry = useRef<string>("0");
     const toolTipRef = useRef<any>(null);
-    const UIcntRef = useRef<number>(0);
     const isHoverCountry = useRef<boolean>(false);
     const activeLayerRef = useRef<L.Path | null>(null);
     const gridcellSizeLatLng = useRef<{ lng: number; lat: number }>({ lng: 0, lat: 0 });
@@ -388,6 +396,13 @@ const LeafD3MapGermanyComponentInner = ({props}: {props: LeafD3MapGermanyProps})
     const [isLoading_MosquitoData, rawMosquitoData] = useGetJSONData(selectedDataset);  
     const [isLoadingDatalist, dataList] = useGetJSONData(apiRoutes.GET_LIST_OF_DATASETS)
     const [isLoading_Metadata, rawMetaData] = useGetJSONData(apiRoutes.getDatasetsMetadata({ LANGID: locale }));
+    const mosquitoData = rawMosquitoData as unknown as dbDATA;
+    const inferredFeature = !isLoading_MosquitoData && mosquitoData.response && mosquitoData.error === null
+        ? mosquitoData.header[Math.ceil(mosquitoData.header.length / 2) - 1] || ""
+        : "";
+    const selectedFeature = props.isApplySelectionsTransition && contextT.curDatasetURL
+        ? (contextT.curFeature || inferredFeature)
+        : (localSelectedFeature || inferredFeature);
     
     // Date bounds, month limits, and lookback range from dedicated hook
     const {
@@ -400,11 +415,6 @@ const LeafD3MapGermanyComponentInner = ({props}: {props: LeafD3MapGermanyProps})
     /** Available database relations keyed by their backend-provided label. */
     type dataListT = {
         [key: string]: string
-    }
-    /** Minimal geometry/feature row consumed by the legacy map parsing block. */
-    type MosquitoDataRowT = {
-        geometry: string
-        feature: string
     }
   
 
@@ -425,37 +435,14 @@ const LeafD3MapGermanyComponentInner = ({props}: {props: LeafD3MapGermanyProps})
 
 
 
-    useEffect(() => {
-        if(props.isApplySelectionsTransition) {
-            L_contextSync.start();
-
-            if(curColorMapType != contextT.curColorMap){
-                
-                setColorMapType(contextT.curColorMap);
-            }
-            if(curDatasetname.current != contextT.curDatasetURL && contextT.curDatasetURL != ""){
-                setSelectedDataset(contextT.curDatasetURL);
-            }
-            if(layerOpacity != contextT.curLayerOpacity){
-                
-                setTimeout(() => {
-                    setLayerOpacity(contextT.curLayerOpacity);
-                }, 50);
-            }
-            
-                setSelectedFeature(contextT.curFeature);
-                //console.log("selectedFeature2:", contextT.curFeature);
-            
-        }
-    }, [contextT.curColorMap, contextT.curDatasetURL, contextT.curLayerOpacity, contextT.curFeature]);
-
+    const { setCurDatasetURL, setCurFeature, setCurColorMap, setCurLayerOpacity } = contextT;
     // if isSetIntialContextDataFromComponent is true set context values from component
     useEffect(() => {
         if (props.isSetIntialContextDataFromComponent === true) {
-            contextT.setCurDatasetURL(selectedDataset);
-            contextT.setCurFeature(selectedFeature);
-            contextT.setCurColorMap(curColorMapType);
-            contextT.setCurLayerOpacity(layerOpacity);
+            setCurDatasetURL(selectedDataset);
+            setCurFeature(selectedFeature);
+            setCurColorMap(curColorMapType);
+            setCurLayerOpacity(layerOpacity);
             console.log("SET context from Germany component:", {
                 selectedDataset,
                 selectedFeature,
@@ -463,7 +450,7 @@ const LeafD3MapGermanyComponentInner = ({props}: {props: LeafD3MapGermanyProps})
                 layerOpacity,
             });
         }
-    }, [props.isSetIntialContextDataFromComponent, selectedDataset, selectedFeature, curColorMapType]);
+    }, [props.isSetIntialContextDataFromComponent, selectedDataset, selectedFeature, curColorMapType, layerOpacity, setCurDatasetURL, setCurFeature, setCurColorMap, setCurLayerOpacity]);
 
     const metaData = rawMetaData as unknown as metaDataT;
     let dataTableContext = useInterfaceContext();
@@ -474,24 +461,6 @@ const LeafD3MapGermanyComponentInner = ({props}: {props: LeafD3MapGermanyProps})
             acc[key] = listOfDataSets[key];
             return acc;
         }, {} as dataListT);
-    if(!isLoadingDatalist &&  selectedDataset === "") {
-        //console.log("dataList:", dataList);
-        
-        curDatasetname.current = URLparams["relationName"];
-        let initialURL = props.dataURL;
-        if (props.mapUIsettings.defaultFeatureName) {
-            initialURL = apiRoutes.fetchDbData({
-                relationName: curDatasetname.current,
-                feature: props.mapUIsettings.defaultFeatureName
-            });
-        }
-        setSelectedDataset(initialURL);
-       
-    }
-
-
-    
-    let mosquitoData = rawMosquitoData as unknown as dbDATA;
     collectDataLoadingErrors.push(handleLoadDataError(isLoading_mapData, rawMapData as unknown as dbDATA));
     collectDataLoadingErrors.push(handleLoadDataError(isLoading_MosquitoData, rawMosquitoData as unknown as dbDATA));
     collectDataLoadingErrors.push(handleLoadDataError(isLoadingDatalist, dataList as unknown as dbDATA));
@@ -532,7 +501,6 @@ const LeafD3MapGermanyComponentInner = ({props}: {props: LeafD3MapGermanyProps})
     let mapTime = useRef<ReturnType<typeof setTimeout> | null>(null);
     // ── Loading task hooks (replace old isLoadingSpinner ref) ──
     const L_dataLoading = useLoadingTask('Data');
-    const L_contextSync = useLoadingTask('Context Sync');
     const L_debounceLoading = useLoadingTask('Debounce Render');
     const L_aggregationLoading = useLoadingTask('Aggregating Data');
 
@@ -545,27 +513,20 @@ const LeafD3MapGermanyComponentInner = ({props}: {props: LeafD3MapGermanyProps})
             !isLoadingDatalist &&
             !isLoading_Metadata) {
             L_dataLoading.stop();
-            L_contextSync.stop();
         } else {
             L_dataLoading.start();
         }
-    }, [isLoading_mapData, isLoading_MosquitoData, isLoadingDatalist, isLoading_Metadata, L_dataLoading, L_contextSync]);
+    }, [isLoading_mapData, isLoading_MosquitoData, isLoadingDatalist, isLoading_Metadata, L_dataLoading]);
 
     // ─── Shared hook: parse raw polygon data → Map<gridCellIndex, VisDataT> ───
-    const { gridData: parsedGridData, parseErrors, cellSize: parsedGridCellSize } = useGridDataParser({
+    const { gridData: parsedGridData, parseErrors } = useGridDataParser({
         isLoading: isLoading_MosquitoData,
         rawData: mosquitoData,
         gridcellSizeRef: gridcellSizeLatLng,
     });
 
-    useEffect(() => {
-        if (parsedGridData.size > 0) {
-            setVisData(parsedGridData);
-        }
-        if (parseErrors.length > 0) {
-            parseErrors.forEach(e => collectDataLoadingErrors.push(<div>{e}</div>));
-        }
-    }, [parsedGridData, parseErrors]);   
+    const visData = parsedGridData;
+    parseErrors.forEach((parseError) => collectDataLoadingErrors.push(<div key={parseError}>{parseError}</div>));
  
         // Leaflet init is now handled by useLeafletInit() hook at the top of the component
 
@@ -587,7 +548,7 @@ const LeafD3MapGermanyComponentInner = ({props}: {props: LeafD3MapGermanyProps})
     // remove existing scale bar
    d3.select("#"+id_scaleBar).remove();
    d3.select("#"+id_colorMap).remove();
-}, [dimensions]);
+}, [dimensions, id_scaleBar, id_colorMap]);
 
 
      /************************** */
@@ -610,7 +571,7 @@ useLayerUpdateDebounce({
             map.fitBounds(bounds);
         }
     },
-    deps: [latitude, longitude, zoom, isMouseEvent, rawMosquitoData, curColorMapType, layerOpacity, dimensions, map],
+    deps: [latitude, longitude, zoom, rawMosquitoData, curColorMapType, layerOpacity, dimensions, map],
 });
 
 
@@ -638,10 +599,9 @@ function DrawMapPolygons() {
                
             }
         });
-        let geoLayer: any;
         try {
             if (mapData && !mapData.error && mapData.type) {
-                geoLayer = L.geoJSON(mapData, {
+                L.geoJSON(mapData, {
                 style: (feature: any) => {
                     const country = feature?.properties?.name || "";
                     const curVal = getFeatureValForState(country);
@@ -660,11 +620,13 @@ function DrawMapPolygons() {
                     const country = feature && 'properties' in feature ? feature.properties?.name || "" : "";
 
                         contextT.setMapSelectionObj(feature);
+                        // eslint-disable-next-line react-hooks/refs -- Leaflet invokes this click handler after the effect registers it.
                         curPropertyNames.current = country;
                         let id = stateMappersGermany.Map__State_to_ID(country);
                         c.setSelectedStateID(id);
 
                         // Track and bring active layer to front
+                        // eslint-disable-next-line react-hooks/refs -- Leaflet invokes this click handler after render.
                         activeLayerRef.current = layer as L.Path;
                         (layer as L.Path).bringToFront();
                      
@@ -674,40 +636,10 @@ function DrawMapPolygons() {
                         toolTip();
 
                         function toolTip() {
+                            // eslint-disable-next-line react-hooks/refs -- Tooltip cleanup runs in a Leaflet mouse event.
                             removeAllTooltips();
-
-                            let unit = "";
-                            let number: any = "";
-                            if (Number.isNaN(curGridCellFeature.current)) {
-                                number = "NA";
-                                unit = "";
-                            } else {
-                                number = Math.round(Number(curGridCellFeature.current));
-                                if (metaData[selectedFeature] != undefined) {
-                                    unit = metaData[selectedFeature].dimension;
-                                }
-                                if (
-                                    metaData[selectedFeature]?.description.includes("precipitation") ||
-                                    metaData[selectedFeature]?.description.includes("Niederschlag")
-                                ) {
-                                    number = Math.round(Number(curGridCellFeature.current) * 1000);
-                                    unit = "mm";
-                                }
-
-                                // round percentage values
-                                if (unit === "%") {
-                                    number = Math.round(Number(curGridCellFeature.current) * 100);
-                                }
-
-                                // convert Kelvin to Celsius
-                                if (unit === "K") {
-                                    number = Math.round(Number(curGridCellFeature.current) - 273.15);
-                                    unit = "°C";
-                                }
-                            }
-
+                            // eslint-disable-next-line react-hooks/refs -- Leaflet invokes this mouse handler after render.
                             toolTipRef.current.setLatLng(event.latlng);
-                           
                         }
 
                         if (feature.properties) {
@@ -757,6 +689,7 @@ function DrawMapPolygons() {
                                 if (el) el.classList.add("leaflet-path-hover");
                                 isHoverCountry.current = true;
                             }
+                            // eslint-disable-next-line react-hooks/refs -- Leaflet invokes this mouse handler after render.
                             hoverCountry.current = feature.properties.name;
                         } else {
                             hoverCountry.current = "";
@@ -796,7 +729,6 @@ function DrawMapPolygons() {
         }
         catch(e) {
             let errorMsg = { ERROR: "ERROR: while retriving geo data." +e};
-            let res = <div>{String(errorMsg['ERROR'])}</div>;
             console.log("Error:", errorMsg);
         };
 
@@ -861,10 +793,12 @@ function MapMouseEvents() {
                 //console.log("mousemove:", event.latlng.lat, event.latlng.lng);
                 function toolTip() {
                    
+                // eslint-disable-next-line react-hooks/refs -- Tooltip cleanup runs in a Leaflet mouse event.
                 removeAllTooltips()
                     
                 let unit = "";
                 let number: any = "";
+                // eslint-disable-next-line react-hooks/refs -- Leaflet invokes this mouse handler after render.
                 if(Number.isNaN(curGridCellFeature.current)) {
                     number = "NA";
                     unit = "";
@@ -917,6 +851,7 @@ function MapMouseEvents() {
                 }
                if (isLoading_MosquitoData) return;
                               const gridCellDims = {
+                                  // eslint-disable-next-line react-hooks/refs -- Leaflet invokes this mouse handler after render.
                                   lat: gridcellSizeLatLng.current.lat,
                                   lng: gridcellSizeLatLng.current.lng,
                               };
@@ -928,7 +863,7 @@ function MapMouseEvents() {
                               let mapVal = visData.entries().next();
                               if (!mapVal || mapVal.done) return; // Ensure visData is not empty
               
-                              const [firstKey, firstVisData] = mapVal.value;
+                              const [, firstVisData] = mapVal.value;
                               const firstTopLeft = firstVisData.corners
                                   ? [
                                       Math.max(firstVisData.corners[0], firstVisData.corners[2], firstVisData.corners[4], firstVisData.corners[6]),
@@ -962,6 +897,7 @@ function MapMouseEvents() {
                               curGridCell.current = [gridLat, gridLng];
                              
                               let curGridCoords = {lat: gridLat, lng: gridLng};
+                              // eslint-disable-next-line react-hooks/refs -- Leaflet invokes this mouse handler after render.
                               curGridCellID.current = getGridCellIndex(curGridCoords, gridCellDims)-1;
                               curGridCellFeature.current = NaN; // Use NaN to indicate an invalid or uninitialized state
                    
@@ -1018,9 +954,6 @@ function MapMouseEvents() {
                 }
                   
             
-                // Convert mouse position to container point
-                const pos = map.latLngToContainerPoint(event.latlng);
-            
                 // Remove previous mouse position circle
                 svg.selectAll("circle").remove();
             
@@ -1032,7 +965,7 @@ function MapMouseEvents() {
                     .attr("fill", "blue");
             };
 
-            const handleMouseClick = (event: L.LeafletMouseEvent) => {
+            const handleMouseClick = () => {
 
 
                 // Handle click event here
@@ -1077,7 +1010,7 @@ function MapMouseEvents() {
             
 
                 
-            map.on("click", (event: L.LeafletMouseEvent) => handleMouseClick(event));
+            map.on("click", handleMouseClick);
             map.on("moveend", handleMouseEvent);
             map.on("zoomend", handleMouseEvent);
             map.on("mousemove", handleMouseMove);
@@ -1227,33 +1160,13 @@ MapMouseEvents();
 
 // resetTimeout is now imported from utils/mapUtils
 
-// ─── Shared hook: canvas grid layer rendering (replaces nested MapDrawLayer) ───
-useCanvasGridLayer({
-    map,
-    L,
-    isUpdate,
-    isLoading: isLoading_MosquitoData || !isLayerDrawnCanvas,
-    hasError: mosquitoData.error != null,
-    gridData: visData,
-    cellSize: parsedGridCellSize,
-    dimensions,
-    colorMap,
-    layerOpacity,
-    transitionDuration: 0,
-    debug: false,
-});
  
     useEffect(() => {
-        // Initialize the selected feature when colNames are available
-        if (mosquitoData.response !== undefined && !isLoading_MosquitoData && mosquitoData.error === null && selectedFeature === "") {
-            let index = Math.ceil(mosquitoData.header.length / 2)-1;
-            const tempSelectedFeature = props.mapUIsettings.defaultFeatureName ? props.mapUIsettings.defaultFeatureName : mosquitoData.header[index];
-            setSelectedFeature(tempSelectedFeature);
-            contextT.setCurFeature(tempSelectedFeature);
-            contextT.setCurDatasetURL(selectedDataset);
-            console.log("tempSelectedFeature", selectedFeature,selectedDataset);
+        if (!localSelectedFeature && inferredFeature) {
+            if (contextT.curFeature !== inferredFeature) contextT.setCurFeature(inferredFeature);
+            if (contextT.curDatasetURL !== selectedDataset) contextT.setCurDatasetURL(selectedDataset);
         }
-      }, [mosquitoData])
+    }, [localSelectedFeature, inferredFeature, selectedDataset, contextT]);
 
     const roundTo = 1;
     const  rounder = Math.pow(10, roundTo);
@@ -1404,7 +1317,7 @@ useCanvasGridLayer({
             <SelectContent>
             <SelectGroup>
                 <SelectLabel></SelectLabel>
-                    {colNames.map((name, index) => {
+                    {colNames.map((_, index) => {
                         const isAvailable = (metaData[colNames[index] as keyof typeof metaData]?.availability === "1" ||  metaData[colNames[index] as keyof typeof metaData]?.availability === undefined) && colNames[index] !== "id";
                         if (isAvailable) {
                             return (
@@ -1443,28 +1356,22 @@ useCanvasGridLayer({
                     selected={selectedTargetDate}
                     onSelect={async (date) => {
                         if (!date) return;
-                        setSelectedTargetDate(date);
                         const formattedDate = format(date, "yyyy-MM-dd");
                         setIsAggregating(true);
                         L_aggregationLoading.start();
                         try {
-                            const res = await fetch(apiRoutes.aggregateRKI({ targetDate: formattedDate }));
-                            if (res.ok) {
-                                // 1. Clear all cached data so components re-fetch fresh results
-                                clearDataCache();
+                            await aggregateRKI({ targetDate: formattedDate });
+                            clearDataCache();
+                            setSelectedTargetDate(date);
+                            contextT.setTargetDate(formattedDate);
 
-                                // 2. Update target date in shared interface context
-                                contextT.setTargetDate(formattedDate);
-
-                                // 3. Update map data URL with targetDate parameter
-                                let baseUrl = apiRoutes.fetchDbData({
-                                    relationName: curDatasetname.current || "aktuell_deutschland_sarscov2_infektionen_aggregated",
-                                    feature: selectedFeature || "accudeaths",
-                                    targetDate: formattedDate
-                                });
-                                setSelectedDataset(baseUrl);
-                                contextT.setCurDatasetURL(baseUrl);
-                            }
+                            const baseUrl = apiRoutes.fetchDbData({
+                                relationName: curDatasetname.current || "aktuell_deutschland_sarscov2_infektionen_aggregated",
+                                feature: selectedFeature || "accudeaths",
+                                targetDate: formattedDate
+                            });
+                            setSelectedDataset(baseUrl);
+                            contextT.setCurDatasetURL(baseUrl);
                         } catch (err) {
                             console.error("Error aggregating data for targetDate:", err);
                         } finally {
@@ -1592,6 +1499,20 @@ useCanvasGridLayer({
     );
 };
 
+/**
+ * Wraps the supported Germany COVID-19 Leaflet map in a loading-task provider.
+ *
+ * @param props - Germany map configuration created by {@link LeafD3MapGermanyProps}.
+ * @returns The map with card-scoped asynchronous loading feedback.
+ *
+ * @example
+ * ```tsx
+ * import GermanyCovidMap, { LeafD3MapGermanyProps } from "@/components/plots/maps/LeafD3MapGermanyCovid";
+ * import { InterfaceContextProvider } from "@/components/contexts/InterfaceContext";
+ * const mapProps = LeafD3MapGermanyProps("covid-states");
+ * <InterfaceContextProvider><GermanyCovidMap props={mapProps} /></InterfaceContextProvider>;
+ * ```
+ */
 const LeafD3MapGermanyComponent = ({props}: {props: LeafD3MapGermanyProps}) => {
     return (
         <LoadingSpinnerProvider>

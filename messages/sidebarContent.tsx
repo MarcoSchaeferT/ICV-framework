@@ -3,20 +3,69 @@ import { Droplets, Wind, Bug, X, ArrowDown, Bookmark, LucideProps} from "lucide-
 import { Locale } from "next-intl";
 import {Group} from './navbarContent'
 
+/**
+ * Disease entry shown under a transmission path in the localized sidebar.
+ *
+ * @example
+ * ```ts
+ * import { Group } from "@messages/navbarContent";
+ * import type { DiseaseItemT } from "@messages/sidebarContent";
+ * const dengueHabitatItem: DiseaseItemT = {
+ *   name: "Habitat Suitability (Ae. aegypti, Ae. albopictus)",
+ *   enabled: true,
+ *   group: Group.dengue,
+ * };
+ * ```
+ */
 export interface DiseaseItemT {
+  /** Localized label displayed in the disease list. */
   name: string;
+  /** Whether the destination can be selected. */
   enabled: boolean;
+  /** Optional disease-group identifier shared with navigation. */
   group?: string;
 }
 
+/**
+ * Locale-specific sidebar sections keyed by transmission category.
+ *
+ * @example
+ * ```ts
+ * import { Bug } from "lucide-react";
+ * import type { TransmissionDataT } from "@messages/sidebarContent";
+ * const mosquitoVectors: TransmissionDataT = {
+ *   vector: {
+ *     transmissionPath: "Vector",
+ *     icon: Bug,
+ *     diseases: [{ name: "Habitat Suitability", enabled: true, group: "dengue" }],
+ *   },
+ * };
+ * ```
+ */
 export interface TransmissionDataT {
+  /** Section key such as `air` or `vector`. */
   [key: string]: {
+    /** Localized transmission-path heading. */
     transmissionPath: string;
+    /** React icon component for the sidebar section. */
     icon: React.ElementType;
+    /** Disease destinations offered in this section. */
     diseases: DiseaseItemT[];
   };
 }
 
+/**
+ * German and English transmission-path navigation data.
+ *
+ * @remarks The sidebar uses disease groups to coordinate its selection with
+ * the primary navigation. Disabled entries remain visible as placeholders.
+ *
+ * @example
+ * ```ts
+ * import { transmissionData } from "@messages/sidebarContent";
+ * const englishVectorDiseases = transmissionData.en.vector.diseases;
+ * ```
+ */
 export const transmissionData: Record<Locale, TransmissionDataT> = {
   de: {
     /*

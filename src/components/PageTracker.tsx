@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+// Tracking stores the actual locale-prefixed URL; the i18n wrapper removes the prefix.
+// eslint-disable-next-line no-restricted-imports
 import { usePathname } from "next/navigation";
 
 /**

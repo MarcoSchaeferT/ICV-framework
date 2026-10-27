@@ -29,15 +29,11 @@ export default function DisclaimerDialog() {
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
   useEffect(() => {
-    // Fetch disclaimer status from our API endpoint
-    fetch("/api/disclaimer")
+    fetch("/api/disclaimer", { cache: "no-store" })
       .then((res) => res.json())
       .then((data) => {
-        if (data.showDisclaimer) {
-          const isAccepted = getCookie("icv_disclaimer_accepted");
-          if (isAccepted !== "true") {
-            setIsOpen(true);
-          }
+        if (data.showDisclaimer && getCookie("icv_disclaimer_accepted") !== "true") {
+          setIsOpen(true);
         }
       })
       .catch((err) => console.error("Failed to fetch disclaimer status:", err));

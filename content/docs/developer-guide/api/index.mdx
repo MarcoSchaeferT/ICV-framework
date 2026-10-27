@@ -1,0 +1,16 @@
+---
+title: API reference
+description: Find public TypeScript exports, Python backend modules, and Flask endpoint contracts.
+---
+
+## TypeScript
+
+The [TypeScript API](./typescript) is generated from `src/framework/index.ts`. It lists components, hooks, contexts, types, and helpers available through that barrel. For maps, start with the [Leaflet architecture](../architecture#frontend-ownership), then inspect the exported map component and WebGL overlay contracts.
+
+## Python
+
+The [Python API](./python) is generated from the Python AST and Google-style docstrings across `backend/`. It covers core infrastructure, query routes, the CSV upload pipeline, spatial/UQ processing, and column metadata management.
+
+## REST
+
+The [REST API guide](./rest-api) explains the request boundary, response variants, the Flasgger source files, and where to inspect the live contract.

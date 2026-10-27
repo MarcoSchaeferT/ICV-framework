@@ -1,5 +1,5 @@
 import createNextIntlPlugin from 'next-intl/plugin';
-import createMDX from '@next/mdx'
+import { createMDX } from 'fumadocs-mdx/next';
 
 const withNextIntl = createNextIntlPlugin();
 
@@ -22,49 +22,59 @@ const nextConfig = {
   },
   webpack: (cfg, options) => {
     cfg.module.rules.push({
+      test: /\.glsl$/,
+      type: 'asset/source',
     });
     return cfg;
   },
   /* proxy requests to flask server */
   rewrites: async () => {
+    const backendUrl =
+      process.env.IS_DOCKER === "true"
+        ? "http://icv-backend:5222"
+        : "http://localhost:5222";
     return [
       {
         source: "/api/:path*",
-        destination:
-          process.env.IS_DOCKER === "true"
-            ? "http://icv-backend:5222/api/:path*"
-            : "http://localhost:5222/api/:path*",
+        destination: `${backendUrl}/api/:path*`,
       },
       {
         source: "/api-docs",
-        destination:
-          process.env.IS_DOCKER === "true"
-            ? "http://icv-backend:5222/apidocs"
-            : "http://localhost:5222/apidocs",
+        destination: `${backendUrl}/apidocs/`,
       },
       {
         source: "/api-docs/:path*",
-        destination:
-          process.env.IS_DOCKER === "true"
-            ? "http://icv-backend:5222/apidocs/:path*"
-            : "http://localhost:5222/apidocs/:path*",
+        destination: `${backendUrl}/apidocs/:path*`,
+      },
+      {
+        source: "/apidocs",
+        destination: `${backendUrl}/apidocs/`,
+      },
+      {
+        source: "/apidocs/:path*",
+        destination: `${backendUrl}/apidocs/:path*`,
+      },
+      {
+        source: "/flasgger_static/:path*",
+        destination: `${backendUrl}/flasgger_static/:path*`,
+      },
+      {
+        source: "/apispec_1.json",
+        destination: `${backendUrl}/apispec_1.json`,
       },
     ];
   },
   turbopack: {
     rules: {
-      // Add your custom turbopack rules here
+      '*.glsl': {
+        loaders: ['raw-loader'],
+        as: '*.js',
+      },
     },
   },
 };
 
-const withMDX = createMDX({
-  extension: /\.mdx?$/,
-  options: {
-    remarkPlugins: ['remark-gfm'],
-    //rehypePlugins: ['rehype-katex'],
-  },
-});
+const withMDX = createMDX();
 
 
 export default withNextIntl(withMDX(nextConfig));

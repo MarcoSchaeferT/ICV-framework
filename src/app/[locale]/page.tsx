@@ -1,20 +1,6 @@
 
-import { layoutSizes } from "@/app/const_store";
-import { Link } from "@/i18n/routing";
-import { useTranslations } from "next-intl";
-import { t_richConfig } from "@/app/const_store";
-import { LINK } from '@messages/navbarContent';
-import {
-  TestTube,
-  Axes,
-  MediaImage,
-  MediaImagePlus,
-  Arc3d,
-  Gym,
-  ReportColumns,
-  StatsReport,
-} from "iconoir-react";
-import { routing} from '@/i18n/routing';
+import { layoutSizes, t_richConfig } from "@/app/const_store";
+import { routing } from "@/i18n/routing";
 import ShowcaseGrid from './home/ShowCases';
 import LayoutTemplatesGrid from './home/LayoutTemplates';
 import Image from 'next/image';
@@ -29,7 +15,7 @@ export function generateStaticParams() {
 import { setRequestLocale, getTranslations } from 'next-intl/server';
 
 /**
- * Renders the localized ICV landing page and dashboard showcase navigation.
+ * Renders the localized ICV landing page and Vis. Interface showcase navigation.
  *
  * @param props - Asynchronous locale route parameter.
  * @returns The server-rendered localized home page.
@@ -38,7 +24,6 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   const resolvedParams = await params;
   setRequestLocale(resolvedParams.locale);
   const t = await getTranslations("page_home.pageContent");
-  const subpage_features = await getTranslations("page_home.subpage_features");
 
 
 return (
@@ -108,107 +93,3 @@ return (
 )
 }
 
-
-const Features = () => {
-
-  const subpage_features = useTranslations("page_home.subpage_features");
-  const subpage_features_featureList = useTranslations("page_home.featureList");
-
-  return (
-    <>
-   <div className="mx-auto flex max-w-232 flex-col items-center space-y-4 text-center pt-20">
-            <h2 className="font-heading text-3xl leading-[1.1] sm:text-3xl md:text-4xl     rounded-lg px-4 py-2">
-              {subpage_features.rich('heading', {...t_richConfig})}
-            </h2>
-            <p className="max-w-[85%] leading-normal sm:text-lg sm:leading-7">
-              {subpage_features.rich('subHeading', {...t_richConfig})}
-            </p>
-          </div>
-          <div className="mx-auto grid justify-center gap-4 sm:grid-cols-2 md:max-w-5xl md:grid-cols-3">
-            {/* ...feature cards unchanged... */}
-            <div className="relative overflow-hidden rounded-lg border bg-background p-2">
-              <div className="flex h-[180px] flex-col justify-between rounded-md p-6">
-                <Axes className="h-12 w-12" />
-                <div className="space-y-2">
-                  <h3 className="font-bold">
-                    {subpage_features_featureList.rich('feature1.heading', {...t_richConfig})}
-                  </h3>
-                  <p className="text-sm">
-                    {subpage_features_featureList.rich('feature1.description', {...t_richConfig})}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="relative overflow-hidden rounded-lg border bg-background p-2">
-              <div className="flex h-[180px] flex-col justify-between rounded-md p-6">
-                <ReportColumns className="h-12 w-12" />
-                <div className="space-y-2">
-                  <h3 className="font-bold">
-                    {subpage_features_featureList.rich('feature2.heading', {...t_richConfig})}
-                  </h3>
-                  <p className="text-sm">
-                    {subpage_features_featureList.rich('feature2.description', {...t_richConfig})}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="relative overflow-hidden rounded-lg border bg-background p-2">
-              <div className="flex h-[180px] flex-col justify-between rounded-md p-6">
-                <div className="flex space-x-2">
-                  <MediaImage className="h-12 w-12" />
-                  <Arc3d className="h-12 w-12" />
-                  <MediaImagePlus className="h-12 w-12" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="font-bold">
-                    {subpage_features_featureList.rich('feature3.heading', {...t_richConfig})}
-                  </h3>
-                  <p className="text-sm">
-                    {subpage_features_featureList.rich('feature3.description', {...t_richConfig})}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="relative overflow-hidden rounded-lg border bg-background p-2">
-              <div className="flex h-[180px] flex-col justify-between rounded-md p-6">
-                <Gym className="h-12 w-12" />
-                <div className="space-y-2">
-                  <h3 className="font-bold">
-                    {subpage_features_featureList.rich('feature4.heading', {...t_richConfig})}
-                  </h3>
-                  <p className="text-sm">
-                    {subpage_features_featureList.rich('feature4.description', {...t_richConfig})}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="relative overflow-hidden rounded-lg border bg-background p-2">
-              <div className="flex h-[180px] flex-col justify-between rounded-md p-6">
-                <StatsReport className="h-12 w-12" />
-                <div className="space-y-2">
-                  <h3 className="font-bold">
-                    {subpage_features_featureList.rich('feature5.heading', {...t_richConfig})}
-                  </h3>
-                  <p className="text-sm">
-                    {subpage_features_featureList.rich('feature5.description', {...t_richConfig})}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="relative overflow-hidden rounded-lg border bg-background p-2">
-              <div className="flex h-[180px] flex-col justify-between rounded-md p-6">
-                <TestTube className="h-12 w-12" />
-                <div className="space-y-2">
-                  <h3 className="font-bold">
-                    {subpage_features_featureList.rich('feature6.heading', {...t_richConfig})}
-                  </h3>
-                  <p className="text-sm">
-                    {subpage_features_featureList.rich('feature6.description', {...t_richConfig})}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-  )
-}

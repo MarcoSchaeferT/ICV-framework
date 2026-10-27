@@ -1,12 +1,25 @@
-import React from 'react';
 import * as d3 from 'd3';
 import * as GEOjson from 'geojson';
 
 
-/** A substring filter can contain one value or several alternatives. */
+/**
+ * A substring filter can contain one value or several alternatives.
+ *
+ * @example
+ * ```ts
+ * import type { MapStringFilter } from "@/framework";
+ *
+ * const vectorNames: MapStringFilter = ["albopictus", "aegypti"];
+ * ```
+ */
 export type MapStringFilter = string | string[];
 
-/** Return the non-empty substrings represented by a map filter option. */
+/**
+ * Normalizes an optional string or string array into non-empty filters.
+ *
+ * @param filter - One substring, alternatives, or no filter.
+ * @returns Truthy string values in their original order; an empty array if disabled.
+ */
 export function getActiveStringFilters(filter?: MapStringFilter): string[] {
     const filters = Array.isArray(filter) ? filter : [filter];
     return filters.filter((value): value is string => Boolean(value));
@@ -15,6 +28,12 @@ export function getActiveStringFilters(filter?: MapStringFilter): string[] {
 /**
  * Determines whether a value passes optional include and exclude substring
  * filters. Multiple values in either filter use OR semantics.
+ *
+ * @param value - String to test; matching is case-sensitive.
+ * @param includeFilter - Allowed substrings; omitted or empty values allow all.
+ * @param excludeFilter - Rejected substrings; any match takes precedence.
+ * @returns `true` when no exclusion matches and at least one inclusion matches,
+ * or when the inclusion filter is disabled.
  */
 export function passesStringFilters(
     value: string,
@@ -68,12 +87,15 @@ export function isDatasetIncluded(
  * Computes the minimum and maximum feature numerical values across a dataset array.
  *
  * @param data - Array of dataset objects containing numerical `feature` properties.
- * @returns A tuple `[min, max]` representing numerical bounds.
+ * @returns `[min, max]`; empty input returns `[0, 0]`, and a constant
+ * dataset uses zero as its lower bound.
  *
  * @see {@link ColorMapLegend} for color scale domain calculation.
  *
  * @example
  * ```ts
+ * import { getMinMaxFeature } from "@/framework";
+ *
  * const [min, max] = getMinMaxFeature([{ feature: 0.12 }, { feature: 0.89 }]);
  * // Returns [0.12, 0.89]
  * ```
@@ -117,10 +139,11 @@ export function getGridOffset(latGeometryTopLeft: number, lngGeometryTopLeft: nu
 /**
  * Snaps latitude and longitude coordinates to top-left corner bounds of a spatial grid cell.
  *
- * @param coords - Target coordinate pair `{ lat, lng }`.
+ * @param coords - Target coordinate pair `{ lat, lng }`. The function subtracts
+ * the grid offset from this object in place.
  * @param gridCellDims - Grid cell dimensions `{ lat, lng }`.
  * @param gridOffset - Optional offset displacement `{ lat, lng }`.
- * @returns Object containing `topLeft` snapped coordinate pair.
+ * @returns North-west `topLeft` and cell `center` coordinate pairs.
  */
 export function snapToGrid(coords:{lat: number, lng: number}, gridCellDims:{lat:number, lng: number}, gridOffset?:{lat:number, lng: number}) : {topLeft: {lat: number, lng: number}, center: {lat: number, lng: number}} {
 
@@ -142,19 +165,21 @@ export function snapToGrid(coords:{lat: number, lng: number}, gridCellDims:{lat:
 }
 
 /**
- * Computes a unique 2D spatial grid cell integer index key for fast map lookup and 2.0-degree spatial bucket indexing.
+ * Computes a 2D integer grid-cell key from a point and angular cell dimensions.
  *
- * Maps continuous 2D coordinates ($\text{lat} \in [-90, +90], \text{lng} \in [-180, +180]$) into discrete integer cell keys ($a \cdot \text{rowCnt} + b$).
+ * Snaps the point to the cell's north-west corner, then combines its grid
+ * column and row into one key. The supplied `coords` object is modified by
+ * {@link snapToGrid}.
  *
  * @param coords - Geographical point coordinates `{ lat, lng }`.
  * @param gridCellDims - Angular cell width and height `{ lat, lng }`.
  * @returns Unique integer grid cell index key.
  *
  * @remarks
- * Used by spatial spatial bucket indexing inside {@link useGridLayer} to accelerate tile collision queries ($O(1)$ lookup).
+ * Used by spatial bucket indexing to accelerate collision queries ($O(1)$ lookup).
  *
  * @see {@link useGridDataParser} for populating spatial cell maps.
- * @see {@link useGridLayer} for tile canvas rendering using cell index lookups.
+ * @see {@link useWebGLGridLayer} for raster grid rendering using cell index lookups.
  *
  * @example
  * ```ts
@@ -179,8 +204,8 @@ export function getGridCellIndex(coords:{lat: number, lng: number}, gridCellDims
  * Rounds latitude and longitude coordinates to a specified decimal precision.
  *
  * @param point - Geographical coordinate point `{ lat, lng }`.
- * @param roundTo - Decimal places precision. @default 2
- * @returns Rounded coordinate point `{ lat, lng }`.
+ * @param roundTo - Decimal places precision (defaults to `2`).
+ * @returns New coordinate object `{ lat, lng }` rounded to `roundTo` decimal places.
  */
 export function roundLatLng(point: { lat: number; lng: number }, roundTo: number = 2): { lat: number; lng: number } {
 
@@ -199,7 +224,9 @@ export function roundLatLng(point: { lat: number; lng: number }, roundTo: number
  * Swaps standard WGS84 (EPSG:4326) `[lng, lat]` order to Leaflet-compatible `[lat, lng]` pairs.
  *
  * @param polygonString - WKT polygon string representation from database payload.
- * @returns Array of 5 closed `[latitude, longitude]` coordinate tuples.
+ * @returns Parsed `[latitude, longitude]` pairs in source order, rounded to
+ * two decimal places, or five `[0, 0]` sentinel tuples if `polygonString` is `undefined`.
+ * The function does not validate polygon closure or size.
  *
  * @see {@link useGridDataParser} for spatial dataset parsing.
  *
@@ -231,8 +258,10 @@ export function polygonParser(polygonString: string): [number, number][] {
 /**
  * Parses WKT `"POINT (...)"` strings into a single `[latitude, longitude]` tuple.
  *
- * @param polygonString - WKT point string.
- * @returns `[latitude, longitude]` tuple.
+ * Swaps WGS84 `[lng, lat]` coordinate order to `[lat, lng]` and rounds to two decimal places.
+ *
+ * @param polygonString - WKT point string (e.g. `"POINT (13.405 52.52)"`).
+ * @returns `[latitude, longitude]` tuple, or `[0, 0]` if `polygonString` is `undefined`.
  */
 export function pointParser(polygonString: string): [number, number] {
     
@@ -255,10 +284,10 @@ export function pointParser(polygonString: string): [number, number] {
 }
 
 /**
- * Computes angular cell height ($\Delta\text{lat}$) and width ($\Delta\text{lng}$) in degrees from a polygon boundary rectangle.
+ * Computes angular cell height and width in degrees from polygon bounds.
  *
- * @param geoRect - Closed array of boundary coordinate tuples.
- * @returns Object `{ gridDimLat, gridDimLng }` in degrees.
+ * @param geoRect - Closed array of `[lat, lng]` boundary coordinate tuples.
+ * @returns Object `{ gridDimLat, gridDimLng }` in degrees, or `{ gridDimLat: 0, gridDimLng: 0 }` when `geoRect` is empty.
  *
  * @see {@link useGridDataParser}
  */
@@ -277,10 +306,10 @@ export function getGridCellDims(geoRect: [number, number][]): { gridDimLat: numb
 }
 
 /**
- * Calculates geographical centroid coordinates `[lat, lng]` of a polygon coordinate array.
+ * Calculates the arithmetic mean coordinates `[lat, lng]` of a polygon vertex array.
  *
- * @param geometry - Array of `[lat, lng]` tuples.
- * @returns `[avgLat, avgLng]` centroid coordinate pair.
+ * @param geometry - Non-empty array of `[lat, lng]` vertex tuples.
+ * @returns `[avgLat, avgLng]` centroid coordinate pair (or `[NaN, NaN]` when `geometry` is empty).
  */
 export function getGeometryCenter (geometry: [number, number][]) {
 
@@ -299,11 +328,13 @@ export function getGeometryCenter (geometry: [number, number][]) {
 /**
  * Resolves center coordinates `{ lat, lng }` of an administrative country feature from a GeoJSON FeatureCollection.
  *
- * Uses property matching, fuzzy alias normalization (`normalizeCountryName`), and geometric centroid fallback calculation.
+ * Uses property matching (`admin`, `name`, `NAME`, `iso_a3`, `iso_a2`), fuzzy alias normalization
+ * (`normalizeCountryName`), and substring fallback. Prefers explicit `label_y` / `label_x` feature
+ * properties over geometric vertex averaging when present.
  *
  * @param mapData - World GeoJSON FeatureCollection instance.
  * @param countryName - ISO code or country name string to locate.
- * @returns Center point `{ lat, lng }`.
+ * @returns Center point `{ lat, lng }`, or `{ lat: 0, lng: 0 }` when `countryName` is empty or not found.
  */
 export function getCountryCenterFromMapData(mapData: GEOjson.FeatureCollection, countryName: string ): { lat: number, lng: number } {
     let curCenter = { lat: 0, lng: 0 };
@@ -441,9 +472,11 @@ function normalizeCountryName(name: any): string {
 }
 
 /**
- * Calculates high-contrast text color (black or white) for a background color to satisfy WCAG AA contrast standards.
+ * Chooses black or white text from a simple background-brightness threshold.
  *
- * Uses WCAG 2.0 relative luminance formula ($\text{Luminance} = 0.2126 R + 0.7152 G + 0.0722 B$). Returns black for light backgrounds ($\text{luminance} > 0.6$) and white for dark backgrounds.
+ * Uses a weighted average of RGB channels. Backgrounds above 0.6 choose
+ * black; darker or missing backgrounds choose white. This heuristic does not
+ * calculate WCAG contrast ratios or guarantee an accessibility threshold.
  *
  * @param bgColor - D3 RGB or HSL color object.
  * @returns High-contrast D3 RGB color object (`#000000` or `#ffffff`).
@@ -462,58 +495,6 @@ export function getContrastTextColorForBgColor(bgColor: d3.RGBColor | d3.HSLColo
     return textColor;
 }
 
-/**
- * Generates an ocean masking polygon FeatureCollection by subtracting landmass feature polygons from a world bounding box.
- *
- * @param mapData - Landmass GeoJSON FeatureCollection.
- * @returns Mask FeatureCollection containing inverted ocean polygons.
- */
-export function getOceanMaskGeoJSON(mapData: GEOjson.FeatureCollection): GEOjson.FeatureCollection {
-    // 1. Create a world bounding box polygon that covers the full extent
-    const worldOuterRing = [
-        [-180, 90],
-        [180, 90],
-        [180, -90],
-        [-180, -90],
-        [-180, 90]
-    ];
-
-    const holes: number[][][] = [];
-
-    // 2. Add all outer rings of countries as holes in the world polygon
-    mapData.features.forEach((feature) => {
-        if (!feature.geometry) return;
-        
-        if (feature.geometry.type === 'Polygon') {
-            if (feature.geometry.coordinates.length > 0) {
-                // GeoJSON Polygon coordinates: [outer_ring, hole_ring_1, hole_ring_2, ...]
-                holes.push(feature.geometry.coordinates[0]);
-            }
-        } else if (feature.geometry.type === 'MultiPolygon') {
-            feature.geometry.coordinates.forEach((poly) => {
-                if (poly.length > 0) {
-                    holes.push(poly[0]);
-                }
-            });
-        }
-    });
-
-    const oceanFeature: GEOjson.Feature = {
-        type: "Feature",
-        properties: {
-            name: "OceanMask",
-        },
-        geometry: {
-            type: "Polygon",
-            coordinates: [worldOuterRing, ...holes]
-        }
-    };
-
-    return {
-        type: "FeatureCollection",
-        features: [oceanFeature]
-    };
-}
 
 
 
@@ -548,6 +529,8 @@ export function getGoodReadableRange(dataMin: number, dataMax: number): [number,
  *
  * @example
  * ```ts
+ * import type { StandardTooltipRow } from "@/framework";
+ *
  * const speciesRow: StandardTooltipRow = { label: "Species", value: "Aedes albopictus" };
  * ```
  */
@@ -558,7 +541,21 @@ export interface StandardTooltipRow {
     value: string | number;
 }
 
-/** Optional second metric rendered below the primary tooltip value. */
+/**
+ * Optional second metric rendered below the primary tooltip value.
+ *
+ * @example
+ * ```ts
+ * import type { StandardTooltipSection } from "@/framework";
+ *
+ * const habitatProbability: StandardTooltipSection = {
+ *   label: "Aedes albopictus suitability",
+ *   value: 0.42,
+ *   unit: "probability",
+ *   description: "SEAS5 forecast for August 2026",
+ * };
+ * ```
+ */
 export interface StandardTooltipSection {
     /** Short heading identifying the metric or selected field. */
     label?: string;
@@ -575,6 +572,8 @@ export interface StandardTooltipSection {
  *
  * @example
  * ```ts
+ * import type { StandardTooltipProps } from "@/framework";
+ *
  * const tooltip: StandardTooltipProps = {
  *   value: 0.73,
  *   unit: "probability",
@@ -585,13 +584,13 @@ export interface StandardTooltipSection {
  * ```
  */
 export interface StandardTooltipProps {
-    /** Use reduced width, spacing, and typography for compact chart cards. */
+    /** Use reduced width, spacing, and typography for compact chart cards. @defaultValue false */
     compact?: boolean;
     /** Short heading identifying the primary metric or selected field. */
     valueLabel?: string;
     /** Inspected primary numerical or string feature value */
     value: string | number;
-    /** Physical dimension unit string (e.g. "°C", "mm", "%") */
+    /** Physical dimension unit string (e.g. "°C", "mm", "%"). @defaultValue "" */
     unit?: string;
     /** Variable description text */
     description?: string;
@@ -599,7 +598,7 @@ export interface StandardTooltipProps {
     rows: StandardTooltipRow[];
     /** Optional metric displayed below the primary value using identical styling. */
     secondarySection?: StandardTooltipSection;
-    /** DOM container element ID */
+    /** DOM container element ID. @defaultValue "tooltip" */
     chartId?: string;
     /** Optional HTML snippet for color bar previews */
     colorBarHtml?: string;
@@ -610,6 +609,10 @@ export interface StandardTooltipProps {
  *
  * @param props - Configuration matching {@link StandardTooltipProps}.
  * @returns HTML string representation.
+ * @remarks Values, labels, descriptions, `chartId`, and `colorBarHtml` are
+ * interpolated as raw HTML. Escape untrusted content before calling this
+ * function; the React {@link StandardTooltip} component is preferable for
+ * plain text values.
  */
 export function renderStandardTooltipHTML({
     compact = false,
@@ -689,9 +692,14 @@ export function renderStandardTooltipHTML({
 }
 
 /**
- * Standardized React component for map tooltips.
+ * Standardized React component for map and chart tooltips.
  *
  * @param props - Configuration matching {@link StandardTooltipProps}.
+ * @returns A styled tooltip card rendering the primary metric, optional secondary metric, and key-value attribute table.
+ *
+ * @remarks
+ * Text fields (`value`, `description`, `rows`) are rendered safely as React text nodes, whereas
+ * `colorBarHtml` is injected via `dangerouslySetInnerHTML` and must only contain trusted markup.
  */
 export function StandardTooltip({
     compact = false,

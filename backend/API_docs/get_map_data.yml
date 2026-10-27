@@ -23,12 +23,26 @@ responses:
       type: object
       description: GeoJSON FeatureCollection
   400:
-    description: Map name missing or invalid
+    description: Missing mapName.
     schema:
-      type: string
-      example: "ERROR: No mapName provided!"
+      type: object
+      properties:
+        error:
+          type: string
+          example: "ERROR: No mapName provided!"
+  404:
+    description: Unknown mapName.
+    schema:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "ERROR: Map 'unknown' not found!"
   500:
     description: Internal server error reading map data
     schema:
-      type: string
-      example: "ERROR reading map data for germany_map_states: ..."
+      type: object
+      properties:
+        error:
+          type: string
+          example: "ERROR reading map data for germany_map_states: ..."

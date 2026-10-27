@@ -10,11 +10,11 @@ export const consts: { [key: string]: string } =
 
 
 /**
- * Pixel and grid-unit measurements shared by the responsive dashboard shell.
+ * Pixel and grid-unit measurements shared by the responsive Vis. Interface shell.
  *
  * @example
  * ```ts
- * const compactDashboard: LayoutSizesT = {
+ * const compactVisInterface: LayoutSizesT = {
  *   rowSpanSize: 8.5,
  *   gapSize: 20,
  *   leftSidebarWidth: 40,
@@ -24,9 +24,9 @@ export const consts: { [key: string]: string } =
  * ```
  */
 export type LayoutSizesT = {
-    /** Height represented by one dashboard grid row. */
+    /** Height represented by one Vis. Interface grid row. */
     rowSpanSize: number;
-    /** Gap between dashboard cards in pixels. */
+    /** Gap between Vis. Interface cards in pixels. */
     gapSize: number;
     /** Width reserved for the disease sidebar in pixels. */
     leftSidebarWidth: number;
@@ -37,15 +37,20 @@ export type LayoutSizesT = {
 };
 
 /**
- * Standard frontend representation of a Flask database response.
+ * Legacy TypeScript envelope for database reads from Flask.
  *
  * @remarks
- * The `response` member varies by backend task and is therefore currently untyped. New task-specific consumers should
- * narrow it at their component boundary rather than spreading `any` into visualization logic.
+ * The `response` member varies by backend task and is currently untyped. Narrow
+ * it at the consumer boundary. This interface does not precisely model all
+ * runtime states: `/api/getDataFromDB` can send `error: null` on success, and
+ * `useGetJSONData` can return an empty object before a response or `{ error }`
+ * after a failed request. Check those states before reading required fields.
  *
  * @example
  * ```ts
- * const mosquitoResponse: dbDATA = {
+ * import type { DatabaseResponse } from "@/framework";
+ *
+ * const mosquitoResponse: DatabaseResponse = {
  *   relationName: "world_mosquitos_2014_2025_gdf_mosquito_amount",
  *   header: ["id", "species", "mosquito_amount"],
  *   response: [{ id: 42, species: "albopictus", mosquito_amount: 18 }],
@@ -60,7 +65,7 @@ export interface dbDATA {
       header: string[];
       /** Task-dependent records or aggregate values returned by Flask. */
       response: any;
-      /** Empty string on success or a human-readable backend error. */
+      /** Legacy string error field; the database route may return `null` on success. */
       error: string;
 }
 

@@ -12,8 +12,23 @@ import { useTranslations } from "next-intl"
 import { t_richConfig } from '@/app/const_store';
 
 
-/** Localized pathogen/vector article rows displayed by `TabularAccordion`. */
+/**
+ * Localized pathogen/vector article rows displayed by `TabularAccordion`.
+ *
+ * @example
+ * ```ts
+ * const accordionProps: TabularAccordionProps = {
+ *   tabularAccordionContent: [{
+ *     title: "Dengue virus",
+ *     column_2: "Aedes aegypti",
+ *     content: "Aedes mosquitoes transmit dengue virus.",
+ *     imageUrl: "/viruses/Dengue_Virus.png",
+ *   }],
+ * };
+ * ```
+ */
 interface TabularAccordionProps {
+    /** Localized pathogen or vector articles displayed as accordion rows. */
     tabularAccordionContent: BlogPostProps[]
 }
 

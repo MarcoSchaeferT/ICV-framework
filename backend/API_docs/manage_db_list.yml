@@ -1,0 +1,23 @@
+tags:
+  - Data Management Endpoints
+summary: List user-managed database relations
+description: >-
+  Returns public PostgreSQL regular and partitioned tables that are not in
+  `PROTECTED_TABLES` (`User`, `Test`, `column_metadata_en`,
+  `column_metadata_de`), along with their estimated or counted `row_count`.
+responses:
+  200:
+    description: Array of unprotected relation summaries ordered by `table_name`.
+    content:
+      application/json:
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              table_name:
+                type: string
+                example: "custom_mosquito_upload_2026"
+              row_count:
+                type: integer
+                example: 1450

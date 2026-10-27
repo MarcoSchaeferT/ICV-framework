@@ -1,13 +1,11 @@
 "use client";
 
-import { useRef, useEffect, useState } from 'react'
-import CovidDataStates from '@/components/dataTableClasses/CovidDataStates';
-import CovidDataDistricts from '@/components/dataTableClasses/CovidDataDistricts';
+import { useRef, useEffect } from 'react'
 import {apiRoutes } from "@/app/api_routes";
-import { InterfaceContextProvider, useInterfaceContext, interfaceContextI } from '@/components/contexts/InterfaceContext';
+import { InterfaceContextProvider } from '@/components/contexts/InterfaceContext';
 import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '@/components/plots/maps/LeafD3Map';
 import LeafD3MapGermanyComponent, {LeafD3MapGermanyProps}  from '@/components/plots/maps/LeafD3MapGermanyCovid';
-import DataTableComponent from '@/components/DataTable';
+import CovidStateTable from '@/components/CovidStateTable';
 import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
 import { createSwapy, Swapy } from 'swapy';
@@ -30,7 +28,6 @@ export default function Home() {
 
   // set up the map props
   let dataSet = "covid_states_dat";
-  let feature = "accucasesperweek";
   let dataURL = apiRoutes.fetchDbData({ relationName: dataSet, feature: "" });
   let mapPropsGermany = LeafD3MapGermanyProps();
   mapPropsGermany.chartName = 'map_germany';
@@ -98,7 +95,6 @@ export default function Home() {
   PieChartProps1.isDummyMode = false;
 
   // intitialize data table context
-  useInterfaceContext();
 
     // set up swapy (client side only)
     const swapyRef = useRef<Swapy | null>(null)
@@ -131,7 +127,6 @@ export default function Home() {
   <>
     <main className="flex max-h-fit flex-col items-center justify-between p-4">
     <InterfaceContextProvider>
-      <HandleLinking />
       {/*** START: grid layout ***/}
       <div ref={swapContainerRef} className={`w-full grid grid-cols-12 md:grid-cols-12 pl-0`} style={{
               gridTemplateRows: `repeat(auto-fill, minmax(${layoutSizes.rowSpanSize}vh, ${layoutSizes.rowSpanSize}vh))`,
@@ -153,13 +148,7 @@ export default function Home() {
         <SGridPlotCard rowColSpan={[2,2]} cardProps={CardPropsClass("Plot3","","","")}> <D3ExampleChartComponent chartProps={d3ExampleProps3}/> </SGridPlotCard>
         <SGridPlotCard rowColSpan={[4,4]}  cardProps={CardPropsClass("Map3","","","")}> <LeafD3MapGermanyComponent props={mapPropsGermany}/> </SGridPlotCard>
         <SGridPlotCard rowColSpan={[4,8]} cardProps={covidDataStatesPpros}>
-          <DataTableComponent
-          cardProps={covidDataStatesPpros}
-          refDataTableClass={CovidDataStates}
-          onClickEvent={(row,id, dataTableCONTEXT)=>{
-              dataTableCONTEXT.setTableRow(row);
-            }
-          }  />
+          <CovidStateTable cardProps={covidDataStatesPpros} />
         </SGridPlotCard>
         <SGridPlotCard rowColSpan={[2,12]} cardProps={CardPropsClass("Plot4","Heading","Sub Heading","Footer")}> <D3ExampleChartComponent chartProps={d3ExampleProps5}/> </SGridPlotCard>
 
@@ -170,26 +159,10 @@ export default function Home() {
         </SGridPlotCard>
          
 
-        {/*<div className={`${leftDataTableStyle}`}><CardWrapper headline={"Covid Data Districts"} component={<DataTableCovid constructor={CovidDataDistricts}  />} /></div>*/}
       </div>
     </InterfaceContextProvider>
     </main>
     <div/>
     </>
   );
-}
-
-function HandleLinking() {
-  let c = useInterfaceContext();
-  useEffect(() => {
-    if(c.selectedTableName === "CovidDataStates") {
-      let selBundesland = CovidDataStates.getStateBundesland(c.selectedTableRow);
-      let stateId = CovidDataStates.mapperFunctions.Map__State_to_ID(selBundesland);
-      c.setSelectedStateID(stateId);
-    }
-  }, [c.selectedTableRow, c.selectedTableName]);
-  return(
-    <>
-    </>
-    );
 }

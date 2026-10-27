@@ -29,16 +29,6 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    # Metadata extraction for Database
-    - name: Extract Database Metadata
-      id: meta-database
-      uses: docker/metadata-action@v5
-      with:
-        images: ghcr.io/marcoschaefert/icv-database
-        tags: |
-          type=ref,event=branch
-          type=raw,value=latest,enable=${{ github.ref_name == 'main' }}
-
     # 1. Build and push Database image
     - name: Build and push icv-database
       uses: docker/build-push-action@v6
@@ -47,20 +37,9 @@ jobs:
         file: ./db/Dockerfile.db
         platforms: linux/amd64,linux/arm64
         push: true
-        tags: ${{ steps.meta-database.outputs.tags }}
-        labels: ${{ steps.meta-database.outputs.labels }}
+        tags: ghcr.io/marcoschaefert/icv-database:test
         build-args: |
           POSTGRES_PASSWORD=${{ secrets.DB_PASSWORD_SECRET }}
-
-    # Metadata extraction for Backend
-    - name: Extract Backend Metadata
-      id: meta-backend
-      uses: docker/metadata-action@v5
-      with:
-        images: ghcr.io/marcoschaefert/icv-backend
-        tags: |
-          type=ref,event=branch
-          type=raw,value=latest,enable=${{ github.ref_name == 'main' }}
 
     # 2. Build and push Backend image
     - name: Build and push icv-backend
@@ -70,20 +49,9 @@ jobs:
         file: ./backend/Dockerfile.backend
         platforms: linux/amd64,linux/arm64
         push: true
-        tags: ${{ steps.meta-backend.outputs.tags }}
-        labels: ${{ steps.meta-backend.outputs.labels }}
+        tags: ghcr.io/marcoschaefert/icv-backend:test
         build-args: |
           DATABASE_URL=${{ secrets.DATABASE_URL_SECRET }}
-
-    # Metadata extraction for Frontend
-    - name: Extract Frontend Metadata
-      id: meta-frontend
-      uses: docker/metadata-action@v5
-      with:
-        images: ghcr.io/marcoschaefert/icv-frontend
-        tags: |
-          type=ref,event=branch
-          type=raw,value=latest,enable=${{ github.ref_name == 'main' }}
 
     # 3. Build and push Frontend image
     - name: Build and push icv-frontend
@@ -93,5 +61,4 @@ jobs:
         file: ./Dockerfile.frontend
         platforms: linux/amd64,linux/arm64
         push: true
-        tags: ${{ steps.meta-frontend.outputs.tags }}
-        labels: ${{ steps.meta-frontend.outputs.labels }}
+        tags: ghcr.io/marcoschaefert/icv-frontend:test

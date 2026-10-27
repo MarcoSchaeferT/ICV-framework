@@ -1,0 +1,84 @@
+tags:
+  - Data Management Endpoints
+summary: Bulk-replace column metadata for a relation
+description: >-
+  Replaces all metadata rows for `relationName` in `column_metadata_<lang>` in a
+  single transaction, updates changed SQL column types in the underlying data
+  table, and invalidates cached responses for the relation.
+parameters:
+  - name: body
+    in: body
+    required: true
+    description: Full replacement column metadata list for one relation and language.
+    schema:
+      type: object
+      required:
+        - relationName
+        - columns
+      properties:
+        lang:
+          type: string
+          enum: ["en", "de"]
+          default: "en"
+          example: "en"
+        relationName:
+          type: string
+          example: "dengue_serotype_counts"
+        columns:
+          type: array
+          items:
+            type: object
+            required:
+              - columnName
+            properties:
+              columnName:
+                type: string
+                example: "serotype_count"
+              datatype:
+                type: string
+                enum: ["string", "float", "int", "date"]
+                default: "string"
+                example: "int"
+              dimension:
+                type: string
+                example: "counts"
+              description:
+                type: string
+                example: "Reported dengue serotype sequence count"
+              availability:
+                type: integer
+                default: 0
+                example: 1
+responses:
+  200:
+    description: Bulk replacement succeeded.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            count:
+              type: integer
+              example: 3
+  400:
+    description: Missing JSON body, missing `relationName`, or invalid `columns` array.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+              example: "relationName is required."
+  500:
+    description: Database error or incompatible `ALTER TABLE ... TYPE` cast.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            error:
+              type: string

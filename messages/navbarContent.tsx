@@ -1,5 +1,4 @@
 import {
-  Archive,
   MultiplePages,
   PageSearch,
   ColorWheel,
@@ -19,7 +18,6 @@ import {
   StatsReport,
   DocStar,
   Iconoir,
-  Globe,
   GoogleDocs,
   DesignNibSolid,
   OpenBook,
@@ -37,23 +35,67 @@ import  {VirusIcon,
 } from  "./reactIcons"
 
 
+/**
+ * Disease-group identifiers used to filter localized navigation links.
+ *
+ * @example
+ * ```ts
+ * import { Group } from "@messages/navbarContent";
+ * const habitatNavigationGroup = Group.dengue;
+ * ```
+ */
 export const Group = {
   dengue: "dengue",
   covid: "covid",
   all: "all"
 }
 
+/**
+ * One localized navigation destination.
+ *
+ * @remarks The `group` value controls disease-specific visibility; `all`
+ * denotes a destination shared across disease groups.
+ *
+ * @example
+ * ```ts
+ * import { Group, type LINK } from "@messages/navbarContent";
+ * const predictionLink: LINK = {
+ *   icon: null,
+ *   title: "Prediction View",
+ *   href: "/worldView",
+ *   group: Group.dengue,
+ * };
+ * ```
+ */
 export type LINK = {
+  /** React icon component, or `null` for a text-only entry. */
   icon: React.ElementType | null;
+  /** Label shown in the selected locale. */
   title: string;
+  /** Internal route or absolute external destination. */
   href: string;
+  /** Optional disease-group visibility filter. */
   group?: string;
+  /** Optional top-navigation menu shown instead of a direct link. */
+  menu?: "help";
 };
 
+/**
+ * Navigation entries grouped by locale identifier.
+ *
+ * @example
+ * ```ts
+ * import { nav_LINKS_top, type LINKS } from "@messages/navbarContent";
+ * const localizedNavigation: LINKS = nav_LINKS_top;
+ * const englishLinks = localizedNavigation.en;
+ * ```
+ */
 export type LINKS = {
+  /** Locale key such as `en` or `de`. */
   [key: string]: LINK[];
 };
 
+/** Localized primary navigation, including disease-filtered application routes. */
 const nav_LINKS_top: LINKS = { 
     "en": [
         /* {
@@ -117,7 +159,8 @@ const nav_LINKS_top: LINKS = {
             icon: GoogleDocs,
             title: "Help",
             href: "/docs",
-            group: Group.all
+            group: Group.all,
+            menu: "help"
         },
         {
             icon: InfoCircle,
@@ -188,7 +231,8 @@ const nav_LINKS_top: LINKS = {
             icon: GoogleDocs,
             title: "Hilfe",
             href: "/docs",
-            group: Group.all
+            group: Group.all,
+            menu: "help"
         },
          {
             icon: InfoCircle,
@@ -200,20 +244,13 @@ const nav_LINKS_top: LINKS = {
 };
 
 
+/**
+ * Localized developer and utility navigation entries.
+ *
+ * @remarks This registry contains links to development tools and documentation.
+ */
 const nav_LINKS_left: LINKS = { 
     "en": [
-         {
-           icon: Globe,
-            title: "WIP Dashboard Germany",
-            href: "/covidDashboardMapLibre",
-            group: Group.all 
-        },
-        {
-            icon: Archive,
-            title: "ICV-Docs",
-            href: "https://marcoschaefert.github.io/davisDocu/",
-            group: Group.all
-        },
        /* {
             icon: PageSearch,
             title: "shdcn/ui-Docs",
@@ -234,7 +271,7 @@ const nav_LINKS_left: LINKS = {
         {
             icon: DocStar,
             title: "REST API Docs",
-            href: "http://localhost:5222/apidocs",
+            href: "/apiDocs",
             group: Group.all
         },
         {
@@ -288,12 +325,6 @@ const nav_LINKS_left: LINKS = {
 
     ],
     "de": [
-        {
-            icon: Archive,
-            title: "ICV-Docs",
-            href: "https://marcoschaefert.github.io/davisDocu/",
-            group: Group.all
-        },
         /*{
             icon: PageSearch,
             title: "shdcn/ui-Docs",
@@ -314,7 +345,7 @@ const nav_LINKS_left: LINKS = {
         {
             icon: DocStar,
             title: "REST API Docs",
-            href: "http://localhost:5222/apidocs",
+            href: "/apiDocs",
             group: Group.all
         },
         {

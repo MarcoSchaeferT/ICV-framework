@@ -1,5 +1,3 @@
-import sys
-import types
 import unittest
 from unittest.mock import patch
 
@@ -101,10 +99,9 @@ class EnsoSchemaTests(unittest.TestCase):
         self.assertEqual(precipitation["availability"], 0)
 
     def test_sql_type_override_only_applies_to_enso_columns(self):
-        fake_index = types.ModuleType("backend.index")
-        fake_index.metadata = {"known_column": "string"}
-
-        with patch.dict(sys.modules, {"backend.index": fake_index}):
+        with patch.object(
+            createTable, "loadMetadata", return_value={"known_column": "string"}
+        ):
             self.assertEqual(
                 createTable.getColumnSQLdataType("Forecast: Aug 2026"),
                 "float4",
@@ -233,10 +230,9 @@ class EnsoColumnMetadataTests(unittest.TestCase):
 
         with (
             patch.object(route_columnMetadata, "loadMetadataCSV", return_value=templates),
-            patch.object(route_columnMetadata, "get_db_connection_params", return_value={}),
             patch.object(
-                route_columnMetadata.psycopg,
-                "connect",
+                route_columnMetadata,
+                "get_db_connection",
                 return_value=_FakeConnection(inserted_rows, deleted_relations),
             ),
         ):
@@ -292,10 +288,9 @@ class EnsoColumnMetadataTests(unittest.TestCase):
         deleted_relations = []
         with (
             patch.object(route_columnMetadata, "loadMetadataCSV", return_value={}),
-            patch.object(route_columnMetadata, "get_db_connection_params", return_value={}),
             patch.object(
-                route_columnMetadata.psycopg,
-                "connect",
+                route_columnMetadata,
+                "get_db_connection",
                 return_value=_FakeConnection(inserted_rows, deleted_relations),
             ),
         ):

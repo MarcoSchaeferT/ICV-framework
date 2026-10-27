@@ -1,0 +1,53 @@
+---
+title: Python & OpenAPI
+description: Generated reference for Flask OpenAPI endpoints, Pydantic schemas, and Python backend pipelines.
+---
+
+**ICV Python & OpenAPI Reference**
+
+***
+
+Generated automatically from the Python AST, Google-style docstrings, and Flasgger OpenAPI specs (`backend/API_docs/*.yml`). Do not edit the generated `.mdx` files under `content/docs/developer-guide/api/python/` by hand — run `npm run docs:api` after changing backend docstrings, signatures, or OpenAPI YAML files.
+
+## Module Groups
+
+- [Core & Infrastructure](./core) — Flask entry point, multi-worker response cache, Redis upload state, and Gunicorn worker lifecycle.
+- [Database Query Routes](./query-routes) — Read-only endpoints for tabular queries, aggregations, compact map grids, column names, and relation discovery.
+- [CSV Upload & Ingestion](./upload-pipeline) — Streaming CSV header/row parsing, SQL type inference, transactional table replacement, and PostgreSQL COPY.
+- [Spatial Processing & Uncertainty](./processing-analytics) — Spatial point-to-country assignment, ENSO suitability panels, and UQ calibration/SVG rendering.
+- [Column Metadata & Administration](./metadata-admin) — Localized per-column metadata management, relation administration, and single-cell updates.
+
+## Flask OpenAPI Endpoints
+
+| Method | Endpoint Path | Handler | Summary |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/python` | [`hello_world`](./core#hello_world) | Return the small HTML development landing response at `/api/python`. |
+| `GET` | `/api/test` | [`test`](./core#test) | Return the static JSON diagnostic payload at `/api/test`. |
+| `GET` | `/api/uploadStatus` | [`getUploadStatus`](./core#getuploadstatus) | Get upload status (progress + error) |
+| `GET` | `/api/getMapData` | [`getMap`](./core#getmap) | Get map GeoJSON data by name |
+| `GET` | `/api/get_datasets_metaData` | [`getDatasetsMetadata`](./core#getdatasetsmetadata) | Get datasets metadata |
+| `GET` | `/api/get_image` | [`get_image`](./core#get_image) | Get image file |
+| `GET` | `/api/get_cell_chart_data` | [`get_cell_chart_data`](./core#get_cell_chart_data) | Get cell-level JSON data for interactive ENSO or uncertainty charts |
+| `GET` | `/api/get_uncertainty_svg` | [`get_uncertainty_svg`](./core#get_uncertainty_svg) | Render cell-level uncertainty or ENSO suitability SVG |
+| `GET` | `/health` | [`health`](./core#health) | Liveness health check |
+| `GET` | `/api/cache/stats` | [`cache_stats`](./core#cache_stats) | Get process-local response cache statistics |
+| `POST` | `/api/cache/clear` | [`cache_clear`](./core#cache_clear) | Clear the response cache across all workers |
+| `GET` | `/api/getDataFromDB` | [`getDataFromDB`](./query-routes#getdatafromdb) | Get data from database |
+| `GET` | `/api/getColumnNamesDB` | [`getColumnNamesDB`](./query-routes#getcolumnnamesdb) | Get column names from a database table |
+| `GET` | `/api/getListOfRelationsDB` | [`getListOfRelationsDB`](./query-routes#getlistofrelationsdb) | Get list of database tables |
+| `POST` | `/api/setFilesToDB` | [`setFilesToDB`](./upload-pipeline#setfilestodb) | Upload CSV files to database |
+| `POST` | `/api/processData/assignCountries` | [`assign_countries`](./processing-analytics#assign_countries) | Assign countries to a relation |
+| `GET` | `/api/columnMetadata` | [`get_column_metadata`](./metadata-admin#get_column_metadata) | Get column metadata for a relation |
+| `POST` | `/api/columnMetadata` | [`upsert_column_metadata`](./metadata-admin#upsert_column_metadata) | Upsert a single column metadata row |
+| `PUT` | `/api/columnMetadata` | [`bulk_upsert_column_metadata`](./metadata-admin#bulk_upsert_column_metadata) | Bulk-replace column metadata for a relation |
+| `GET` | `/api/manageDB` | [`list_relations`](./metadata-admin#list_relations) | List user-managed database relations |
+| `DELETE` | `/api/manageDB` | [`delete_relation`](./metadata-admin#delete_relation) | Delete a user-managed database relation |
+| `POST` | `/api/setEntryToTable` | [`setEntryToTable`](./metadata-admin#setentrytotable) | Insert a new entry into a database table |
+
+<ShowCovGuard>
+
+<h3>RKI aggregation endpoint</h3>
+
+- `POST` `/api/processData/aggregateRKI` — [`aggregate_rki`](./processing-analytics#aggregate_rki): Build RKI state aggregates
+
+</ShowCovGuard>

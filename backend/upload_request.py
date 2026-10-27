@@ -6,11 +6,16 @@ from typing import IO
 from flask import Request
 
 
-UPLOAD_DIR_ENV_KEY = "icv.upload_dir"
+UPLOAD_DIR_ENV_KEY = "icv:.upload_dir"
 
 
 class DirectUploadRequest(Request):
-    """Avoid Werkzeug's temporary-file-to-work-directory copy for uploads."""
+    """Stream multipart files into the per-upload directory during parsing.
+
+    The upload route sets ``UPLOAD_DIR_ENV_KEY`` before accessing
+    ``request.files``. Without that key, this request type delegates to
+    Werkzeug's default stream factory.
+    """
 
     def _get_file_stream(
         self,
@@ -19,6 +24,11 @@ class DirectUploadRequest(Request):
         filename: str | None = None,
         content_length: int | None = None,
     ) -> IO[bytes]:
+        """Write a multipart file directly into the request's upload directory.
+
+        Falls back to Werkzeug when no upload directory or filename is set.
+        Basename normalization and resolved-parent checks reject path traversal.
+        """
         upload_dir_value = self.environ.get(UPLOAD_DIR_ENV_KEY)
         if not upload_dir_value or not filename:
             return super()._get_file_stream(

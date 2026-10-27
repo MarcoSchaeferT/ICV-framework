@@ -1,0 +1,24 @@
+---
+title: Troubleshooting
+description: Resolve common ICV usage problems.
+---
+
+## A page does not load
+
+Reload once and verify that the deployment URL is reachable. Local development also requires the database and Flask services; a frontend page alone cannot retrieve datasets.
+
+## A chart is empty
+
+Confirm the dataset, axes, date range, category filters, and row limit. Then check whether the same dataset contains records in the raw-data view.
+
+## Upload progress stops
+
+Do not immediately upload the same file again. Large imports may continue in the backend. Record the upload identifier and any visible error message before contacting an administrator.
+
+## A map is slow
+
+Reduce the requested data range or level of detail when controls permit it. Close other graphics-heavy browser tabs and avoid repeatedly switching projections while a layer is loading.
+
+## Report a reproducible problem
+
+Include the page, locale, dataset, filters, expected result, actual result, browser version, and exact steps. Do not attach confidential source data to a public issue.

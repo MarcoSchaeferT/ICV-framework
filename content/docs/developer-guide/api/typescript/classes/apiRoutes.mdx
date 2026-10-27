@@ -1,0 +1,529 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: apiRoutes
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Canonical frontend registry for Flask API endpoint URLs.
+
+## Remarks
+
+Route builders keep the Next.js-to-Flask proxy boundary decoupled from visualization components and encode every
+supplied query value. Add new supported backend routes here so maps, charts, tables, and editors do not duplicate
+endpoint strings. All returned paths remain relative and therefore pass through the Next.js `/api/*` rewrite.
+
+## Example
+
+```ts
+import { apiRoutes } from "@/framework";
+
+// Replace the relation name with one available in your deployment.
+const habitatUrl = apiRoutes.fetchDbData({
+  relationName: "t_2024_monthly_mean_7_ocsvm_albopictus_predictions_2023_mod_sim",
+  feature: "mean",
+  filterBy: "country",
+  filterValue: "Germany",
+});
+```
+
+## Constructors
+
+### Constructor
+
+> **new apiRoutes**(): `apiRoutes`
+
+#### Returns
+
+`apiRoutes`
+
+## Properties
+
+### API\_BASE
+
+> `readonly` `static` **API\_BASE**: `"api"` = `'api'`
+
+API namespace used by the Next.js proxy.
+
+#### Default Value
+
+```ts
+"api"
+```
+
+***
+
+### API\_URL
+
+> `readonly` `static` **API\_URL**: `string`
+
+Root path shared by all proxied Flask endpoints.
+
+#### Default Value
+
+```ts
+"/api"
+```
+
+***
+
+### CREATE\_TABLE\_FROM\_FILE
+
+> `readonly` `static` **CREATE\_TABLE\_FROM\_FILE**: `string`
+
+Endpoint that creates a database relation from an uploaded file.
+
+***
+
+### SET\_ENTRY\_TO\_TABLE
+
+> `readonly` `static` **SET\_ENTRY\_TO\_TABLE**: `string`
+
+Endpoint that updates an individual database value.
+
+***
+
+### GET\_LIST\_OF\_DATASETS
+
+> `readonly` `static` **GET\_LIST\_OF\_DATASETS**: `string`
+
+Endpoint returning the relations available as visualization datasets.
+
+***
+
+### COLUMN\_METADATA
+
+> `readonly` `static` **COLUMN\_METADATA**: `string`
+
+Base endpoint for localized per-column metadata.
+
+***
+
+### MANAGE\_DB
+
+> `readonly` `static` **MANAGE\_DB**: `string`
+
+Base endpoint for database-relation administration.
+
+***
+
+### ASSIGN\_COUNTRIES\_TO\_DATASET
+
+> `readonly` `static` **ASSIGN\_COUNTRIES\_TO\_DATASET**: `string`
+
+Processing endpoint that assigns spatial records to country polygons.
+
+***
+
+### AGGREGATE\_RKI
+
+> `readonly` `static` **AGGREGATE\_RKI**: `string`
+
+POST endpoint that creates or refreshes RKI state aggregates.
+
+***
+
+### FETCH\_MAP\_DATA
+
+> `readonly` `static` **FETCH\_MAP\_DATA**: `object`
+
+Prebuilt URLs for every supported Leaflet basemap asset.
+
+#### GERMANY\_MAP\_STATES
+
+> `readonly` **GERMANY\_MAP\_STATES**: `string`
+
+#### GERMANY\_MAP\_DISTRICTS
+
+> `readonly` **GERMANY\_MAP\_DISTRICTS**: `string`
+
+#### WORLD\_MAP
+
+> `readonly` **WORLD\_MAP**: `string`
+
+#### USA\_MAP
+
+> `readonly` **USA\_MAP**: `string`
+
+#### CAPITALS
+
+> `readonly` **CAPITALS**: `string`
+
+## Methods
+
+### uploadStatus()
+
+> `static` **uploadStatus**(`params`): `string`
+
+Builds the polling URL for one asynchronous dataset upload.
+
+#### Parameters
+
+##### params
+
+Upload identifier returned when ingestion starts.
+
+###### id
+
+`string`
+
+#### Returns
+
+`string`
+
+Encoded upload-status endpoint URL.
+
+***
+
+### fetchDbColumnNames()
+
+> `static` **fetchDbColumnNames**(`params`): `string`
+
+Builds the URL for retrieving the columns of a database relation.
+
+#### Parameters
+
+##### params
+
+Database relation identifier.
+
+###### relationName
+
+`string`
+
+#### Returns
+
+`string`
+
+Encoded column-name endpoint URL.
+
+***
+
+### fetchDbData()
+
+> `static` **fetchDbData**(`params`): `string`
+
+Fetch data from a DB relation.
+
+#### Parameters
+
+##### params
+
+Relation, feature, task, spatial filter, and temporal filter contract.
+
+###### relationName
+
+`string`
+
+###### feature?
+
+`string`
+
+###### features?
+
+`string`[]
+
+Columns returned together for generic chart views.
+
+###### limit?
+
+`number`
+
+Maximum rows returned by a multi-column chart request; -1 opts into unbounded debug mode.
+
+###### filterBy?
+
+`string`
+
+###### filterValue?
+
+`string`
+
+###### task?
+
+[`DataQueryTask`](../type-aliases/DataQueryTask)
+
+Optional aggregate or set operation performed on a single feature.
+
+###### responseFormat?
+
+`"map-grid-v1"`
+
+Optional response representation optimized for a specific consumer.
+
+###### groupBy?
+
+`string`
+
+Secondary grouping column used by grouped aggregate tasks.
+
+###### startDate?
+
+`string`
+
+###### endDate?
+
+`string`
+
+###### targetDate?
+
+`string`
+
+###### aggregation_level?
+
+`number`
+
+#### Returns
+
+`string`
+
+Encoded database-query endpoint URL.
+
+#### Remarks
+
+This builder targets `/api/getDataFromDB` through the Next.js-to-Flask rewrite.
+`relationName` is required; `feature` and the remaining filters are emitted only
+when supplied. Generic multi-column charts pass `features` as a comma-separated
+query value. The response shape depends on `task` and `responseFormat`; this
+method only constructs the URL and does not validate the query or fetch data.
+JSON consumers can pass the returned URL to `useGetJSONData`.
+
+#### Example
+
+```ts
+import { apiRoutes } from "@/framework";
+
+// Replace the relation name with one available in your deployment.
+const url = apiRoutes.fetchDbData({
+  relationName: "world_mosquitos_2014_2025_gdf_mosquito_amount",
+  feature: "mosquito_amount",
+  filterBy: "species",
+  filterValue: "albopictus",
+  startDate: "2024-01-01",
+  endDate: "2024-12-31",
+});
+```
+
+***
+
+### fetchMapData()
+
+> `static` **fetchMapData**(`params`): `string`
+
+Builds the URL for a supported Leaflet map asset.
+
+#### Parameters
+
+##### params
+
+Supported map identifier.
+
+###### mapName
+
+[`MapName`](../type-aliases/MapName)
+
+#### Returns
+
+`string`
+
+Encoded map-data endpoint URL.
+
+***
+
+### getDatasetsMetadata()
+
+> `static` **getDatasetsMetadata**(`params`): `string`
+
+Builds the URL for localized dataset metadata.
+
+#### Parameters
+
+##### params
+
+UI language and optional database relation.
+
+###### LANGID
+
+`string`
+
+###### relationName?
+
+`string`
+
+#### Returns
+
+`string`
+
+Encoded metadata endpoint URL.
+
+***
+
+### getImage()
+
+> `static` **getImage**(`params`): `string`
+
+Builds the URL for an image managed by the backend.
+
+#### Parameters
+
+##### params
+
+Backend-relative image path.
+
+###### imagePath
+
+`string`
+
+#### Returns
+
+`string`
+
+Encoded image endpoint URL.
+
+***
+
+### getUncertaintySvg()
+
+> `static` **getUncertaintySvg**(`params`): `string`
+
+Builds the URL for a cell-level UQ SVG visualization.
+
+#### Parameters
+
+##### params
+
+SVG filename and database row ID of the selected spatial cell.
+
+###### filename
+
+`string`
+
+###### cellID
+
+`number`
+
+###### dataset?
+
+`string`
+
+###### month?
+
+`string`
+
+###### locale?
+
+`"en"` \| `"de"`
+
+#### Returns
+
+`string`
+
+Encoded uncertainty-visualization endpoint URL.
+
+#### Remarks
+
+Use the database row ID corresponding to the selected grid cell, as stored
+in `InterfaceContext.dbRowID_of_selectedGridcellID`. The response is an SVG
+image; render the URL as an image source rather than parsing it as `dbDATA`.
+
+#### Example
+
+```tsx
+import { apiRoutes } from "@/framework";
+
+const svgUrl = apiRoutes.getUncertaintySvg({
+  filename: "seasonal_uncertainty_cell.svg",
+  cellID: 200509,
+});
+<img src={svgUrl} alt="Seasonal uncertainty for the selected grid cell" />;
+```
+
+***
+
+### getCellChartData()
+
+> `static` **getCellChartData**(`params`): `string`
+
+Builds a JSON chart-data URL for ENSO suitability or seasonal uncertainty visualizations.
+
+#### Parameters
+
+##### params
+
+Chart mode (`"enso"` or `"uncertainty"`), database row `cellID`, and optional dataset/locale overrides.
+
+###### chart
+
+`"enso"` \| `"uncertainty"`
+
+###### cellID
+
+`number`
+
+###### dataset?
+
+`string`
+
+###### locale?
+
+`"en"` \| `"de"`
+
+#### Returns
+
+`string`
+
+Encoded cell-chart endpoint URL (`/api/get_cell_chart_data`).
+
+***
+
+### manageDbRelation()
+
+> `static` **manageDbRelation**(`params`): `string`
+
+Builds the administration URL for a database relation.
+
+#### Parameters
+
+##### params
+
+Relation to inspect or delete.
+
+###### relationName
+
+`string`
+
+#### Returns
+
+`string`
+
+Encoded database-management endpoint URL.
+
+***
+
+### columnMetadata()
+
+> `static` **columnMetadata**(`params`): `string`
+
+Builds the URL for relation-scoped, localized column metadata.
+
+#### Parameters
+
+##### params
+
+Relation identifier and supported metadata language.
+
+###### relationName
+
+`string`
+
+###### lang
+
+`"en"` \| `"de"`
+
+#### Returns
+
+`string`
+
+Encoded column-metadata endpoint URL.

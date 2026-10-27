@@ -6,6 +6,8 @@ import { CALCER } from '../constants';
  *
  * @example
  * ```ts
+ * import type { UseMapPositionParams } from "@/framework";
+ *
  * const berlinViewport: UseMapPositionParams = {
  *   map: null,
  *   latitude: 52.52,
@@ -28,20 +30,26 @@ export interface UseMapPositionParams {
 /**
  * Synchronizes React viewport coordinate state with a Leaflet map instance.
  *
- * Compares current Leaflet center and zoom against target state values using fixed-precision
- * rounding (`CALCER`) to eliminate feedback loops between Leaflet move events and React state updates.
+ * Compares Leaflet's current center and zoom with target values after rounding
+ * the current view to reduce redundant updates.
  *
  * @param params - Configuration containing map instance, latitude, longitude, and zoom.
  *
  * @remarks
- * Uncontrolled calls to `map.setView()` on every render cycle cause severe map canvas tearing
- * and recursive event dispatch loops. This hook performs precision checks prior to calling
- * `map.setView()`, ensuring Leaflet re-centers only when coordinates meaningfully diverge.
+ * Skips `setView()` while Leaflet reports an active drag or zoom animation.
+ * Center coordinates are rounded using `CALCER`, and zoom to two decimal
+ * places, before exact comparison with the requested values.
  *
  * @example
  * ```tsx
- * const map = useMap();
- * useMapPosition({ map, latitude: 52.52, longitude: 13.405, zoom: 6 });
+ * import { useMap } from "react-leaflet";
+ * import { useMapPosition } from "@/framework";
+ *
+ * function MapPositionSync() {
+ *   const map = useMap();
+ *   useMapPosition({ map, latitude: 52.52, longitude: 13.405, zoom: 6 });
+ *   return null;
+ * }
  * ```
  */
 export function useMapPosition({ map, latitude, longitude, zoom }: UseMapPositionParams): void {

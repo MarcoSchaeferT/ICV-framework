@@ -6,11 +6,19 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "lucide-react"
-import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker"
+import { DayButton, DayPicker, getDefaultClassNames } from "@daypicker/react"
 
 import { cn } from "@/lib/utils"
 import { Button, buttonVariants } from "@/components/ui/button"
 
+/**
+ * Renders the date picker used by Vis. Interface date filters.
+ *
+ * @param showOutsideDays - Shows adjacent-month dates in the month grid (defaults to `true`).
+ * @param captionLayout - Month caption presentation (defaults to `"label"`).
+ * @param buttonVariant - Variant applied to month-navigation buttons (defaults to `"ghost"`).
+ * @returns A styled `DayPicker` with overridable formatters and components.
+ */
 function Calendar({
   className,
   classNames,
@@ -81,7 +89,7 @@ function Calendar({
             : "rounded-md pl-2 pr-1 flex items-center gap-1 text-sm h-8 [&>svg]:text-slate-500 [&>svg]:size-3.5 dark:[&>svg]:text-slate-400",
           defaultClassNames.caption_label
         ),
-        table: "w-full border-collapse",
+        month_grid: "w-full border-collapse",
         weekdays: cn("flex", defaultClassNames.weekdays),
         weekday: cn(
           "text-slate-500 rounded-md flex-1 font-normal text-[0.8rem] select-none dark:text-slate-400",
@@ -169,6 +177,12 @@ function Calendar({
   )
 }
 
+/**
+ * Renders one date cell, including selected-range styling and keyboard focus.
+ *
+ * @returns A calendar day button reflecting its `DayPicker` modifiers.
+ * @remarks Focused days receive DOM focus when the modifier changes.
+ */
 function CalendarDayButton({
   className,
   day,

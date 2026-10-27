@@ -1,3 +1,5 @@
+"""Replace one uploaded relation and finish its metadata and country indexes."""
+
 import asyncio
 from pathlib import Path
 
@@ -12,13 +14,31 @@ from backend.cache import response_cache
 
 
 async def uploadFileToDB(file_path: Path, upload_id: str):
+    """Ingest one CSV snapshot under a cross-worker filename lock.
+
+    Args:
+        file_path: Uploaded CSV already streamed into its work directory.
+        upload_id: Shared progress and error-state key returned to the client.
+
+    Returns:
+        ``None`` on success or a dict containing ``error`` or ``restart``.
+
+    Replaces the relation schema, streams row insertion, populates column
+    metadata, optionally assigns countries with Shapely, and invalidates
+    relation-scoped cache entries. The file-name processing lock is shared
+    across workers when Redis is available and released even on failure.
+    A metadata-population exception is logged and does not stop ingestion;
+    a country-assignment exception becomes a processing error.
+    Schema replacement and COPY are separate transactions, so a later error
+    does not restore the prior table. Cache invalidation runs on success.
+    """
     file_name = Path(file_path).name
 
     # Prevent duplicate processing of the same file (Redis-backed lock,
     # shared across all Gunicorn workers)
     if not upload_state.try_acquire_file_lock(file_name):
         print(f"File {file_name} is already being processed, skipping duplicate request")
-        return {"ERROR": f"File {file_name} is already being processed"}
+        return {"error": f"File {file_name} is already being processed"}
 
     try:
         # *** PARSE *** #
@@ -46,11 +66,11 @@ async def uploadFileToDB(file_path: Path, upload_id: str):
         try:
             inserted_rows = await insertData(data, upload_id)
         except Exception as e:
-            return {"ERROR": f"Insert failed: {str(e)}"}
+            return {"error": f"Insert failed: {str(e)}"}
 
         insert_error = upload_state.get_status(upload_id)["error"]
         if insert_error != NO_ERROR:
-            return {"ERROR": insert_error}
+            return {"error": insert_error}
 
         # *** POPULATE COLUMN METADATA *** #
         # Auto-fill column_metadata_en and column_metadata_de from CSV suggestions
@@ -77,6 +97,7 @@ async def uploadFileToDB(file_path: Path, upload_id: str):
             upload_state.set_country_progress(upload_id, 0.0)
 
             def report_country_progress(processed_rows: int, total_rows: int) -> None:
+                """Convert processed-row counts to a bounded percentage."""
                 ratio = processed_rows / total_rows if total_rows else 1.0
                 upload_state.set_country_progress(
                     upload_id, min(100.0, ratio * 100)
@@ -96,7 +117,7 @@ async def uploadFileToDB(file_path: Path, upload_id: str):
                     f"({updated_count} rows updated)"
                 )
             except Exception as e:
-                return {"ERROR": f"Country assignment failed: {str(e)}"}
+                return {"error": f"Country assignment failed: {str(e)}"}
 
         # *** INVALIDATE CACHE *** #
         # The table's content (and possibly schema) just changed — drop
@@ -112,8 +133,9 @@ async def uploadFileToDB(file_path: Path, upload_id: str):
 
 
 def checkErrors(result):
+    """Pass through error or restart result dictionaries."""
     if isinstance(result, dict):
-        if "ERROR" in result:
+        if "error" in result:
             return result
         if "restart" in result:
             return result

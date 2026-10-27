@@ -1,0 +1,739 @@
+---
+title: Column Metadata & Administration
+description: Localized per-column metadata management, relation administration, and single-cell updates.
+---
+
+Localized per-column metadata management, relation administration, and single-cell updates.
+
+## `backend/routes/columnMetadata/route_columnMetadata.py`
+
+Routes for managing per-relation column metadata (English & German).
+
+Tables:
+  column_metadata_en  – English metadata rows
+  column_metadata_de  – German  metadata rows
+
+Endpoints:
+  GET  /api/columnMetadata?relationName=&lt;name&gt;&lang=&lt;en|de&gt;
+       → returns all metadata rows for that relation + language
+
+  POST /api/columnMetadata   (JSON body)
+       → upserts one metadata row (insert or update on conflict)
+
+  PUT  /api/columnMetadata   (JSON body, list)
+       → bulk-upserts a full set of rows for a relation + language
+
+### `_table_name`
+
+```python
+def _table_name(lang: str) -> str
+```
+
+Return the localized metadata table identifier for `lang` (`'en'` or `'de'`).
+
+**Parameters**
+
+<TypeTable type={{"lang": {"type": "str", "required": true}}} />
+
+### `_alter_column_type`
+
+```python
+def _alter_column_type(cur, relation_name: str, column_name: str, datatype: str)
+```
+
+Alter the physical PostgreSQL column type in `relation_name` when `datatype` changed.
+
+Uses `ALTER TABLE ... ALTER COLUMN ... TYPE ... USING column::new_type` so
+PostgreSQL casts existing values in place.
+
+
+**Raises**
+
+psycopg.Error: If the `USING` cast fails for existing row values
+(e.g. non-numeric strings cast to `float4`), causing the caller's
+transaction context manager to roll back both the metadata upsert
+and the `ALTER TABLE` statement.
+
+**Parameters**
+
+<TypeTable type={{"cur": {"type": "Any", "required": true, "description": "Active database cursor within the caller's transaction."}, "relation_name": {"type": "str", "required": true, "description": "Target data table name in schema `public`."}, "column_name": {"type": "str", "required": true, "description": "Target column name within `relation_name`."}, "datatype": {"type": "str", "required": true, "description": "Logical metadata datatype key (`'string'`, `'float'`, `'int'`, or `'date'`) mapped via `SQL_DATATYPES`."}}} />
+
+### `_ensure_table`
+
+```python
+def _ensure_table(cur, lang: str)
+```
+
+Create the localized `column_metadata_<lang>` table and relation index if absent.
+
+**Parameters**
+
+<TypeTable type={{"cur": {"type": "Any", "required": true, "description": "Active PostgreSQL cursor."}, "lang": {"type": "str", "required": true, "description": "Two-letter language code (`'en'` or `'de'`)."}}} />
+
+### `ensure_metadata_tables`
+
+```python
+def ensure_metadata_tables()
+```
+
+Create column_metadata_en and column_metadata_de if they do not exist.
+
+Call this once at app startup so the tables are available without
+relying on an ORM migration or JavaScript client. Missing or invalid
+`DATABASE_URL` can raise before the connection attempt; connection and
+table-creation errors are logged without aborting startup.
+
+### `populate_column_metadata`
+
+```python
+def populate_column_metadata(relation_name: str, column_names: list[str], *, resolved_sql_types: dict[str, str] | None=None, replace_existing: bool=False)
+```
+
+Populate English and German column metadata rows for a dataset relation.
+
+Exact ENSO suitability columns use the rolling schema metadata from
+`enso_column_metadata`. Other columns first look up the static language
+CSV (`loadMetadataCSV`) and fall back to the SQL type resolved during
+upload.
+
+**Parameters**
+
+<TypeTable type={{"relation_name": {"type": "str", "required": true, "description": "Sanitized PostgreSQL relation name."}, "column_names": {"type": "list[str]", "required": true, "description": "Raw or sanitized column names to register."}, "resolved_sql_types": {"type": "dict[str, str] | None", "required": false, "description": "Optional mapping from column name to PostgreSQL SQL type (e.g. `'float4'`, `'int4'`, `'date'`, `'varchar'`).", "default": "None"}, "replace_existing": {"type": "bool", "required": false, "description": "When `True`, deletes existing metadata rows for `relation_name` before inserting (used for full-snapshot uploads). Partial callers such as country assignment leave this `False` to preserve existing column metadata.", "default": "False"}}} />
+
+### `ColumnMetadataQueryParams`
+
+```python
+class ColumnMetadataQueryParams(BaseSchema)
+```
+
+Query parameters for fetching localized column metadata.
+
+
+**Example**
+
+```python
+params = ColumnMetadataQueryParams(relationName="observations", lang="en")
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"relationName": {"type": "RelationName", "required": true}, "lang": {"type": "LangCode", "required": false, "default": "'en'"}}} />
+
+### `ColumnMetadataUpsertPayload`
+
+```python
+class ColumnMetadataUpsertPayload(BaseSchema)
+```
+
+Request payload for upserting metadata for a single column.
+
+
+**Example**
+
+```python
+payload = ColumnMetadataUpsertPayload(
+relationName="observations",
+columnName="temperature",
+lang="en",
+datatype="float",
+dimension="°C",
+description="Ambient temperature",
+availability=1,
+)
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"relationName": {"type": "RelationName", "required": true}, "columnName": {"type": "str", "required": false, "description": "Target column name within the relation.", "default": "Field(min_length=1)"}, "lang": {"type": "LangCode", "required": false, "default": "'en'"}, "datatype": {"type": "str", "required": false, "description": "Logical datatype key ('string', 'float', 'int', 'date').", "default": "'string'"}, "dimension": {"type": "Optional[str]", "required": false, "description": "Physical unit or dimension string.", "default": "''"}, "description": {"type": "Optional[str]", "required": false, "description": "Human-readable description.", "default": "''"}, "availability": {"type": "int", "required": false, "description": "Availability flag (0 or 1).", "default": "0"}}} />
+
+### `ColumnMetadataBulkItem`
+
+```python
+class ColumnMetadataBulkItem(BaseSchema)
+```
+
+Single column metadata row in a bulk upsert request.
+
+
+**Example**
+
+```python
+item = ColumnMetadataBulkItem(
+columnName="temperature",
+datatype="float",
+dimension="°C",
+description="Ambient temperature",
+availability=1,
+)
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"columnName": {"type": "str", "required": false, "description": "Target column name within the relation.", "default": "Field(min_length=1)"}, "datatype": {"type": "str", "required": false, "description": "Logical datatype key ('string', 'float', 'int', 'date').", "default": "'string'"}, "dimension": {"type": "Optional[str]", "required": false, "description": "Physical unit or dimension string.", "default": "''"}, "description": {"type": "Optional[str]", "required": false, "description": "Human-readable description.", "default": "''"}, "availability": {"type": "int", "required": false, "description": "Availability flag (0 or 1).", "default": "0"}}} />
+
+### `ColumnMetadataBulkUpsertPayload`
+
+```python
+class ColumnMetadataBulkUpsertPayload(BaseSchema)
+```
+
+Request payload for replacing all column metadata rows for a relation.
+
+
+**Example**
+
+```python
+payload = ColumnMetadataBulkUpsertPayload(
+relationName="observations",
+lang="en",
+columns=[
+    ColumnMetadataBulkItem(columnName="temperature", datatype="float")
+],
+)
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"relationName": {"type": "RelationName", "required": true}, "lang": {"type": "LangCode", "required": false, "default": "'en'"}, "columns": {"type": "list[ColumnMetadataBulkItem]", "required": false, "default": "Field(default_factory=list, description='List of column metadata items.')"}}} />
+
+### `get_column_metadata`
+
+**HTTP Endpoint:** `GET` `/api/columnMetadata` — Get column metadata for a relation (Data Management Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/get_column_metadata.yml`
+
+**OpenAPI Request Parameters**
+
+<TypeTable type={{"relationName (query)": {"type": "string", "required": true, "description": "Required database relation name. (Example: `seas5_forecast_albopictus_habitat_probability`)"}, "lang (query)": {"type": "string ('en' | 'de')", "required": false, "description": "Metadata language code (`en` or `de`).", "default": "'en'"}}} />
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200", "HTTP 400", "HTTP 500"]}>
+<Tab value="HTTP 200">
+
+Array of column metadata row objects ordered by `id`.
+
+- **Content-Type:** `application/json`
+
+```json
+[
+  {
+    "id": 1,
+    "relation_name": "seas5_forecast_albopictus_habitat_probability",
+    "column_name": "suitability_2026_08",
+    "datatype": "float",
+    "dimension": "%",
+    "description": "Forecasted habitat suitability for August 2026",
+    "availability": 1
+  }
+]
+```
+
+</Tab>
+<Tab value="HTTP 400">
+
+Missing `relationName` or unsupported `lang`.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "error": "Missing required query param 'relationName'."
+}
+```
+
+</Tab>
+<Tab value="HTTP 500">
+
+Database query error.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "error": "<string>"
+}
+```
+
+</Tab>
+</Tabs>
+
+```python
+@route_columnMetadata.route('', methods=['GET'])
+@swag_from(f'{SWAGGER_YAML_PATH}/get_column_metadata.yml')
+def get_column_metadata()
+```
+
+Return all column metadata rows for a given relation and language.
+
+
+**Query Parameters**
+
+- `relationName (str)`: Required database relation name.
+- `lang (str)`: Metadata language code (`'en'` or `'de'`, default `'en'`).
+
+
+**Returns**
+
+Flask JSON response containing a list of metadata row dicts
+(`id`, `relation_name`, `column_name`, `datatype`, `dimension`,
+`description`, `availability`), or an `{"error": ...}` payload with
+HTTP 400 (invalid parameters) or HTTP 500 (database error).
+
+### `upsert_column_metadata`
+
+**HTTP Endpoint:** `POST` `/api/columnMetadata` — Upsert a single column metadata row (Data Management Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/upsert_column_metadata.yml`
+
+**OpenAPI Request Parameters**
+
+<TypeTable type={{"body (body)": {"type": "object", "required": true, "description": "Column metadata payload."}}} />
+
+**Request Body Schema Example**
+
+```json
+{
+  "lang": "en",
+  "relationName": "dengue_serotype_counts",
+  "columnName": "serotype_count",
+  "datatype": "int",
+  "dimension": "counts",
+  "description": "Reported dengue serotype sequence count",
+  "availability": 1
+}
+```
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200", "HTTP 400", "HTTP 500"]}>
+<Tab value="HTTP 200">
+
+Upsert succeeded and column type aligned.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "success": true,
+  "id": 42
+}
+```
+
+</Tab>
+<Tab value="HTTP 400">
+
+Missing JSON body, required fields, or invalid `lang`.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "error": "relationName and columnName are required."
+}
+```
+
+</Tab>
+<Tab value="HTTP 500">
+
+Database error or incompatible `ALTER TABLE ... TYPE` cast.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "error": "<string>"
+}
+```
+
+</Tab>
+</Tabs>
+
+```python
+@route_columnMetadata.route('', methods=['POST'])
+@swag_from(f'{SWAGGER_YAML_PATH}/upsert_column_metadata.yml')
+def upsert_column_metadata()
+```
+
+Upsert a single column metadata row and align the underlying SQL column type.
+
+Expects a JSON body with `relationName`, `columnName`, and optional
+`lang` (`'en'` or `'de'`), `datatype`, `dimension`,
+`description`, and `availability`. Also executes `_alter_column_type`
+within the same transaction and invalidates cached responses for the
+relation and global metadata endpoint.
+
+
+**Returns**
+
+Flask JSON response `{"success": True, "id": <row_id>}` on HTTP 200,
+or `{"error": ...}` with HTTP 400 / 500 on validation or cast failure.
+
+### `bulk_upsert_column_metadata`
+
+**HTTP Endpoint:** `PUT` `/api/columnMetadata` — Bulk-replace column metadata for a relation (Data Management Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/bulk_upsert_column_metadata.yml`
+
+**OpenAPI Request Parameters**
+
+<TypeTable type={{"body (body)": {"type": "object", "required": true, "description": "Full replacement column metadata list for one relation and language."}}} />
+
+**Request Body Schema Example**
+
+```json
+{
+  "lang": "en",
+  "relationName": "dengue_serotype_counts",
+  "columns": [
+    {
+      "columnName": "serotype_count",
+      "datatype": "int",
+      "dimension": "counts",
+      "description": "Reported dengue serotype sequence count",
+      "availability": 1
+    }
+  ]
+}
+```
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200", "HTTP 400", "HTTP 500"]}>
+<Tab value="HTTP 200">
+
+Bulk replacement succeeded.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "success": true,
+  "count": 3
+}
+```
+
+</Tab>
+<Tab value="HTTP 400">
+
+Missing JSON body, missing `relationName`, or invalid `columns` array.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "error": "relationName is required."
+}
+```
+
+</Tab>
+<Tab value="HTTP 500">
+
+Database error or incompatible `ALTER TABLE ... TYPE` cast.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "error": "<string>"
+}
+```
+
+</Tab>
+</Tabs>
+
+```python
+@route_columnMetadata.route('', methods=['PUT'])
+@swag_from(f'{SWAGGER_YAML_PATH}/bulk_upsert_column_metadata.yml')
+def bulk_upsert_column_metadata()
+```
+
+Replace all metadata rows for a relation and language in a single transaction.
+
+Expects a JSON body containing `relationName`, optional `lang`
+(`'en'` or `'de'`), and a `columns` list of column metadata dicts.
+Deletes existing rows for `relation_name` in `column_metadata_<lang>`,
+inserts the replacement rows, alters changed SQL column types in the
+underlying data table, and invalidates cached responses for the relation.
+
+
+**Returns**
+
+Flask JSON response `{"success": True, "count": <len(columns)>}` on
+HTTP 200, or `{"error": ...}` with HTTP 400 / 500 on failure.
+
+## `backend/routes/manageDB/route_manageDB.py`
+
+ManageDB blueprint – list and delete database relations.
+
+### `DeleteRelationParams`
+
+```python
+class DeleteRelationParams(BaseSchema)
+```
+
+Query parameters for deleting a database relation.
+
+
+**Example**
+
+```python
+params = DeleteRelationParams(relationName="old_dataset")
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"relationName": {"type": "RelationName", "required": true}}} />
+
+### `list_relations`
+
+**HTTP Endpoint:** `GET` `/api/manageDB` — List user-managed database relations (Data Management Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/manage_db_list.yml`
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200"]}>
+<Tab value="HTTP 200">
+
+Array of unprotected relation summaries ordered by `table_name`.
+
+- **Content-Type:** `application/json`
+
+```json
+[
+  {
+    "table_name": "custom_mosquito_upload_2026",
+    "row_count": 1450
+  }
+]
+```
+
+</Tab>
+</Tabs>
+
+```python
+@route_manageDB.route('', methods=['GET'])
+@swag_from(f'{SWAGGER_YAML_PATH}/manage_db_list.yml')
+async def list_relations() -> Response
+```
+
+List unprotected public tables with approximate row counts.
+
+The route includes regular and partitioned tables. When PostgreSQL's
+estimate is zero, it tries `COUNT(*)` and uses zero if that query fails.
+
+### `delete_relation`
+
+**HTTP Endpoint:** `DELETE` `/api/manageDB` — Delete a user-managed database relation (Data Management Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/manage_db_delete.yml`
+
+**OpenAPI Request Parameters**
+
+<TypeTable type={{"relationName (query)": {"type": "string", "required": true, "description": "Name of the unprotected relation to drop. (Example: `custom_mosquito_upload_2026`)"}}} />
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200", "HTTP 400", "HTTP 403", "HTTP 500"]}>
+<Tab value="HTTP 200">
+
+Relation and associated metadata rows deleted (or already absent).
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "success": true,
+  "deleted": "custom_mosquito_upload_2026"
+}
+```
+
+</Tab>
+<Tab value="HTTP 400">
+
+Missing `relationName` query parameter.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "error": "Missing required query parameter 'relationName'."
+}
+```
+
+</Tab>
+<Tab value="HTTP 403">
+
+Relation is in `PROTECTED_TABLES` (`User`, `Test`, `column_metadata_en`, `column_metadata_de`).
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "error": "Table 'column_metadata_en' is protected and cannot be deleted."
+}
+```
+
+</Tab>
+<Tab value="HTTP 500">
+
+Database error while dropping the relation.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "error": "<string>"
+}
+```
+
+</Tab>
+</Tabs>
+
+```python
+@route_manageDB.route('', methods=['DELETE'])
+@swag_from(f'{SWAGGER_YAML_PATH}/manage_db_delete.yml')
+async def delete_relation() -> Response
+```
+
+Drop an unprotected relation and its dependent objects with CASCADE.
+
+The route then removes localized column metadata and invalidates cached
+relation data. Missing `relationName` returns 400; protected names
+return 403. The `DROP TABLE IF EXISTS` statement accepts an absent table.
+
+## `backend/routes/setEntryToTable/route_setEntryToTable.py`
+
+Insert form submissions and initialize feedback/page-visit relations.
+
+### `SetEntryParams`
+
+```python
+class SetEntryParams(BaseSchema)
+```
+
+Form parameters for inserting a row into an existing table.
+
+
+**Example**
+
+```python
+params = SetEntryParams(relationName="feedback_csv")
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"relationName": {"type": "RelationName", "required": true}}} />
+
+### `setEntryToTable`
+
+**HTTP Endpoint:** `POST` `/api/setEntryToTable` — Insert a new entry into a database table (REST Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/set_entry_to_table.yml`
+
+**OpenAPI Request Parameters**
+
+<TypeTable type={{"relationName (formData)": {"type": "string", "required": true, "description": "Name of the database relation (table) to insert data into. (Example: `feedback_csv`)"}}} />
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200", "HTTP 400", "HTTP 500", "HTTP 404"]}>
+<Tab value="HTTP 200">
+
+Data successfully inserted into the table
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "SUCCESS": "Form data submitted successfully"
+}
+```
+
+</Tab>
+<Tab value="HTTP 400">
+
+Bad request - missing or invalid parameters
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "ERROR": "<string>"
+}
+```
+
+</Tab>
+<Tab value="HTTP 500">
+
+Internal server error during data insertion
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "ERROR": "Error inserting data into table: invalid input syntax"
+}
+```
+
+</Tab>
+<Tab value="HTTP 404">
+
+The named relation does not exist.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "ERROR": "Table 'missing_table' does not exist. Please create the table first."
+}
+```
+
+</Tab>
+</Tabs>
+
+```python
+@swag_from('../../API_docs/set_entry_to_table.yml')
+@route_setEntryToTable.route('', methods=['POST'])
+async def setEntryToTable()
+```
+
+Insert posted form fields into the named PostgreSQL relation.
+
+`relationName` is required. The feedback and page-visit relations are
+created on demand; other relation names must already exist. Column names
+use `psycopg.sql.Identifier` and values use bound placeholders. Missing
+fields return 400, absent relations 404, and insert failures 500.
+
+### `create_Feedback_Relation`
+
+```python
+async def create_Feedback_Relation()
+```
+
+Create the legacy `feedback_csv` table, logging creation failures.
+
+### `ensure_feedback_csv_exists`
+
+```python
+async def ensure_feedback_csv_exists()
+```
+
+Create `feedback_csv` when absent from the public relation list.
+
+### `create_page_visits_relation`
+
+```python
+async def create_page_visits_relation()
+```
+
+Create the `page_visits` table, logging creation failures.
+
+### `ensure_page_visits_exists`
+
+```python
+async def ensure_page_visits_exists()
+```
+
+Create `page_visits` when absent from the public relation list.

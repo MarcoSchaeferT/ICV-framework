@@ -1,0 +1,188 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: dataTableFeatures
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> `const` **dataTableFeatures**: `object`
+
+TanStack Table feature set used by database-backed data tables.
+
+## Type Declaration
+
+### columnFacetingFeature
+
+> **columnFacetingFeature**: `TableFeature`
+
+Feature that derives faceted row models, unique values, and min/max values for filters.
+
+These APIs are deliberately not memoized at this layer: the stock
+`createFaceted*` factories memoize internally (like every other stock row
+model), and an extra memo layer here would freeze custom factories whose
+data changes independently of the faceted row model. Custom factories own
+their memoization.
+
+### columnFilteringFeature
+
+> **columnFilteringFeature**: `TableFeature`
+
+Feature that adds per-column filtering state, options, and column/table filter APIs.
+
+### columnVisibilityFeature
+
+> **columnVisibilityFeature**: `TableFeature`
+
+Feature that adds column visibility state and APIs for hiding and showing columns.
+
+### globalFilteringFeature
+
+> **globalFilteringFeature**: `TableFeature`
+
+Feature that adds global filtering state, defaults, and global filter APIs.
+
+### rowPaginationFeature
+
+> **rowPaginationFeature**: `TableFeature`
+
+Feature that adds pagination state and table APIs for page navigation.
+
+### rowSelectionFeature
+
+> **rowSelectionFeature**: `TableFeature`
+
+Feature that adds row selection state and APIs for row and page selection.
+
+### rowSortingFeature
+
+> **rowSortingFeature**: `TableFeature`
+
+Feature that adds row sorting state, defaults, and column/table sorting APIs.
+
+### filteredRowModel
+
+> **filteredRowModel**: (`table`) => () => `RowModel`\<`any`, `any`\>
+
+#### Parameters
+
+##### table
+
+`Table`\<`any`, `any`\>
+
+#### Returns
+
+() => `RowModel`\<`any`, `any`\>
+
+### sortedRowModel
+
+> **sortedRowModel**: (`table`) => () => `RowModel`\<`any`, `any`\>
+
+#### Parameters
+
+##### table
+
+`Table`\<`any`, `any`\>
+
+#### Returns
+
+() => `RowModel`\<`any`, `any`\>
+
+### paginatedRowModel
+
+> **paginatedRowModel**: (`table`) => () => `RowModel`\<`any`, `any`\>
+
+#### Parameters
+
+##### table
+
+`Table`\<`any`, `any`\>
+
+#### Returns
+
+() => `RowModel`\<`any`, `any`\>
+
+### facetedRowModel
+
+> **facetedRowModel**: (`table`, `columnId`) => () => `RowModel`\<`any`, `any`\>
+
+#### Parameters
+
+##### table
+
+`Table`\<`any`, `any`\>
+
+##### columnId
+
+`string`
+
+#### Returns
+
+() => `RowModel`\<`any`, `any`\>
+
+### facetedUniqueValues
+
+> **facetedUniqueValues**: (`table`, `columnId`) => () => `Map`\<`any`, `number`\>
+
+#### Parameters
+
+##### table
+
+`Table`\<`TableFeatures`, `any`\>
+
+##### columnId
+
+`string`
+
+#### Returns
+
+() => `Map`\<`any`, `number`\>
+
+### facetedMinMaxValues
+
+> **facetedMinMaxValues**: (`table`, `columnId`) => () => \[`number`, `number`\] \| `undefined`
+
+#### Parameters
+
+##### table
+
+`Table`\<`TableFeatures`, `any`\>
+
+##### columnId
+
+`string`
+
+#### Returns
+
+() => \[`number`, `number`\] \| `undefined`
+
+### filterFns
+
+> **filterFns**: `object`
+
+#### filterFns.fuzzy
+
+> **fuzzy**: `CreatedFilterFn`\<`any`, `any`\> = `fuzzyFilter`
+
+### filterMeta
+
+> **filterMeta**: `object`
+
+#### filterMeta.itemRank
+
+> **itemRank**: `RankingInfo`
+
+## Remarks
+
+Enables sorting, pagination, selection, column visibility, and faceting.
+The `fuzzy` global filter records match ranking in `itemRank` metadata;
+consumers pass this feature set to `useTable` and select `globalFilterFn: "fuzzy"`.
+
+## Example
+
+```ts
+import { dataTableFeatures } from "@/framework";
+
+const featuresForMosquitoObservations = dataTableFeatures;
+```

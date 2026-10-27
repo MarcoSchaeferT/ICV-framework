@@ -1,7 +1,6 @@
 
 import { layoutSizes, LayoutSizesT } from '@/app/const_store';
-import { createContext, useContext, use, useState, useRef } from 'react'
-import React from 'react';
+import React, { createContext, useContext, useMemo, useState, useRef, useCallback } from 'react';
 import { transmissionData,TransmissionDataT } from '@messages/sidebarContent'
 import { useLocale, useTranslations } from "next-intl"
 import { MDXContentProvider } from '@messages/markdown/MDXContentProvider';
@@ -35,9 +34,9 @@ export interface UIContextI {
     sidebarSelection: SidebarSelectionI;
     /** Updates the current sidebar selection. */
     setSidebarSelection: React.Dispatch<React.SetStateAction<SidebarSelectionI>>;
-    /** Shared dashboard-shell measurements. */
+    /** Shared Vis. Interface shell measurements. */
     layoutDims: LayoutSizesT;
-    /** Updates dashboard-shell measurements. */
+    /** Updates Vis. Interface shell measurements. */
     setLayoutDims: React.Dispatch<React.SetStateAction<LayoutSizesT>>;
     /** Whether the disease sidebar is expanded. */
     isSidebarOpen: boolean;
@@ -53,6 +52,8 @@ export interface UIContextI {
     setIsSwapy: React.Dispatch<React.SetStateAction<boolean>>;
     /** Mutable display name for the active documentation section. */
     curDocsNameRef: React.MutableRefObject<string>;
+    /** Updates the active documentation section name from navigation events. */
+    setCurDocsName: (name: string) => void;
     /** Mutable invalidation counter used by documentation navigation. */
     updateHash: React.MutableRefObject<number>;
     /** Whether the demo-mode information dialog is visible. */
@@ -61,6 +62,8 @@ export interface UIContextI {
     setIsDemoModeDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
     /** Server-configured read-only/demo-mode flag. */
     demoMode: boolean;
+    /** Whether deployment flags have been loaded from the runtime API. */
+    configReady: boolean;
     /** Updates the locally cached demo-mode flag. */
     setDemoMode: React.Dispatch<React.SetStateAction<boolean>>;
     /** Whether covariance-related controls and content should be shown. */
@@ -105,10 +108,10 @@ export interface SidebarSelectionI {
  * @returns The UI context provider wrapping its children.
  *
  * @remarks
- * On mount, the provider reads deployment flags from the Next.js route handlers. Network failures are logged and leave
- * the declared local defaults in place, allowing the interface to remain usable.
+ * Flag-dependent UI starts hidden until the runtime API responds, so static HTML
+ * and the first browser render agree across deployments.
  */
-function UIContextProvider({children}: any) {
+function UIContextProvider({ children }: { children: React.ReactNode }) {
 
     const locale = useLocale();
     const MDXContent = MDXContentProvider[locale as string].FullDocu.fullDocu;
@@ -123,73 +126,72 @@ function UIContextProvider({children}: any) {
     const [curDocsMDXContent, setCurMDXContent] = useState<React.ReactNode>(<MDXContent />);
     const [isSwapy, setIsSwapy] = useState<boolean>(false)
     const curDocsNameRef = useRef<string>(' General ');
+    const setCurDocsName = useCallback((name: string) => {
+        curDocsNameRef.current = name;
+    }, []);
     const updateHash = useRef(0);
     const [isDemoModeDialogOpen, setIsDemoModeDialogOpen] = useState<boolean>(false);
     const [demoMode, setDemoMode] = useState<boolean>(false);
-    // Keep optional COVID navigation and showcases hidden until the runtime
-    // deployment flag has explicitly enabled them.
+    const [configReady, setConfigReady] = useState<boolean>(false);
     const [showCov, setShowCov] = useState<boolean>(false);
     const [showLegalTexts, setShowLegalTexts] = useState<boolean>(false);
     const [showLayoutTemplates, setShowLayoutTemplates] = useState<boolean>(false);
 
-    // Fetch demo mode on mount
     React.useEffect(() => {
-        fetch('/api/demoMode', { cache: 'no-store' })
-            .then(res => res.json())
-            .then(data => setDemoMode(data.demoMode))
-            .catch(err => console.error('Failed to fetch demo mode:', err));
+        let active = true;
+        fetch('/api/appConfig', { cache: 'no-store' })
+            .then(res => {
+                if (!res.ok) throw new Error(`App config request failed: ${res.status}`);
+                return res.json();
+            })
+            .then(data => {
+                if (!active) return;
+                setDemoMode(data.demoMode);
+                setShowCov(data.showCov);
+                setShowLegalTexts(data.showLegalTexts);
+                setShowLayoutTemplates(data.showLayoutTemplates);
+                setConfigReady(true);
+            })
+            .catch(err => console.error('Failed to fetch app config:', err));
+        return () => { active = false; };
     }, []);
 
-     React.useEffect(() => {
-        fetch('/api/showCov', { cache: 'no-store' })
-            .then(res => res.json())
-            .then(data => setShowCov(data.showCov))
-            .catch(err => console.error('Failed to fetch COVID visibility:', err));
-    }, []);
-
-     React.useEffect(() => {
-        fetch('/api/showLegalTexts', { cache: 'no-store' })
-            .then(res => res.json())
-            .then(data => setShowLegalTexts(data.showLegalTexts))
-            .catch(err => console.error('Failed to fetch legal texts status:', err));
-    }, []);
-
-     React.useEffect(() => {
-        fetch('/api/showLayoutTemplates', { cache: 'no-store' })
-            .then(res => res.json())
-            .then(data => setShowLayoutTemplates(data.showLayoutTemplates))
-            .catch(err => console.error('Failed to fetch layout templates visibility:', err));
-    }, []);
-
-   const contextValue = {
-       sidebarSelection, setSidebarSelection,
-       layoutDims, setLayoutDims,
-       isSidebarOpen, setIsSidebarOpen,
-       curDocsMDXContent, setCurMDXContent,
-       curDocsNameRef,
-       updateHash,
-       isSwapy, setIsSwapy
-   }
+    // Memoize the context value so consumers only re-render when an
+    // included field actually changes — not on every parent render.
+    const contextValue = useMemo(() => ({
+        sidebarSelection, setSidebarSelection,
+        layoutDims, setLayoutDims,
+        isSidebarOpen, setIsSidebarOpen,
+        curDocsMDXContent, setCurMDXContent,
+        isSwapy, setIsSwapy,
+        curDocsNameRef,
+        setCurDocsName,
+        updateHash,
+        isDemoModeDialogOpen, setIsDemoModeDialogOpen,
+        demoMode, setDemoMode,
+        configReady,
+        showCov, setShowCov,
+        showLegalTexts, setShowLegalTexts,
+        showLayoutTemplates, setShowLayoutTemplates,
+    }), [
+        sidebarSelection,
+        layoutDims,
+        isSidebarOpen,
+        curDocsMDXContent,
+        setCurDocsName,
+        isSwapy,
+        isDemoModeDialogOpen,
+        demoMode,
+        configReady,
+        showCov,
+        showLegalTexts,
+        showLayoutTemplates,
+    ])
 
     return (
-        <>
-         <UIContext.Provider value={{
-            sidebarSelection, setSidebarSelection,
-            layoutDims, setLayoutDims,
-            isSidebarOpen, setIsSidebarOpen,
-            curDocsMDXContent, setCurMDXContent,
-            isSwapy, setIsSwapy,
-            curDocsNameRef,
-            updateHash,
-            isDemoModeDialogOpen, setIsDemoModeDialogOpen,
-            demoMode, setDemoMode,
-            showCov, setShowCov,
-            showLegalTexts, setShowLegalTexts,
-            showLayoutTemplates, setShowLayoutTemplates
-           }}>
+        <UIContext.Provider value={contextValue}>
             {children}
-         </UIContext.Provider>
-         </>
+        </UIContext.Provider>
     )
 }
 

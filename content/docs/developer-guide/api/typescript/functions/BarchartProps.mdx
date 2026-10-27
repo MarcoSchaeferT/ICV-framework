@@ -1,0 +1,62 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: BarchartProps
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **BarchartProps**(`chartName`, `dataURL?`, `locale?`, `translations?`, `isDummyMode?`, `dataMode?`, `rowLimit?`): [`BarchartProps`](../interfaces/BarchartProps)
+
+Creates a complete bar-chart configuration.
+
+## Parameters
+
+### chartName
+
+`string`
+
+Stable chart/container identifier.
+
+### dataURL?
+
+`string` = `""`
+
+Encoded database API URL.
+
+### locale?
+
+`string` = `"en"`
+
+Locale for labels and number formatting.
+
+### translations?
+
+`any` = `{}`
+
+`next-intl` translator for the chart namespace.
+
+### isDummyMode?
+
+`boolean` = `false`
+
+Uses bundled demonstration data.
+
+### dataMode?
+
+`"linked"` \| `"generic"` = `"linked"`
+
+`linked` uses the Vis. Interface selection; `generic` uses the shared dataset chart.
+
+### rowLimit?
+
+`number` \| `null`
+
+Optional maximum rows for generic mode.
+
+## Returns
+
+[`BarchartProps`](../interfaces/BarchartProps)
+
+Configuration accepted by `BarchartComponent`.

@@ -1,25 +1,76 @@
 import { Locale } from "next-intl";
-import { BarChart3, Leaf, ArrowLeftRight, Cloud, ChartSpline } from "lucide-react"
-import { MosquitoIcon, VirusIcon } from "../messages/reactIcons"
-import { GreekTemple, AntibodyIcon, LocationIcon, Globe } from "../messages/reactIcons";
-import {ReportColumns} from "iconoir-react";
+import { ArrowLeftRight, CloudSunRain, ChartArea, ChartSpline } from "lucide-react"
+import { CubesIcon, InfoIcon, GreekTemple, AntibodyIcon, LocationIcon } from "./reactIcons";
+import { ReportColumns } from "iconoir-react";
 
+/**
+ * Localized preview card for one public-health visualization showcase.
+ *
+ * @example
+ * ```tsx
+ * const ensoPreview: ShowcaseItem = {
+ *   title: "ENSO Suitability",
+ *   description: "Inspect mosquito habitat forecasts six months ahead",
+ *   backgroundImage: "/showCases/enso_suitability.png",
+ *   icon: <ChartSpline />,
+ *   link: "/home/showCases/ENSO_Suitability",
+ * };
+ * ```
+ */
 interface ShowcaseItem {
+  /** Localized card title. */
   title: string
+  /** Localized summary shown under the title. */
   description: string
+  /** Public asset path for the card image. */
   backgroundImage: string
+  /** React icon node rendered on the card. */
   icon: React.ReactNode
+  /** Application route opened by the card. */
   link: string
 }
 
+/**
+ * Localized showcase-card registry consumed by the home page.
+ *
+ * @remarks Each locale supplies the same destinations in the same order so
+ * switching languages preserves the meaning of the selected showcase.
+ *
+ * @example
+ * ```ts
+ * import { showCasesList } from "@messages/showCasesContent";
+ * const germanEnsoCard = showCasesList.de.find((item) => item.link.endsWith("ENSO_Suitability"));
+ * ```
+ */
 export const showCasesList: Record<Locale, ShowcaseItem[]> = {
   en: [
+    {
+      title: "ENSO Suitability",
+      description: "Inspect mosquito habitat suitability predictions up to 6 months into the future",
+      backgroundImage: "/showCases/enso_suitability.png",
+      icon: <ChartSpline />,
+      link: "/home/showCases/ENSO_Suitability",
+    },
+    {
+      title: "Uncertainty Quantification",
+      description: "Explore the uncertainty quantification for a specific prediction model",
+      backgroundImage: "/showCases/uncertainty_quantification.png",
+      icon: <ChartArea />,
+      link: "/home/showCases/Uncertainty_Vis",
+    },
     {
       title: "Suitable Mosquito Habitats",
       description: "Investigate mosquito habitat suitability predictions for different years and species",
       backgroundImage: "/showCases/suitable_mosquito_habitats.png",
-      icon: <Leaf  />,
-      link: "/home/showCases/Suitable_Mosquito_Habitats",
+      icon: <InfoIcon />,
+      link: "/worldView",
+    },
+    {
+      title: "Training Data View",
+      description: "Explore climate, land-use, and population data used to train the mosquito habitat suitability model",
+      backgroundImage: "/showCases/training_data_view.png",
+      icon: <CubesIcon />,
+      link: "/rawDataView",
     },
     {
       title: "USA Habitats/Sightings",
@@ -39,52 +90,59 @@ export const showCasesList: Record<Locale, ShowcaseItem[]> = {
       title: "Climate and Habitats",
       description: "Inspect habitat suitability in context of climate factors",
       backgroundImage: "/showCases/climate_and_habitats.png",
-      icon: <Cloud className="w-6 h-6" />,
+      icon: <CloudSunRain className="w-6 h-6" />,
       link: "/home/showCases/Climate_and_Habitats",
     },
     {
       title: "Dengue Serotype Counts",
       description: "Explore Dengue serotype counts of Central America for different years and types",
       backgroundImage: "/showCases/dengue_serotype_counts.png",
-      icon: <AntibodyIcon  />,
+      icon: <AntibodyIcon />,
       link: "/home/showCases/Dengue_Serotype_Counts",
     },
     {
-      title: "Uncertainty Quantification",
-      description: "Explore the uncertainty quantification for a specific prediction model",
-      backgroundImage: "/showCases/uncertainty_quantification.png",
-      icon: <ChartSpline  />,
-      link: "/home/showCases/Uncertainty_Vis",
-    },
-    {
-      title: "ENSO Suitability",
-      description: "Inspect mosquito habitat suitability predictions up to 6 months into the future",
-      backgroundImage: "/showCases/enso_suitability.png",
-      icon: <ChartSpline  />,
-      link: "/home/showCases/ENSO_Suitability",
-    },
-     {
       title: "Historical COVID-Data Germany Dashboard",
       description: "Discover historical data of the COVID-19 pandemic in Germany",
       backgroundImage: "/showCases/historical_data_covid.png",
-      icon: <ReportColumns  />,
+      icon: <ReportColumns />,
       link: "/covidDashboard",
     },
-     {
+    {
       title: "Historical COVID-Data Worldwide",
       description: "Investigate the historical trends during the COVID-19 pandemic worldwide",
       backgroundImage: "/showCases/historical_data_covid_worldwide.png",
-      icon: <GreekTemple  />,
+      icon: <GreekTemple />,
       link: "/worldViewCovid",
     }
   ],
   de: [
     {
+      title: "ENSO-Eignung",
+      description: "Untersuchen Sie Vorhersagen zur Mückenlebensraumeignung bis zu 6 Monate in die Zukunft",
+      backgroundImage: "/showCases/enso_suitability.png",
+      icon: <ChartSpline />,
+      link: "/home/showCases/ENSO_Suitability",
+    },
+    {
+      title: "Unsicherheitsquantifizierung",
+      description: "Untersuchen Sie die Unsicherheitsquantifizierung für ein spezifisches Vorhersagemodell",
+      backgroundImage: "/showCases/uncertainty_quantification.png",
+      icon: <ChartArea />,
+      link: "/home/showCases/Uncertainty_Vis",
+    },
+    {
       title: "Geeignete Mückenlebensräume",
       description: "Untersuchen Sie Vorhersagen zur Eignung von Mückenlebensräumen für verschiedene Jahre und Arten",
       backgroundImage: "/showCases/suitable_mosquito_habitats.png",
-      icon: <Leaf />,
-      link: "/home/showCases/Suitable_Mosquito_Habitats",
+      icon: <InfoIcon />,
+      link: "/worldView",
+    },
+    {
+      title: "Trainingsdaten-Ansicht",
+      description: "Erkunden Sie Klima-, Landnutzungs- und Bevölkerungsdaten, mit denen Modelle zur Eignung von Mückenlebensräumen trainiert werden",
+      backgroundImage: "/showCases/training_data_view.png",
+      icon: <CubesIcon />,
+      link: "/rawDataView",
     },
     {
       title: "USA Lebensräume/Sichtungen",
@@ -104,7 +162,7 @@ export const showCasesList: Record<Locale, ShowcaseItem[]> = {
       title: "Klima und Lebensräume",
       description: "Untersuchen Sie die Lebensraumeignung im Kontext von Klimafaktoren",
       backgroundImage: "/showCases/climate_and_habitats.png",
-      icon: <Cloud className="w-6 h-6" />,
+      icon: <CloudSunRain className="w-6 h-6" />,
       link: "/home/showCases/Climate_and_Habitats",
     },
     {
@@ -115,20 +173,6 @@ export const showCasesList: Record<Locale, ShowcaseItem[]> = {
       link: "/home/showCases/Dengue_Serotype_Counts",
     },
     {
-      title: "Unsicherheitsquantifizierung",
-      description: "Untersuchen Sie die Unsicherheitsquantifizierung für ein spezifisches Vorhersagemodell",
-      backgroundImage: "/showCases/uncertainty_quantification.png",
-      icon: <ChartSpline  />,
-      link: "/home/showCases/Uncertainty_Vis",
-    },
-    {
-      title: "ENSO-Eignung",
-      description: "Untersuchen Sie Vorhersagen zur Mückenlebensraumeignung bis zu 6 Monate in die Zukunft",
-      backgroundImage: "/showCases/enso_suitability.png",
-      icon: <ChartSpline  />,
-      link: "/home/showCases/ENSO_Suitability",
-    },
-     {
       title: "Historische COVID-Daten Deutschland Dasboard",
       description: "Betrachten Sie die historischen Daten der COVID-19-Pandemie in Deutschland",
       backgroundImage: "/showCases/historical_data_covid.png",

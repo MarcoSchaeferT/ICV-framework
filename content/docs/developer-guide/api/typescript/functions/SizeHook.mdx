@@ -1,0 +1,64 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: SizeHook
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **SizeHook**(`props`): `null`
+
+React Component observer bridge pairing with [useChartResizer](useChartResizer).
+
+Observes the supplied element and dispatches dimension updates to parent state.
+
+## Parameters
+
+### props
+
+Object containing target `element`, mutable `sizeRef`, and `setSize` dispatcher.
+
+#### element
+
+`HTMLElement` \| `null`
+
+#### sizeRef
+
+`MutableRefObject`\<[`Size`](../interfaces/Size) \| `undefined`\>
+
+#### setSize
+
+`Dispatch`\<`SetStateAction`\<[`Size`](../interfaces/Size)\>\>
+
+## Returns
+
+`null`
+
+`null`; the component renders no visible element.
+
+## Remarks
+
+Rendered side-by-side with plot elements inside grid card components. Modifies `sizeRef.current` and invokes `setSize`
+whenever container bounds change.
+
+## See
+
+ - [useChartResizer](useChartResizer) for the primary container resizer hook.
+ - [useMapResize](useMapResize) for debounced Leaflet map viewport invalidation.
+
+## Example
+
+```tsx
+import { SizeHook, useChartResizer } from "@/framework";
+
+function ObservedCard() {
+  const { dimensions, element, sizeRef, setSizes } = useChartResizer("observed-card");
+  return (
+    <div className="gridPlotCardContent">
+      <SizeHook element={element} sizeRef={sizeRef} setSize={setSizes} />
+      <div id="observed-card">Width: {dimensions.width}px</div>
+    </div>
+  );
+}
+```

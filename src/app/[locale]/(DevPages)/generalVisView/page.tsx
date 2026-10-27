@@ -1,9 +1,8 @@
 
 "use client";
 
-import { useRef, useEffect } from 'react'
+import React, { useRef, useEffect } from 'react'
 import {apiRoutes } from "@/app/api_routes";
-import React from 'react';
 import { InterfaceContextProvider, useInterfaceContext } from '@/components/contexts/InterfaceContext';
 import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
@@ -16,10 +15,9 @@ import { t_richConfig } from "@/app/const_store";
 import { useUIContext } from '@/components/contexts/UIContext';
 import { availableColorMapsNames } from '@/components/plots/maps/constants';
 
-
 const isSWAPY = true;
 
-/** Returns the development dashboard used to exercise linked supported visualization components. */
+/** Returns the development Vis. Interface used to exercise linked supported visualization components. */
 export default function Home() {
 
 const t = useTranslations("page_predictionView");

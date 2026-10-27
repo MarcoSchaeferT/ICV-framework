@@ -1,0 +1,31 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: aggregateRKI
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **aggregateRKI**(`command?`): `Promise`\<`void`\>
+
+Triggers backend aggregation of district-level RKI SARS-CoV-2 infection data into a state-level snapshot table.
+
+## Parameters
+
+### command?
+
+[`RkiAggregationCommand`](../interfaces/RkiAggregationCommand) = `{}`
+
+Optional source relation, target relation, and report date overrides.
+
+## Returns
+
+`Promise`\<`void`\>
+
+A promise that resolves once the aggregated table is ready, or rejects with an `Error` on HTTP failure.
+
+## Remarks
+
+Posts `command` to `/api/processData/aggregateRKI`, which populates or updates the target relation and invalidates
+cached responses for that table.

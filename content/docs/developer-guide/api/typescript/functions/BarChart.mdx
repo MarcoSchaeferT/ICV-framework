@@ -1,0 +1,33 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: BarChart
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **BarChart**(`props`): `Element`
+
+Chooses the generic or linked bar-chart implementation.
+
+## Parameters
+
+### props
+
+Chart configuration; `dataMode` controls the implementation.
+
+#### chartProps
+
+[`BarchartProps`](../interfaces/BarchartProps)
+
+## Returns
+
+`Element`
+
+A generic row-oriented chart or a linked Vis. Interface bar chart.
+
+## Remarks
+
+Defaults to `dataMode = "linked"` when omitted. Generic mode reads the relation from `ChartDatasetProvider`;
+linked mode follows `InterfaceContext` and the supplied `dataURL`.

@@ -5,6 +5,12 @@
       "dom.iterable",
       "esnext"
     ],
+    "types": [
+      "node",
+      "react",
+      "react-dom",
+      "mdx"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,

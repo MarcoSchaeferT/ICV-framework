@@ -1,0 +1,120 @@
+---
+title: Developer Guide
+description: Build, extend, test, and document the ICV framework.
+---
+
+This guide is the English technical documentation for ICV contributors. Start with a working local stack, then follow the architecture and examples for the layer you are changing.
+
+<Callout type="info" title="Looking for product workflows?">
+  The [User Guide](../user-guide/) explains how to upload data and use the interface. This guide is for developers who build, integrate, test, or operate ICV.
+</Callout>
+
+## Navigate by task
+
+<Cards>
+  <Card
+    title="Run ICV locally"
+    description="Install dependencies, start the complete stack, and run the relevant checks."
+    href="./local-development"
+  />
+  <Card
+    title="Understand the architecture"
+    description="Learn the frontend, backend, persistence, and state-ownership boundaries."
+    href="./architecture"
+  />
+  <Card
+    title="Find backend ownership"
+    description="Locate route families, persistence, worker state, and contract sources."
+    href="./backend-overview"
+  />
+  <Card
+    title="Trace a backend query"
+    description="Follow dataset reads, response variants, database helpers, and cache freshness."
+    href="./backend-query-flow"
+  />
+  <Card
+    title="Trace a CSV upload"
+    description="Follow transfer, background ingestion, progress, and cache invalidation."
+    href="./backend-upload-flow"
+  />
+  <Card
+    title="Use the framework"
+    description="Compose data access, cards, and shared state for supported Vis. Interface views."
+    href="./usage-examples"
+  />
+  <Card
+    title="Apply engineering standards"
+    description="Follow the conventions for APIs, state, visualization, localization, and testing."
+    href="./best-practices"
+  />
+  <Card
+    title="Browse API contracts"
+    description="Inspect the generated TypeScript API and the live Flask REST contract."
+    href="./api/"
+  />
+  <Card
+    title="Maintain documentation"
+    description="Update prose, TSDoc, navigation, translations, and generated reference safely."
+    href="./maintaining-documentation"
+  />
+</Cards>
+
+## Recommended reading paths
+
+| Goal | Read in this order | Expected outcome |
+| --- | --- | --- |
+| First contribution | [Local development](./local-development) → [Architecture](./architecture) → [Best practices](./best-practices) | A verified development environment and a change placed in the correct layer |
+| New Vis. Interface or visualization | [Architecture](./architecture) → [Usage examples](./usage-examples) → [TypeScript API](./api/typescript/) | A Leaflet-based view with explicit state ownership |
+| New backend capability | [Backend overview](./backend-overview) → [Backend query flow](./backend-query-flow) or [CSV upload flow](./backend-upload-flow) → [REST API](./api/rest-api) | A route whose behavior, public contract where documented, and tests agree |
+| Public API change | [Best practices](./best-practices#design-public-apis-deliberately) → [Maintaining documentation](./maintaining-documentation) → [TypeScript API](./api/typescript/) | A documented, generated, and compatibility-reviewed contract |
+
+## Framework at a glance
+
+```text
+Localized Next.js route
+        │
+        ├── UI and feature-local state
+        ├── shared context for linked views
+        └── reusable components and hooks from owning modules
+                    │
+                    ├── apiRoutes builds encoded /api/* URLs
+                    └── useGetJSONData handles request lifecycle and cache
+                                      │
+                                      ▼
+                              Next.js API rewrite
+                                      │
+                                      ▼
+                            Flask → Redis/PostgreSQL
+```
+
+Dependency direction matters: pages import reusable components and hooks from the modules that own them; those modules must not depend on a specific page or showcase. Follow the [frontend ownership](./architecture#frontend-ownership) guidance when composing maps.
+
+## Public API contract
+
+TypeDoc reads `src/framework/index.ts`; an export in an implementation file outside that barrel does not enter the generated reference. The barrel catalogues the documented surface, including Leaflet map components and their WebGL grid overlay. Application code uses direct imports from the owning modules so each dependency stays visible; `@/framework` is an in-repository TypeDoc entry point, not a published package. Review the [public TypeScript surface](./architecture#public-typescript-surface) and the symbol's runtime requirements before integrating it.
+
+- Import components, hooks, and types from their owning modules, using `@/components/...` or `@/app/...` when a relative path would obscure the location. Group symbols from the same module in one import.
+- Keep page-specific helpers next to the page until a concrete reuse need justifies moving them.
+- Treat prop types, context values, endpoint parameters, and response envelopes as compatibility contracts.
+- Update TSDoc, usage examples, tests, and generated reference in the same change as a public API.
+
+## Standard change workflow
+
+1. Identify the owning layer and the smallest public contract needed by the feature.
+2. Add or change behavior behind typed inputs and explicit loading, error, empty, and success states.
+3. Verify pure logic, request boundaries, and linked-view behavior at the appropriate test level.
+4. Document observable user behavior in the User Guide and technical contracts in this guide.
+5. Run the relevant checks from [Local development](./local-development#verify-a-change).
+
+## Definition of done
+
+A framework change is complete when:
+
+- ownership and dependency direction remain clear;
+- public input and output types describe the supported contract;
+- network and database failures have intentional behavior;
+- loading, empty, missing-data, and partial-data states are distinguishable;
+- user-facing text is localized;
+- keyboard, non-color, and tabular alternatives are considered for visual information;
+- tests cover the highest-risk boundary; and
+- documentation and generated API reference match the implementation.

@@ -1,0 +1,88 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: PieChartProps
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **PieChartProps**(`chartName`, `data?`, `locale?`, `translations?`, `isDummyMode?`, `dataURL?`, `feature?`, `dataMode?`, `rowLimit?`): [`PieChartProps`](../interfaces/PieChartProps)
+
+Creates a complete categorical pie-chart configuration object with defaults.
+
+## Parameters
+
+### chartName
+
+`string`
+
+Stable chart/container identifier.
+
+### data?
+
+`object`[] = `[]`
+
+Category labels and numeric values to visualize.
+
+### locale?
+
+`string` = `"en"`
+
+Locale for number and label formatting.
+
+### translations?
+
+`any` = `{}`
+
+`next-intl` translator instance for the chart namespace.
+
+### isDummyMode?
+
+`boolean` = `false`
+
+Whether to render bundled demonstration data.
+
+### dataURL?
+
+`string` = `""`
+
+Encoded database API URL.
+
+### feature?
+
+`string` = `""`
+
+Target feature identifier for extraction.
+
+### dataMode?
+
+`"linked"` \| `"generic"` = `"linked"`
+
+`linked` uses supplied categories; `generic` uses the shared dataset chart.
+
+### rowLimit?
+
+`number` \| `null`
+
+Optional maximum rows for generic mode.
+
+## Returns
+
+[`PieChartProps`](../interfaces/PieChartProps)
+
+Configuration object accepted by `PieChartComponent`.
+
+## Example
+
+```tsx
+import { PieChartProps } from "@/framework";
+
+const chartConfig = PieChartProps(
+  "serotype-piechart",
+  [{ name: "DENV-1", value: 120 }, { name: "DENV-2", value: 85 }],
+  "en",
+  {},
+  true
+);
+```

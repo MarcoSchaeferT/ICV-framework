@@ -1,0 +1,58 @@
+tags:
+  - Data Management Endpoints
+summary: Delete a user-managed database relation
+description: >-
+  Drops a non-protected public PostgreSQL relation with `DROP TABLE IF EXISTS
+  ... CASCADE`, deletes its rows from `column_metadata_en` and
+  `column_metadata_de`, and invalidates cached responses for that relation.
+parameters:
+  - name: relationName
+    in: query
+    required: true
+    description: Name of the unprotected relation to drop.
+    schema:
+      type: string
+      example: "custom_mosquito_upload_2026"
+responses:
+  200:
+    description: Relation and associated metadata rows deleted (or already absent).
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            deleted:
+              type: string
+              example: "custom_mosquito_upload_2026"
+  400:
+    description: Missing `relationName` query parameter.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+              example: "Missing required query parameter 'relationName'."
+  403:
+    description: Relation is in `PROTECTED_TABLES` (`User`, `Test`, `column_metadata_en`, `column_metadata_de`).
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+              example: "Table 'column_metadata_en' is protected and cannot be deleted."
+  500:
+    description: Database error while dropping the relation.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            error:
+              type: string

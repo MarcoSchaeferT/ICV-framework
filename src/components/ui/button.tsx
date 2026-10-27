@@ -6,6 +6,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+/** Shared visual variants and sizes for application buttons. */
 const buttonVariants = cva(
   "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-slate-950 disabled:pointer-events-none disabled:opacity-50 dark:focus-visible:ring-slate-300",
   {
@@ -36,12 +37,38 @@ const buttonVariants = cva(
   }
 )
 
+/**
+ * Native button attributes plus visual variants and optional Radix slot rendering.
+ *
+ * @example
+ * ```tsx
+ * import type { ButtonProps } from "@/components/ui/button";
+ * const uploadAction: ButtonProps = {
+ *   variant: "secondary",
+ *   size: "sm",
+ *   children: "Upload observations",
+ * };
+ * ```
+ */
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
+  /** Renders a child element through Radix `Slot` when true. @default false */
   asChild?: boolean
 }
 
+/**
+ * Ref-forwarding application button with typed visual variants.
+ *
+ * @remarks `asChild` forwards button styling and attributes to the single
+ * child element; callers remain responsible for appropriate accessible labels.
+ *
+ * @example
+ * ```tsx
+ * import { Button } from "@/components/ui/button";
+ * <Button variant="secondary" size="sm">Upload observations</Button>;
+ * ```
+ */
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button"

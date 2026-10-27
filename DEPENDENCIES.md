@@ -29,8 +29,14 @@ The following icon libraries require attribution:
 | **Framework** | React, Next.js, TypeScript | MIT / Apache-2.0 |
 | **UI & Styling** | Radix UI, Tailwind CSS, Framer Motion, Lucide | MIT |
 | **Data Viz** | D3, Recharts, Leaflet, React Leaflet | MIT / BSD / ISC |
-| **State & Data** | Prisma, TanStack Table/Virtual | Apache-2.0 / MIT |
+| **State & Data** | TanStack Table/Virtual | MIT |
 | **Utilities** | Swapy (GPL-3.0), date-fns, react-dropzone, sonner | Various (FOSS) |
+
+### Development Tools
+
+| Tool | Purpose | License |
+| :--- | :--- | :--- |
+| **pgweb** | Local, read-only PostgreSQL inspection | MIT |
 
 ### Python / Backend
 | Category | Key Packages | License |

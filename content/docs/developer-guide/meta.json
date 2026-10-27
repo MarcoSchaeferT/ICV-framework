@@ -1,0 +1,6 @@
+{
+  "title": "Developer Guide",
+  "description": "Architecture and extension reference for ICV contributors",
+  "root": true,
+  "pages": ["index", "local-development", "architecture", "backend-overview", "backend-query-flow", "backend-upload-flow", "usage-examples", "best-practices", "api", "maintaining-documentation"]
+}

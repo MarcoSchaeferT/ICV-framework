@@ -33,26 +33,32 @@ _REDIS_RETRY_SECONDS = 30.0
 
 
 def _progress_key(upload_id: str) -> str:
+    """Return the Redis key for an upload's overall percentage."""
     return f"icv:upload:{upload_id}:progress"
 
 
 def _error_key(upload_id: str) -> str:
+    """Return the Redis key for an upload's error message."""
     return f"icv:upload:{upload_id}:error"
 
 
 def _phase_key(upload_id: str) -> str:
+    """Return the Redis key for an upload's processing phase."""
     return f"icv:upload:{upload_id}:phase"
 
 
 def _has_geometry_key(upload_id: str) -> str:
+    """Return the Redis key for the geometry-presence flag."""
     return f"icv:upload:{upload_id}:has_geometry"
 
 
 def _db_progress_key(upload_id: str) -> str:
+    """Return the Redis key for database-ingestion progress."""
     return f"icv:upload:{upload_id}:db_progress"
 
 
 def _country_progress_key(upload_id: str) -> str:
+    """Return the Redis key for country-assignment progress."""
     return f"icv:upload:{upload_id}:country_progress"
 
 
@@ -77,6 +83,7 @@ class _UploadState:
     """Thread-safe accessor for the shared per-upload progress/error state."""
 
     def __init__(self):
+        """Initialize lazy Redis access and the process-local fallback maps."""
         self._client: redis.Redis | None = None
         self._client_lock = threading.Lock()
         self._warned = False
@@ -97,6 +104,7 @@ class _UploadState:
     # ------------------------------------------------------------------
 
     def _redis(self) -> redis.Redis:
+        """Create a Redis client lazily for the current worker."""
         if self._client is None:
             with self._client_lock:
                 if self._client is None:
@@ -110,6 +118,7 @@ class _UploadState:
         return self._client
 
     def _redis_failed(self, err: Exception) -> None:
+        """Warn once and switch to local state during a Redis retry interval."""
         if not self._warned:
             self._warned = True
             print(
@@ -158,6 +167,7 @@ class _UploadState:
                 self._local_country_progress[upload_id] = 0.0
 
     def set_progress(self, upload_id: str, progress: float) -> None:
+        """Store the overall upload percentage in Redis or local fallback."""
         if time.monotonic() < self._redis_down_until:
             with self._local_lock:
                 self._local_progress[upload_id] = float(progress)
@@ -172,6 +182,7 @@ class _UploadState:
                 self._local_progress[upload_id] = float(progress)
 
     def set_error(self, upload_id: str, message: str) -> None:
+        """Store the upload error shown by status polling."""
         if time.monotonic() < self._redis_down_until:
             with self._local_lock:
                 self._local_errors[upload_id] = message
@@ -184,6 +195,7 @@ class _UploadState:
                 self._local_errors[upload_id] = message
 
     def set_phase(self, upload_id: str, phase: str) -> None:
+        """Store the active upload phase, such as ``db`` or ``country``."""
         if time.monotonic() < self._redis_down_until:
             with self._local_lock:
                 self._local_phases[upload_id] = phase
@@ -196,6 +208,7 @@ class _UploadState:
                 self._local_phases[upload_id] = phase
 
     def set_has_geometry(self, upload_id: str, has_geometry: bool) -> None:
+        """Record whether the uploaded table has a geometry column."""
         if time.monotonic() < self._redis_down_until:
             with self._local_lock:
                 self._local_has_geometry[upload_id] = has_geometry
@@ -212,6 +225,7 @@ class _UploadState:
                 self._local_has_geometry[upload_id] = has_geometry
 
     def set_db_progress(self, upload_id: str, progress: float) -> None:
+        """Store database-ingestion progress as a percentage."""
         if time.monotonic() < self._redis_down_until:
             with self._local_lock:
                 self._local_db_progress[upload_id] = float(progress)
@@ -254,6 +268,7 @@ class _UploadState:
                 self._local_db_progress[upload_id] = float(db_progress)
 
     def set_country_progress(self, upload_id: str, progress: float) -> None:
+        """Store country-assignment progress as a percentage."""
         if time.monotonic() < self._redis_down_until:
             with self._local_lock:
                 self._local_country_progress[upload_id] = float(progress)
@@ -268,7 +283,14 @@ class _UploadState:
                 self._local_country_progress[upload_id] = float(progress)
 
     def get_status(self, upload_id: str) -> dict:
-        """Return overall and per-phase progress plus upload status metadata."""
+        """Return the polling payload for one upload ID.
+
+        The payload contains ``progress``, ``error``, ``phase``,
+        ``has_geometry``, ``db_progress``, and ``country_progress``. Missing
+        or expired keys use in-progress defaults; this method does not verify
+        that an upload ID was ever issued. Redis failures use process-local
+        state, which other workers cannot observe.
+        """
         if time.monotonic() < self._redis_down_until:
             with self._local_lock:
                 return {
@@ -321,7 +343,11 @@ class _UploadState:
     # ------------------------------------------------------------------
 
     def try_acquire_file_lock(self, file_name: str) -> bool:
-        """Return True if the lock was acquired, False if already held."""
+        """Acquire the shared, expiring processing lock for a file basename.
+
+        Return ``False`` when another worker holds it. With Redis unavailable,
+        the fallback guards only this worker process.
+        """
         if time.monotonic() < self._redis_down_until:
             with self._local_lock:
                 if file_name in self._local_file_locks:
@@ -346,6 +372,7 @@ class _UploadState:
                 return True
 
     def release_file_lock(self, file_name: str) -> None:
+        """Release a per-filename processing lock in Redis and local fallback."""
         if time.monotonic() < self._redis_down_until:
             with self._local_lock:
                 self._local_file_locks.discard(file_name)

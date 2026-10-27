@@ -10,18 +10,25 @@ import {
 
 import { cn } from "@/lib/utils"
 
+/** Owns the open state of a Radix dropdown menu. */
 const DropdownMenu = DropdownMenuPrimitive.Root
 
+/** Opens the containing dropdown menu. */
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
 
+/** Groups related menu items for assistive technology. */
 const DropdownMenuGroup = DropdownMenuPrimitive.Group
 
+/** Mounts dropdown content outside its trigger hierarchy. */
 const DropdownMenuPortal = DropdownMenuPrimitive.Portal
 
+/** Owns the open state of a nested dropdown menu. */
 const DropdownMenuSub = DropdownMenuPrimitive.Sub
 
+/** Groups mutually exclusive radio menu items. */
 const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup
 
+/** Opens a nested menu and optionally indents its label. */
 const DropdownMenuSubTrigger = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.SubTrigger>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubTrigger> & {
@@ -44,6 +51,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
 DropdownMenuSubTrigger.displayName =
   DropdownMenuPrimitive.SubTrigger.displayName
 
+/** Renders the positioned content of a nested menu. */
 const DropdownMenuSubContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.SubContent>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent>
@@ -60,6 +68,11 @@ const DropdownMenuSubContent = React.forwardRef<
 DropdownMenuSubContent.displayName =
   DropdownMenuPrimitive.SubContent.displayName
 
+/**
+ * Renders the portal-mounted dropdown panel.
+ *
+ * @remarks Default `sideOffset` is `4` pixels from the trigger.
+ */
 const DropdownMenuContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
@@ -79,6 +92,7 @@ const DropdownMenuContent = React.forwardRef<
 ))
 DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName
 
+/** Renders a selectable menu action with optional indentation. */
 const DropdownMenuItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> & {
@@ -97,6 +111,7 @@ const DropdownMenuItem = React.forwardRef<
 ))
 DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName
 
+/** Renders a menu option with a checked-state indicator. */
 const DropdownMenuCheckboxItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.CheckboxItem>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.CheckboxItem>
@@ -121,6 +136,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
 DropdownMenuCheckboxItem.displayName =
   DropdownMenuPrimitive.CheckboxItem.displayName
 
+/** Renders a radio menu option with its selection indicator. */
 const DropdownMenuRadioItem = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.RadioItem>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.RadioItem>
@@ -143,6 +159,7 @@ const DropdownMenuRadioItem = React.forwardRef<
 ))
 DropdownMenuRadioItem.displayName = DropdownMenuPrimitive.RadioItem.displayName
 
+/** Renders a noninteractive label for a menu group. */
 const DropdownMenuLabel = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Label>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Label> & {
@@ -161,6 +178,7 @@ const DropdownMenuLabel = React.forwardRef<
 ))
 DropdownMenuLabel.displayName = DropdownMenuPrimitive.Label.displayName
 
+/** Adds a visual divider between dropdown sections. */
 const DropdownMenuSeparator = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.Separator>,
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Separator>
@@ -173,6 +191,7 @@ const DropdownMenuSeparator = React.forwardRef<
 ))
 DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName
 
+/** Displays a keyboard-shortcut hint beside a menu item. */
 const DropdownMenuShortcut = ({
   className,
   ...props

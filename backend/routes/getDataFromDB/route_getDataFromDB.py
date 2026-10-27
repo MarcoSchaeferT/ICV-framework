@@ -1,12 +1,24 @@
+"""Serve cached PostgreSQL queries and compact grids for Vis. Interface views.
+
+The ``/api/getDataFromDB`` blueprint returns a common response envelope for
+single fields, counts, multi-column charts, and ``map-grid-v1`` spatial data.
+Successful JSON responses may be gzip encoded and cached by relation scope.
+"""
+
 from flask import request, jsonify, Blueprint, make_response, Response
-from backend.routes.setFilesToDB.db_utils import query_raw, query_columnar
-from backend.routes.processData.aggregateRKIdata import aggregate_rki_data
+from backend.routes.setFilesToDB.db_utils import (
+    query_raw,
+    query_columnar,
+    format_db_error,
+    is_connection_error,
+)
 from backend.cache import response_cache, make_cache_key
 from dataclasses import dataclass
 import gzip
 import time
 from math import ceil, isfinite
 from pydantic import BaseModel, ValidationError
+from backend.schemas import BaseSchema, RelationName
 from typing import Optional, List, Union
 from flasgger import swag_from
 import re
@@ -28,8 +40,21 @@ GRID_COORDINATE_RE = re.compile(
 #***************#
 # *** Route *** #
 #***************#
-class RequestParams(BaseModel):
-  relationName: str
+class RequestParams(BaseSchema):
+  """Validated query parameters accepted by the database endpoint.
+
+  The ``features`` path returns selected row objects and applies its own
+  limit; it currently does not apply ``filterBy`` or ``filterValue``. A single
+  ``feature`` request and ``map-grid-v1`` take different query paths.
+
+  Example:
+    RequestParams(
+      relationName="seas5_forecast_albopictus_habitat_probability",
+      feature="forecast_aug_2026",
+      responseFormat="map-grid-v1",
+    )
+  """
+  relationName: RelationName
   feature: str = ""
   features: Optional[str] = None
   limit: Optional[int] = None
@@ -44,6 +69,23 @@ class RequestParams(BaseModel):
   groupBy: Optional[str] = None
 
 class ResponseJson(BaseModel):
+  """Common JSON envelope for database rows, aggregates, and grid payloads.
+
+  ``response`` varies with the requested task. Errors are also represented
+  in this envelope, including cases that currently return HTTP 200. Clients
+  must check ``error`` as well as the status code. ``rowLimit`` and
+  ``isTruncated`` describe the bounded ``features`` variant.
+
+  Example:
+    ```python
+    payload = ResponseJson(
+      relationName="world_mosquitos_2014_2025_gdf_mosquito_amount",
+      header=["id", "geometry", "mosquito_amount"],
+      response=[{"id": 1, "geometry": "POINT (13.405 52.52)", "feature": 42}],
+      error=None,
+    )
+    ```
+  """
   relationName: str
   header: list[str]
   response: object
@@ -54,6 +96,7 @@ class ResponseJson(BaseModel):
 
 @dataclass(frozen=True, slots=True)
 class CachedJSONResponse:
+  """Serialized response bytes plus encoding (``'identity'`` or ``'gzip'``) and uncompressed byte length."""
   body: bytes
   encoding: str
   uncompressed_length: int
@@ -72,10 +115,17 @@ def _response_payload(response_json: ResponseJson) -> dict:
 
 
 def _requested_encoding() -> str:
+  """Choose gzip when accepted by the client, otherwise identity encoding."""
   return "gzip" if request.accept_encodings["gzip"] > 0 else "identity"
 
 
 def _encode_json_response(payload: object, encoding: str) -> CachedJSONResponse:
+  """Serialize JSON once and optionally gzip it before caching.
+
+  PostgreSQL scalar values fall back to ``str`` during serialization.
+  ``orjson`` is preferred when installed; the standard JSON encoder is the
+  local-development fallback.
+  """
   if orjson is not None:
     # Match Flask's compatibility behavior for PostgreSQL-specific scalar
     # types such as Decimal while retaining orjson's fast native path.
@@ -92,6 +142,7 @@ def _encode_json_response(payload: object, encoding: str) -> CachedJSONResponse:
 
 
 def _make_cached_response(cached: CachedJSONResponse, cache_status: str) -> Response:
+  """Build an HTTP response with encoding, size, and cache-status headers."""
   response = Response(cached.body, status=200, content_type="application/json; charset=utf-8")
   if cached.encoding == "gzip":
     response.headers["Content-Encoding"] = "gzip"
@@ -102,6 +153,7 @@ def _make_cached_response(cached: CachedJSONResponse, cache_status: str) -> Resp
 
 
 def _cache_json_response(cache_key: str, payload: object, relation_name: str) -> Response:
+  """Cache a successful JSON payload under its relation and return a miss."""
   encoded = _encode_json_response(payload, _requested_encoding())
   response_cache.set(
     cache_key,
@@ -114,6 +166,19 @@ def _cache_json_response(cache_key: str, payload: object, relation_name: str) ->
 @swag_from('../../API_docs/get_data_from_db.yml')
 @route_getDataFromDB.route("", methods=["GET"])
 async def getDataFromDB():
+  """Handle GET queries for one relation through the shared response envelope.
+
+  Request parsing uses ``RequestParams``. A ``features`` request is bounded
+  unless ``limit=-1`` is explicitly supplied; ``responseFormat=map-grid-v1``
+  emits aligned column arrays for map cells. Successful results are cached
+  by relation and requested encoding. Reads never run aggregation; clients
+  must submit a separate processing request before querying derived data.
+  Validation and query errors often return the envelope with HTTP 200;
+  only successful results are stored in the response cache. The ``features``
+  path does not apply its optional filter fields.
+
+  See ``API_docs/get_data_from_db.yml`` for query fields and HTTP examples.
+  """
   response_json = ResponseJson(
         relationName="",
         header=list(""),
@@ -197,19 +262,11 @@ async def getDataFromDB():
       # Check table existence and retrieve columns using schema cache
       schema = await get_relation_schema(relationName)
       
-      # Auto-trigger incremental aggregation on demand if an aggregated table is requested
-      if relationName.endswith("_aggregated"):
-          source_table = relationName[:-11]
-          source_schema = await get_relation_schema(source_table)
-          if source_schema["exists"] and source_schema["has_data"]:
-              try:
-                  aggregate_rki_data(source_table=source_table, target_table=relationName, targetDate=params.targetDate)
-                  response_cache.invalidate(relationName)
-                  schema = await get_relation_schema(relationName)
-              except Exception as agg_err:
-                  print(f"[INCREMENTAL AGGREGATE ERROR] Failed for '{relationName}': {agg_err}")
-
       response_json.relationName = relationName
+      if schema.get("error"):
+        response_json.error = schema["error"]
+        return response_json.model_dump()
+
       if not schema["exists"]:
         response_json.error = f"Table '{relationName}' does not exist in the database. Please check the table name or upload the dataset first."
         return response_json.model_dump()
@@ -329,7 +386,7 @@ async def getDataFromDB():
 
       return jsonify(result)
   # If the request method is not GET, return an error or appropriate response
-  return {"ERROR": "Invalid request method."}
+  return jsonify({"error": "Invalid request method."}), 405
 
 
 def _grid_geometry_points(geometry: str) -> tuple[tuple[float, float], ...]:
@@ -396,11 +453,12 @@ def _grid_geometry_metadata(
   latitude: object,
   longitude: object,
 ) -> tuple[list[float], list[float]]:
-  """Return per-dataset cell size and the grid anchor offset.
+  """Return per-dataset cell size ``[lat_height, lng_width]`` and north-west anchor offset.
 
-  The legacy frontend already assumes one uniform resolution per dataset.
-  Deriving these values from the first valid polygon preserves that behavior
-  while avoiding a repeated WKT polygon in every response row.
+  Retained for legacy anchor-based grid geometries where cell bounds are
+  reconstructed from a single ``(latitude, longitude)`` anchor plus a uniform
+  ``cellSize`` and ``anchorOffset``. Current ``map-grid-v1`` payloads emit
+  four explicit corner arrays (``lat0..lng3``) via ``_grid_geometry_corners``.
   """
   north, south, west, east = _grid_geometry_bounds(geometry)
   cell_size = [north - south, east - west]
@@ -421,7 +479,14 @@ async def getDBdata_mapGrid(
   aggregation_level: Optional[str] = None,
   targetDate: Optional[str] = None,
 ) -> tuple[object, str | None]:
-  """Return compact per-cell bounds while preserving source projections."""
+  """Return aligned cell columns for the ``map-grid-v1`` response.
+
+  WKT polygon coordinates are converted to four ``latN``/``lngN`` corner
+  pairs per row. ``id`` is synthesized when the relation has no ID column.
+  The payload includes ``featureName``, ``featureRange``, ``cellSize``, and
+  ``rowCount``; every per-cell array has the same length. A missing geometry
+  or feature column returns an error string alongside an empty result.
+  """
   start_time = time.time()
   schema = await get_relation_schema(relationName)
   column_names = list(schema["columns"].keys())
@@ -435,11 +500,7 @@ async def getDBdata_mapGrid(
   if filterBy and filterValue and filterBy[0] != "" and filterValue[0] != "":
     for fb, fv in zip(filterBy, filterValue):
       if fv != "ALL" and fv != "" and fb != "":
-        if fb == "date":
-          conditions.append(sql.SQL("EXTRACT(YEAR FROM {}) = %s").format(sql.Identifier(fb)))
-        else:
-          conditions.append(sql.SQL("{} = %s").format(sql.Identifier(fb)))
-        params.append(fv)
+        _append_filter_condition(conditions, params, fb, fv)
 
   feature_type = schema["columns"].get(feature, "")
   conditions.append(conditionBuilderFeatureNotEmpty(feature, feature_type, params))
@@ -490,6 +551,7 @@ async def getDBdata_mapGrid(
     has_id = "id" in column_names
 
     def geometry_row_mapper(row: tuple) -> tuple:
+      """Replace one WKT polygon with four ``(latitude, longitude)`` corners."""
       geometry_index = 1 if has_id else 0
       feature_index = geometry_index + 1
       points = _grid_geometry_points(row[geometry_index])
@@ -505,7 +567,7 @@ async def getDBdata_mapGrid(
     columns = await query_columnar(query, result_columns, params, row_mapper=geometry_row_mapper)
   except Exception as e:
     print("ERROR COMPACT GRID QUERY", e)
-    return ("", "ERROR DB QUERY " + str(e))
+    return ("", format_db_error(e))
 
   row_count = len(columns["feature"])
   if "id" not in columns:
@@ -560,10 +622,17 @@ async def getDBdata_mapGrid(
 
 
 async def getDBdata_singleCol( relationName: str, feature: str, filterBy: Optional[List[str]], filterValue: Optional[List[str]], startDate: Optional[str], endDate: Optional[str], aggregation_level: Optional[str] = None, targetDate: Optional[str] = None) -> tuple[object, str | None]:
+  """Query one feature with optional geography, date, and aggregation filters.
+
+  Returns a list of row-oriented map records and an optional error string.
+  The legacy empty-result path supplies one zero-valued placeholder polygon.
+  """
   start_time = time.time()
   
   # 1. Get column names to set up filters from schema cache
   schema = await get_relation_schema(relationName)
+  if schema.get("error"):
+    return ("", schema["error"])
   column_names = list(schema["columns"].keys())
   
   # 2. Build safe selection list
@@ -596,12 +665,7 @@ async def getDBdata_singleCol( relationName: str, feature: str, filterBy: Option
   if filterBy and filterValue and filterBy[0] != "" and filterValue[0] != "":
       for fb, fv in zip(filterBy, filterValue):
           if fv != "ALL" and fv != "" and fb != "":
-              if fb == "date":
-                  conditions.append(sql.SQL("EXTRACT(YEAR FROM {}) = %s").format(sql.Identifier(fb)))
-                  params.append(fv)
-              else:
-                  conditions.append(sql.SQL("{} = %s").format(sql.Identifier(fb)))
-                  params.append(fv)
+              _append_filter_condition(conditions, params, fb, fv)
   
   if feature:
       conditions.append(conditionBuilderFeatureNotEmpty(feature, feature_type, params))
@@ -638,8 +702,7 @@ async def getDBdata_singleCol( relationName: str, feature: str, filterBy: Option
     records_raw = await query_raw(query, params)
   except Exception as e:
     print("ERROR DB QUERY", e)
-    data = "ERROR DB QUERY " + str(e)
-    return ("", data)
+    return ("", format_db_error(e))
 
   end_time = time.time()
   print(f"Query execution time: {end_time - start_time} seconds")
@@ -671,7 +734,7 @@ async def getDBdata_singleCol( relationName: str, feature: str, filterBy: Option
         ]
     except Exception as e:
       print("ERROR DB QUERY-PROCESSING", e)
-      data: str = "ERROR DB QUERY " + str(e)
+      data: str = f"Database query processing error: {e}"
       return ("", data)
 
   end_processing_time = time.time()
@@ -682,6 +745,7 @@ async def getDBdata_singleCol( relationName: str, feature: str, filterBy: Option
 
 
 async def getDBdata_singleColCount( relationName, feature, filterBy, filterValue) -> tuple[object, str | None]:
+  """Count rows per feature value after applying optional equality filters."""
   start_time = time.time()
   
   where_clause, params = conditionBuilderEquals(filterBy, filterValue)
@@ -697,8 +761,7 @@ async def getDBdata_singleColCount( relationName, feature, filterBy, filterValue
     records_raw = await query_raw(query, params)
   except Exception as e:
     print("ERROR DB QUERY", e)
-    data = "ERROR DB QUERY " + str(e)
-    return ("", data)
+    return ("", format_db_error(e))
 
   end_time = time.time()
 
@@ -716,7 +779,7 @@ async def getDBdata_singleColCount( relationName, feature, filterBy, filterValue
     ]
   except Exception as e:
     print("ERROR DB QUERY", e)
-    data = "ERROR DB QUERY " + str(e)+" does not exist"
+    data = f"Database query processing error: {e}"
     return ("", data)
 
   end_processing_time = time.time()
@@ -758,12 +821,13 @@ async def getDBdata_groupedCount(
     ], None)
   except Exception as e:
     print("ERROR GROUPED COUNT QUERY", e)
-    return ("", "ERROR DB QUERY " + str(e))
+    return ("", format_db_error(e))
 
 
 
 
 async def getDBdata_singleColUnique( relationName, feature) -> tuple[object, str | None]:
+  """Return distinct feature values; ``date`` yields calendar years instead."""
 
   result_key = feature
   if feature == "date":
@@ -783,9 +847,8 @@ async def getDBdata_singleColUnique( relationName, feature) -> tuple[object, str
   try:
     records_raw = await query_raw(query)
   except Exception as e:
-        print("ERROR DB QUERY", e)
-        data = "ERROR DB QUERY " + str(e)
-        return ("", data)
+    print("ERROR DB QUERY", e)
+    return ("", format_db_error(e))
 
   records_json = []
   try:
@@ -797,13 +860,14 @@ async def getDBdata_singleColUnique( relationName, feature) -> tuple[object, str
       ]
   except Exception as e:
     print("ERROR DB QUERY", e)
-    data = "ERROR DB QUERY " + str(e)+" does not exist"
+    data = f"Database query processing error: {e}"
     return ("", data)
 
   return (records_json, None)
 
 
 async def getDBdata_singleColMinMax(relationName, feature) -> tuple[object, str | None]:
+  """Return ``min_val`` and ``max_val`` for a feature, or an error tuple."""
   query = sql.SQL("SELECT MIN({}) AS min_val, MAX({}) AS max_val FROM {}").format(
       sql.Identifier(feature),
       sql.Identifier(feature),
@@ -820,6 +884,7 @@ async def getDBdata_singleColMinMax(relationName, feature) -> tuple[object, str 
 
 
 async def getDBdata_HEADER(relationName):
+  """Fetch at most one row to expose a relation's available columns."""
   query = sql.SQL("SELECT * FROM {} LIMIT 1").format(sql.Identifier(relationName))
   first_record = await query_raw(query)
   return first_record
@@ -828,6 +893,12 @@ async def getDBdata_HEADER(relationName):
 
 
 async def getDBdata_multiCol( relationName: str, feature: str, filterBy: Optional[List[str]], filterValue: Optional[List[str]], startDate: Optional[str], endDate: Optional[str], aggregation_level: Optional[str]= None) -> tuple[object, str | None]:
+  """Query a numbered feature series for legacy multi-month chart views.
+
+  The result contains one geometry array and parallel feature arrays.
+  Monthly suitability relations are queried separately; an empty result
+  retains the legacy placeholder geometry with no feature values.
+  """
 
   start_time = time.time()
   
@@ -868,12 +939,7 @@ async def getDBdata_multiCol( relationName: str, feature: str, filterBy: Optiona
               for fb, fv in zip(filterBy, filterValue):
                   if fv != "ALL" and fv != "" and fb != "":
                       if fb in column_names:
-                          if fb == "date":
-                              conditions.append(sql.SQL("EXTRACT(YEAR FROM {}) = %s").format(sql.Identifier(fb)))
-                              params.append(fv)
-                          else:
-                              conditions.append(sql.SQL("{} = %s").format(sql.Identifier(fb)))
-                              params.append(fv)
+                          _append_filter_condition(conditions, params, fb, fv)
                               
           feature_type = await get_feature_column_type(target_relation, tmpFeature)
           conditions.append(conditionBuilderFeatureNotEmpty(tmpFeature, feature_type, params))
@@ -900,8 +966,7 @@ async def getDBdata_multiCol( relationName: str, feature: str, filterBy: Optiona
               records_rawStore.append(records_raw)
           except Exception as e:
               print(f"ERROR DB QUERY month {m}", e)
-              data = f"ERROR DB QUERY month {m} " + str(e)
-              return ("", data)
+              return ("", format_db_error(e, f"Database query error month {m}"))
               
       end_time = time.time()
       print(f"Query execution time (monthly): {end_time - start_time} seconds")
@@ -964,12 +1029,7 @@ async def getDBdata_multiCol( relationName: str, feature: str, filterBy: Optiona
   if filterBy and filterValue and filterBy[0] != "" and filterValue[0] != "":
     for fb, fv in zip(filterBy, filterValue):
         if fv != "ALL" and fv != "" and fb != "":
-            if fb == "date":
-                conditions.append(sql.SQL("EXTRACT(YEAR FROM {}) = %s").format(sql.Identifier(fb)))
-                params.append(fv)
-            else:
-                conditions.append(sql.SQL("{} = %s").format(sql.Identifier(fb)))
-                params.append(fv)
+            _append_filter_condition(conditions, params, fb, fv)
   
   # Ensure the first feature is not empty
   first_feature = features_to_select[0]
@@ -997,8 +1057,7 @@ async def getDBdata_multiCol( relationName: str, feature: str, filterBy: Optiona
     records_raw = await query_raw(query, params)
   except Exception as e:
     print("ERROR DB QUERY-", e)
-    data = "ERROR DB QUERY " + str(e)
-    return ("", data)
+    return ("", format_db_error(e))
 
   end_time = time.time()
   print(f"Query execution time (single multi-column): {end_time - start_time} seconds")
@@ -1029,6 +1088,11 @@ async def getDBdata_multiCol( relationName: str, feature: str, filterBy: Optiona
 
 
 async def getDBdata_allCols(relationName: str, targetDate: Optional[str] = None, startDate: Optional[str] = None, endDate: Optional[str] = None) -> tuple[object, str | None]:
+  """Return all relation columns, selecting report dates when present.
+
+  With no date filter, only the latest ``datenstand`` or ``date`` snapshot
+  is selected. Date objects are serialized to ``YYYY-MM-DD`` strings.
+  """
   start_time = time.time()
   schema = await get_relation_schema(relationName)
   column_names = list(schema["columns"].keys())
@@ -1071,14 +1135,14 @@ async def getDBdata_allCols(relationName: str, targetDate: Optional[str] = None,
           records_raw = await query_raw(query, query_params)
       except Exception as e:
           print("ERROR DB QUERY-", e)
-          return ("", f"ERROR DB QUERY {e}")
+          return ("", format_db_error(e))
   else:
       query = sql.SQL("SELECT * FROM {}").format(sql.Identifier(relationName))
       try:
           records_raw = await query_raw(query)
       except Exception as e:
           print("ERROR DB QUERY-", e)
-          return ("", f"ERROR DB QUERY {e}")
+          return ("", format_db_error(e))
   print("records_raw", len(records_raw))
   
 
@@ -1119,6 +1183,8 @@ async def getDBdata_selectedCols(
   retain their stable database order; other tables use the returned row order.
   """
   schema = await get_relation_schema(relationName)
+  if schema.get("error"):
+    return ([], schema["error"], False)
   column_names = list(schema["columns"].keys())
   select_items = [sql.Identifier(feature) for feature in features]
 
@@ -1137,7 +1203,7 @@ async def getDBdata_selectedCols(
       records_raw = await query_raw(query, query_params)
   except Exception as e:
       print("ERROR DB MULTI-COLUMN QUERY", e)
-      return ([], f"ERROR DB QUERY {e}", False)
+      return ([], format_db_error(e), False)
 
   is_truncated = row_limit is not None and len(records_raw) > row_limit
   if row_limit is not None:
@@ -1160,6 +1226,10 @@ async def getDBdata_selectedCols(
 
 
 def consumeARGSvalues(argsValues) -> list[str]:
+  """Decode the legacy quoted query-list format into string values.
+
+  Missing input yields ``[""]`` so callers can treat absent filters uniformly.
+  """
   if argsValues is None:
     return [""]
   print("consumeARGSvalues", argsValues)
@@ -1174,6 +1244,11 @@ def consumeARGSvalues(argsValues) -> list[str]:
   return consumedValues
 
 def conditionBuilderEquals(filterBy: List[str], filterValue: List[str]) -> tuple[Optional[sql.Composed], Optional[list]]:
+   """Build an AND-combined equality filter and its bound parameters.
+
+   Returns ``(None, None)`` for mismatched, empty, or inactive filters.
+   A four-digit value for ``date`` becomes a calendar-year range.
+   """
    if isinstance(filterBy, list) and isinstance(filterValue, list):
       if len(filterBy) != len(filterValue):
         return None, None
@@ -1184,22 +1259,39 @@ def conditionBuilderEquals(filterBy: List[str], filterValue: List[str]) -> tuple
       params = []
       for fb, fv in zip(filterBy, filterValue):
         if fv != "ALL" and fv != "" and fb != "":
-          if fb == "date":
-            # Extract year from date if filterBy is 'date'
-            conditions.append(sql.SQL("EXTRACT(YEAR FROM {}) = %s").format(sql.Identifier(fb)))
-            params.append(fv)
-          else:
-            conditions.append(sql.SQL("{} = %s").format(sql.Identifier(fb)))
-            params.append(fv)
+          _append_filter_condition(conditions, params, fb, fv)
       
       if not conditions:
         return None, None
-      
+
       where_clause = sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions)
       return where_clause, params
    return None, None
 
+
+def _append_filter_condition(
+  conditions: list[sql.Composed],
+  params: list,
+  column_name: str,
+  value: str,
+) -> None:
+  """Append an index-friendly equality or calendar-year condition."""
+  if column_name == "date" and re.fullmatch(r"\d{4}", str(value)):
+    year = int(value)
+    if 1 <= year < 9999:
+      identifier = sql.Identifier(column_name)
+      conditions.append(sql.SQL("{} >= %s AND {} < %s").format(identifier, identifier))
+      params.extend((f"{year:04d}-01-01", f"{year + 1:04d}-01-01"))
+      return
+
+  conditions.append(sql.SQL("{} = %s").format(sql.Identifier(column_name)))
+  params.append(value)
+
 def conditionBuilderFeatureNotEmpty(feature: str, feature_type: str, params: list) -> sql.Composed:
+  """Exclude NULL and type-specific sentinel values from a feature query.
+
+  Appends sentinel values to ``params`` for the composed SQL placeholders.
+  """
   not_in_values = get_not_in_values(feature_type)
   placeholders = sql.SQL(", ").join(sql.Placeholder() * len(not_in_values))
   params.extend(not_in_values)
@@ -1212,6 +1304,7 @@ def conditionBuilderFeatureNotEmpty(feature: str, feature_type: str, params: lis
 
 
 def get_not_in_values(feature_type: str) -> list:
+    """Return missing-value sentinels appropriate for a PostgreSQL type."""
     feature_type = feature_type.lower() if feature_type else ""
 
     if feature_type in {"integer", "bigint", "smallint"}:
@@ -1228,6 +1321,7 @@ def get_not_in_values(feature_type: str) -> list:
         return ["NULL"]
 
 def conditionBuilderRange(start: str, end: str, attribute: str, params: list) -> sql.Composed:
+  """Build an inclusive SQL range and append both bound endpoints."""
   params.extend([start, end])
   return sql.SQL(" {} >= %s AND {} <= %s ").format(
       sql.Identifier(attribute),
@@ -1236,8 +1330,11 @@ def conditionBuilderRange(start: str, end: str, attribute: str, params: list) ->
 
 
 async def get_relation_schema(relationName: str) -> dict:
-  """Retrieve schema (column names and data types) for a relation.
-  Uses the response_cache to cache schema info.
+  """Cache a relation's columns, types, existence, and nonempty status.
+
+  Returns ``{"exists": bool, "has_data": bool, "columns": dict}``.
+  A schema lookup error is reported with an ``error`` key and ``is_connection_error`` flag;
+  a failed row probe is reported as ``has_data=False``. Errors are never cached.
   """
   cache_key = f"schema|{relationName}"
   cached = response_cache.get(cache_key)
@@ -1250,7 +1347,13 @@ async def get_relation_schema(relationName: str) -> dict:
       records = await query_raw(query, (sanitized_table,))
   except Exception as e:
       print(f"Error querying schema for {relationName}: {e}")
-      return {"exists": False, "has_data": False, "columns": {}}
+      return {
+          "exists": False,
+          "has_data": False,
+          "columns": {},
+          "error": format_db_error(e, f"Error inspecting schema for '{relationName}'"),
+          "is_connection_error": is_connection_error(e),
+      }
 
   if not records:
       schema = {"exists": False, "has_data": False, "columns": {}}
@@ -1277,6 +1380,7 @@ async def get_relation_schema(relationName: str) -> dict:
 
 
 async def get_feature_column_type(relationName: str, feature: str) -> str:
+  """Read a feature's PostgreSQL type from the cached relation schema."""
   schema = await get_relation_schema(relationName)
   return schema["columns"].get(feature, "")
 

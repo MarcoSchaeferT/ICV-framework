@@ -1,16 +1,14 @@
 
 "use client";
 
-import { useRef, useEffect, useMemo } from 'react'
+import React, { useRef, useEffect, useMemo } from 'react'
 import {apiRoutes } from "@/app/api_routes";
-import React from 'react';
 import { InterfaceContextProvider, useInterfaceContext } from '@/components/contexts/InterfaceContext';
 import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
 import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '@/components/plots/maps/LeafD3Map';
 import { createSwapy, Swapy } from 'swapy';
 import LinechartComponent, { LinechartProps } from '@/components/plots/linechart/linechart';
-
 import { useLocale ,useTranslations } from "next-intl";
 import { t_richConfig } from "@/app/const_store";
 import { useGetJSONData } from "@/app/hooks/useFetchAndCache";
@@ -21,7 +19,6 @@ import {ViewMainInfoComponent} from '@/components/ViewPageMainInfo';
 import * as d3 from 'd3';
 import { useUIContext } from '@/components/contexts/UIContext';
 import { useLoadingTask, LoadingSpinnerAnimation } from '@/components/plots/maps/utils/loadingSpinner';
-
 import {
   Tabs,
   TabsContent,
@@ -29,12 +26,10 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 
-
-
 const isSWAPY = true;
 
 /**
- * Renders the raw-data exploration dashboard with linked map and temporal chart views.
+ * Renders the raw-data exploration Vis. Interface with linked map and temporal chart views.
  *
  * @returns Localized, resizable Leaflet/D3 and data-analysis cards.
  */
@@ -210,6 +205,16 @@ export default function Home() {
     );
 }
 
+/**
+ * Displays the current dataset, feature, selected country, or color palette.
+ *
+ * @param query - Summary field to render: `dataSet`, `feature`, `country`, or `colorMap`.
+ * @param locale - Locale used to request and display feature metadata.
+ * @param t - Localized labels supplied by the parent page.
+ * @returns A compact Vis. Interface summary or a loading state for feature metadata.
+ * @remarks The feature description is loaded through `useGetJSONData`; the other
+ * values follow changes in `InterfaceContext` without their own requests.
+ */
 function ShowDataSet({ query, locale, t }: { query: string ; locale: string; t: any }) {
   let c = useInterfaceContext();
   let queryV = query; 
@@ -298,6 +303,16 @@ function ShowDataSet({ query, locale, t }: { query: string ; locale: string; t: 
 }
 
 
+/**
+ * Builds a time-series card for the country currently selected on the world map.
+ *
+ * @param featureRaw - Source feature, such as `t2m_1` for temperature.
+ * @param name - Localized card heading.
+ * @returns A linked line-chart card or an error card when its dataset is absent.
+ * @remarks The data request uses the selected country's `gu_a3` code, falling
+ * back to `COL`. Numbered feature suffixes become wildcard queries such as
+ * `t2m_*`; land-use and probability features keep their exact names.
+ */
 function DynamicLineChart({ featureRaw, name }: { featureRaw: string, name: string }) {
   let c = useInterfaceContext();
   const locale = useLocale();

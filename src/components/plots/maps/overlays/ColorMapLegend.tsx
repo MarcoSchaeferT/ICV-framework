@@ -10,6 +10,8 @@ import { getGoodReadableRange } from '../helpers';
  *
  * @example
  * ```ts
+ * import type { ColorMapLegendProps } from "@/framework";
+ *
  * const legend: ColorMapLegendProps = {
  *   chartId: "albopictus-habitat-map",
  *   colorMapType: "interpolateInferno",
@@ -41,15 +43,15 @@ export interface ColorMapLegendProps {
     layerOpacity: number;
     /** BCP-47 locale identifier for localized number formatting (e.g. "en", "de") */
     locale: string;
-    /** Outer SVG width in pixels. @default 5 */
+    /** Outer SVG width in pixels. @defaultValue 5 */
     width?: number;
-    /** Outer SVG height in pixels. @default 160 */
+    /** Outer SVG height in pixels. @defaultValue 160 */
     height?: number;
-    /** Width of the vertical color gradient bar in pixels. @default 10 */
+    /** Width of the vertical color gradient bar in pixels. @defaultValue 10 */
     barWidth?: number;
-    /** Visibility toggle flag. @default true */
+    /** Visibility toggle flag. @defaultValue true */
     isVisible?: boolean;
-    /** Target number of axis ticks along the color scale. @default 5 */
+    /** Target number of axis ticks along the color scale. @defaultValue 5 */
     tickCount?: number;
 }
 
@@ -71,12 +73,18 @@ export interface ColorMapLegendProps {
  *
  * @example
  * ```tsx
+ * import { ColorMapLegend } from "@/framework";
+ *
+ * const metaData = {
+ *   mean: { valuename: "mean", dimension: "probability", description: "Habitat suitability", availability: "2024" },
+ * };
+ *
  * <ColorMapLegend
  *   chartId="habitat-map-legend"
  *   colorMapType="interpolateInferno"
  *   minVal={0.0}
  *   maxVal={1.0}
- *   selectedFeature="prob_7"
+ *   selectedFeature="mean"
  *   metaData={metaData}
  *   layerOpacity={0.85}
  *   locale="en"

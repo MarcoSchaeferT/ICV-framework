@@ -1,0 +1,111 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: DataTableProps
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Configuration for a database-backed data table.
+
+## Remarks
+
+Columns come from the database response. `relationName` selects the dataset;
+optional row-selection fields let a linked view identify a matching record.
+`targetDate` narrows relations that support dated snapshots.
+Row clicks can notify a parent through `onClickEvent`; no Vis. Interface context is required.
+An external selection opens its page and scrolls the row into view.
+
+## Example
+
+```tsx
+import { CardPropsClass, type DataTableProps } from "@/framework";
+
+const config: DataTableProps = {
+  relationName: "dengue_serotypes",
+  cardProps: CardPropsClass(
+    "regional-data-table",
+    "Regional observations",
+    "Select a row to coordinate linked views",
+    "Source: Surveillance",
+  ),
+  onClickEvent: (row) => console.log(row.original),
+};
+```
+
+## Properties
+
+### relationName
+
+> **relationName**: `string`
+
+Public database relation whose current snapshot populates the table.
+
+***
+
+### targetDate?
+
+> `optional` **targetDate?**: `string`
+
+Optional date filter for relations with dated snapshots.
+
+***
+
+### rowKeyColumn?
+
+> `optional` **rowKeyColumn?**: `string`
+
+Column containing a unique, stable row key; defaults to `id`, then the source index.
+
+#### Default Value
+
+```ts
+"id"
+```
+
+***
+
+### cardProps
+
+> **cardProps**: [`CardPropsClass`](CardPropsClass)
+
+Standard Vis. Interface card presentation.
+
+***
+
+### onClickEvent?
+
+> `optional` **onClickEvent?**: (`row`, `rowKey`) => `void`
+
+Optional row-click handler receiving the record and its stable table key.
+
+#### Parameters
+
+##### row
+
+[`DataTableRow`](../type-aliases/DataTableRow)
+
+##### rowKey
+
+`string`
+
+#### Returns
+
+`void`
+
+***
+
+### selectedRowColumn?
+
+> `optional` **selectedRowColumn?**: `string`
+
+Column used to match an external selection; the matching row is paged into view.
+
+***
+
+### selectedRowValue?
+
+> `optional` **selectedRowValue?**: `string` \| `number`
+
+Value to locate in `selectedRowColumn`; omit to disable linked selection.

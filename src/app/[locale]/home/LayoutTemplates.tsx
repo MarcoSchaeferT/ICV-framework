@@ -7,7 +7,7 @@ import { layoutTemplatesList } from "@messages/layoutTemplatesContent";
 import { useUIContext } from "@/components/contexts/UIContext";
 
 /**
- * Client component that renders the localized grid of available dashboard layout templates.
+ * Client component that renders the localized grid of available Vis. Interface layout templates.
  *
  * @returns Responsive grid of interactive cards linking to each layout template route.
  *

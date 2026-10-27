@@ -1,0 +1,52 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: ColorMapLegend
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> `const` **ColorMapLegend**: `React.FC`\<[`ColorMapLegendProps`](../interfaces/ColorMapLegendProps)\>
+
+Universal color map legend component using classical D3 SVG imperative rendering.
+
+Renders a vertical color scale bar with unit-aligned axis ticks, handling:
+- Feature-to-metadata alignment (`alignFeature_to_Metadata` for unit scaling)
+- Human-readable numeric ranges (`getGoodReadableRange`)
+- Symmetric domain centering for `interpolateRdBu` diverging color maps
+- Opacity-aware SVG gradient stops matching map layer alpha settings
+- Dynamic SVG container auto-sizing based on rendered text bounding boxes
+
+## Param
+
+**props**
+
+Configuration properties defined in [ColorMapLegendProps](../interfaces/ColorMapLegendProps).
+
+## Remarks
+
+In multi-view map layouts, legend SVG gradient IDs must be unique to avoid SVG linearGradient collision bugs.
+`pointer-events: none` is set on the container SVG element so hovering or clicking over legend overlays does not block map navigation.
+
+## Example
+
+```tsx
+import { ColorMapLegend } from "@/framework";
+
+const metaData = {
+  mean: { valuename: "mean", dimension: "probability", description: "Habitat suitability", availability: "2024" },
+};
+
+<ColorMapLegend
+  chartId="habitat-map-legend"
+  colorMapType="interpolateInferno"
+  minVal={0.0}
+  maxVal={1.0}
+  selectedFeature="mean"
+  metaData={metaData}
+  layerOpacity={0.85}
+  locale="en"
+  height={160}
+/>
+```

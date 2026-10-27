@@ -1,0 +1,68 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: InterfaceContextProviderProps
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Initial selection and child content for the linked-view context provider.
+
+## Remarks
+
+The optional grid-cell index and database row ID identify different keys;
+UQ/XAI SVG endpoints require the database row ID for the selected cell.
+
+## Example
+
+```tsx
+import type { InterfaceContextProviderProps } from "@/framework";
+
+const initialSelection: InterfaceContextProviderProps = {
+  children: <div>Habitat suitability map</div>,
+  initialSelectedGridcellID: 300625,
+  initialDbRowIDOfSelectedGridcell: 48292,
+};
+```
+
+## See
+
+ - [useInterfaceContext](../functions/useInterfaceContext) to consume state in child components.
+ - [interfaceContextI](InterfaceContextValue) for complete shape of context state.
+
+## Properties
+
+### children
+
+> **children**: `ReactNode`
+
+React subtree sharing Vis. Interface selection state.
+
+***
+
+### initialSelectedGridcellID?
+
+> `optional` **initialSelectedGridcellID?**: `number`
+
+Optional initial spatial grid key for showcases with a meaningful default cell.
+
+#### Default Value
+
+```ts
+-1
+```
+
+***
+
+### initialDbRowIDOfSelectedGridcell?
+
+> `optional` **initialDbRowIDOfSelectedGridcell?**: `number`
+
+Optional initial database row ID corresponding to the selected spatial cell.
+
+#### Default Value
+
+```ts
+200509
+```

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,18 +44,22 @@ function uploadFileWithProgress(
     xhr.onload = () => {
       if (xhr.status >= 400) {
         let errDetail = `Server returned HTTP ${xhr.status} ${xhr.statusText || ""}`.trim();
-        if (xhr.response && typeof xhr.response === "object" && xhr.response.ERROR) {
-          errDetail = xhr.response.ERROR;
+        const resErr =
+          xhr.response && typeof xhr.response === "object"
+            ? xhr.response.error
+            : undefined;
+        if (resErr) {
+          errDetail = String(resErr);
         }
-        resolve({ ERROR: errDetail });
+        resolve({ error: errDetail });
       } else if (!xhr.response) {
-        resolve({ ERROR: `Server returned HTTP ${xhr.status} with empty/non-JSON response` });
+        resolve({ error: `Server returned HTTP ${xhr.status} with empty/non-JSON response` });
       } else {
         resolve(xhr.response);
       }
     };
-    xhr.onerror = () => resolve({ ERROR: "Network connection lost or server unreachable during upload transfer" });
-    xhr.onabort = () => resolve({ ERROR: "Upload aborted by user" });
+    xhr.onerror = () => resolve({ error: "Network connection lost or server unreachable during upload transfer" });
+    xhr.onabort = () => resolve({ error: "Upload aborted by user" });
     xhr.send(formData);
   });
 }
@@ -76,10 +80,9 @@ export default function FileUploadForm() {
   const t = useTranslations('page_upload');
   const { setIsDemoModeDialogOpen, demoMode } = useUIContext();
 
-  const files = useRef<File[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
   const [curFile, setCurFile] = useState<string>("");
-  const [prevFile, setPrevFile] = useState<string>("");
-  const processedFilesRef = useRef<{
+  const [processedFiles, setProcessedFiles] = useState<{
     [key: string]: string;
   }>({});
   const [collectErrors, setCollectErrors] = useState<string[]>([]);
@@ -92,11 +95,8 @@ export default function FileUploadForm() {
   // Transfer is measured in the browser; later phases come from the backend.
   const [phase, setPhase] = useState<"idle" | "transfer" | "db" | "country" | "complete">("idle");
   const [hasGeometry, setHasGeometry] = useState<boolean>(false);
-  const [isUpdate, setIsUpdate] = useState<boolean>(false);
-
-  let message = useRef<string>("created");
-  let complete = useRef<boolean>(false);
-  let error =  useRef<boolean>(false);
+  const [complete, setComplete] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   /** Backend upload result keyed by uploaded relation or status field. */
   interface UploadResponse {
@@ -126,48 +126,38 @@ export default function FileUploadForm() {
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     let validFiles = acceptedFiles.filter(checkedFiles_Type_Size_NameLength);
-    files.current = [...files.current, ...validFiles];
-    complete.current = false;
+    setFiles((previous) => [...previous, ...validFiles]);
+    setComplete(false);
     setUploadProgress(0);
     setDbProgress(0);
     setCountryProgress(0);
     setHasGeometry(false);
-    processedFilesRef.current = {};
+    setProcessedFiles({});
     setCollectErrors([]);
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, disabled: isUploading });
 
   const removeFile = (file: File) => {
-    files.current = files.current.filter((f) => f !== file);
+    setFiles((previous) => previous.filter((item) => item !== file));
   };
 
 
 
-  useEffect(() => {
-    localStorage.setItem("pendingUploads", JSON.stringify(files));
-  }, [files]);
-  
-  useEffect(() => {
-    const savedFiles = JSON.parse(localStorage.getItem("pendingUploads") || "[]");
-    if (savedFiles.length > 0) {
-      files.current = savedFiles;
-      handleUpload();
-    }
-  }, []);
-  
-
   const handleUpload = async () => {
+    if (isUploading || files.length === 0) return;
     if (demoMode) {
       setIsDemoModeDialogOpen(true);
       return;
     }
 
-    processedFilesRef.current = {};
+    const queuedFiles = files;
+    let uploadFailed = false;
+    setIsUploading(true);
+    setProcessedFiles({});
     setuploadResponse({});
     setCollectErrors([]);
-    complete.current = false;
-    error.current = false;
+    setComplete(false);
     setHasGeometry(false);
     setDbProgress(0);
     setCountryProgress(0);
@@ -239,10 +229,9 @@ export default function FileUploadForm() {
         }
 
         if (status.error !== "false") {
-          setuploadResponse({ ERROR: (t("feedback.error") + ": " + status.error) });
+          setuploadResponse({ error: (t("feedback.error") + ": " + status.error) });
           setCollectErrors((prev) => [...prev, status.error]);
-          error.current = true;
-          return;
+          return false;
         }
 
         const progress = Number(status.progress.toFixed(2));
@@ -250,7 +239,7 @@ export default function FileUploadForm() {
         setUploadProgress(progress);
         if (progress === 100) {
           setPhase("complete");
-          return;
+          return true;
         }
 
         await new Promise((resolve) =>
@@ -259,8 +248,8 @@ export default function FileUploadForm() {
       }
     }
 
-    console.log("Files to upload:", files);
-    for (const file of files.current) {
+    console.log("Files to upload:", queuedFiles);
+    for (const file of queuedFiles) {
       setCurFile(file.name);
       // Transfer phase: XHR reports the real byte progress of the POST.
       // uploadProgress = 1 keeps the existing "busy" gating (disabled button,
@@ -279,20 +268,27 @@ export default function FileUploadForm() {
         );
         console.log("response: ", jsonResponse);
 
-        if (!jsonResponse || jsonResponse["ERROR"] || !jsonResponse["upload_id"]) {
+        const postError =
+          jsonResponse && typeof jsonResponse === "object"
+            ? jsonResponse["error"]
+            : undefined;
+        if (!jsonResponse || postError || !jsonResponse["upload_id"]) {
           const uploadError =
-            (jsonResponse && jsonResponse["ERROR"]) || "Upload failed: no response from server";
-          setuploadResponse({ ERROR: (t("feedback.error") + ": " + uploadError) });
+            postError || "Upload failed: no response from server";
+          setuploadResponse({ error: (t("feedback.error") + ": " + uploadError) });
           setCollectErrors((prev) => [...prev, uploadError]);
-          error.current = true;
+          uploadFailed = true;
           break;
         }
-        message.current = (jsonResponse["table_exist"] === true) ? "updated" : "created";
+        const resultMessage = jsonResponse["table_exist"] === true ? "updated" : "created";
 
         // Processing phase: poll until the backend has finished this upload
         setPhase("db");
-        await watchProgress(jsonResponse["upload_id"]);
-        if (error.current) break;
+        if (!await watchProgress(jsonResponse["upload_id"])) {
+          uploadFailed = true;
+          break;
+        }
+        setProcessedFiles((previous) => ({ ...previous, [file.name]: resultMessage }));
         console.log("File successfully uploaded:", file.name);
       } catch (uploadError) {
         console.error("Error uploading files:", uploadError);
@@ -301,39 +297,26 @@ export default function FileUploadForm() {
             ? uploadError.message
             : t("feedback.progressStatusUnavailable");
         const msg = `${file.name}: ${errorDetail}`;
-        setuploadResponse({ ERROR: (t("feedback.error") + ": " + msg) });
+        setuploadResponse({ error: (t("feedback.error") + ": " + msg) });
         setCollectErrors((prev) => [...prev, msg]);
-        error.current = true;
+        uploadFailed = true;
         break;
       }
     }
 
-    if (!error.current) {
+    if (!uploadFailed) {
       setuploadResponse({ SUCCESS: (t("feedback.success")) });
     }
-    files.current = [];
+    setFiles((previous) => previous.filter((file) => !queuedFiles.includes(file)));
     setCurFile("");
     setUploadProgress(0);
     setTransferProgress(0);
     setDbProgress(0);
     setCountryProgress(0);
     setPhase("idle");
-    complete.current = true;
+    setComplete(true);
+    setIsUploading(false);
   };
-  //let complete: boolean = (files.length === 0 && uploadResponse !== undefined && (typeof uploadResponse["ERROR"] === 'string' || typeof uploadResponse["SUCCESS"] === 'string'));
-  useEffect(() => {
-    console.log("Setting processedFiles: ", curFile, message.current, prevFile);
-    if (prevFile != "") {
-      console.log("processedFilesREAL: ", prevFile, message.current);
-      processedFilesRef.current[prevFile] = message.current;
-      const fileToRemove = files.current.find((file) => file.name === prevFile);
-      if (fileToRemove) {
-        // removeFile(fileToRemove);
-      }
-    }
-    setPrevFile(curFile);
-  }, [curFile]);
-
   return (
     <>
       <Card className="w-full max-w-md  ">
@@ -363,9 +346,9 @@ export default function FileUploadForm() {
               </p>
             )}
           </div>
-          {files.current.length > 0 && (
+          {files.length > 0 && (
             <div className="space-y-2 ">
-              {files.current.map((file, index) => (
+              {files.map((file, index) => (
                 <div
                   key={index}
                   className="flex items-center justify-between bg-gray-100 rounded"
@@ -380,10 +363,8 @@ export default function FileUploadForm() {
                     variant="ghost"
                     className="bg-indigo-600 hover:bg-indigo-500"
                     size="sm"
-                    onClick={() => {
-                      removeFile(file)
-                      setIsUpdate(!isUpdate)
-                    }}
+                    onClick={() => removeFile(file)}
+                    disabled={isUploading}
                   >
                     <X className="h-4 w-4 text-white" />
                   </Button>
@@ -391,21 +372,16 @@ export default function FileUploadForm() {
               ))}
             </div>
           )}
-          {Object.keys(processedFilesRef.current).length > 0 && (
-            <div className="text-center  text-slate-600"></div>
-          )}
-          {(complete.current || uploadProgress > 0) &&
-            Object.keys(processedFilesRef.current).length !== 0 && (
+          {(complete || uploadProgress > 0) &&
+            Object.keys(processedFiles).length !== 0 && (
               /* processed: */
               <div className="content-start text-slate-600">{t.rich("feedback.progressProcessed")}:</div>
             )}
-          {(complete.current || uploadProgress > 0) &&
-            Object.keys(processedFilesRef.current).map((fileName, index) => (
+          {(complete || uploadProgress > 0) &&
+            Object.keys(processedFiles).map((fileName, index) => (
               <div
                 key={index}
-                className={`flex items-center justify-between rounded ${
-                  error.current ? "bg-red-100" : "bg-emerald-100"
-                }`}
+                className="flex items-center justify-between rounded bg-emerald-100"
                 title={fileName}
               >
                 <div className="flex items-center space-x-2">
@@ -414,7 +390,7 @@ export default function FileUploadForm() {
                     {fileName}
                   </span>
                 </div>
-                <span className="text-sm">{processedFilesRef.current[fileName]}</span>
+                <span className="text-sm">{processedFiles[fileName]}</span>
               </div>
             ))}
           {curFile != "" && (
@@ -423,7 +399,7 @@ export default function FileUploadForm() {
              {t.rich("feedback.progressWorkingOn")}: <i>{curFile}</i>
             </div>
           )}
-          {(complete.current || uploadProgress > 0) && files.current.length !== 0 && (
+          {(complete || uploadProgress > 0) && files.length !== 0 && (
             <div className="space-y-1">
               <div className="flex truncate max-w-xl items-center space-x-2">
                 {t.rich("feedback.progressText")}
@@ -438,11 +414,11 @@ export default function FileUploadForm() {
               </div>
             </div>
           )}
-          {(complete.current || phase === "db" || phase === "country" || phase === "complete") && files.current.length !== 0 && (
+          {(complete || phase === "db" || phase === "country" || phase === "complete") && files.length !== 0 && (
             <div className="space-y-1">
               <div className="flex truncate max-w-xl items-center space-x-2">
                 {t.rich("feedback.progressDBIntegration")}
-                {!complete.current && phase === "db" ? <LoadingSpinner /> : <Check />}
+                {!complete && phase === "db" ? <LoadingSpinner /> : <Check />}
               </div>
               <Progress value={dbProgress} className="w-full" />
               <div className="text-center text-xs text-slate-600">
@@ -469,22 +445,22 @@ export default function FileUploadForm() {
           <Button
             onClick={handleUpload}
             className="w-full"
-            disabled={files.current.length === 0 || uploadProgress > 0}
+            disabled={files.length === 0 || isUploading}
           >
             <Upload className="mr-2 h-4 w-4" />
             {/* "Uploading..." : "Upload Files": */}
             {uploadProgress > 0 ? t.rich("feedback.progressText") : t.rich("ButtonUpload")}
           </Button>
-          {complete.current && uploadResponse && files.current.length === 0 && (
+          {complete && uploadResponse && files.length === 0 && (
             <div
               className={`text-center border-2 border-solid rounded-lg p-4 ${
-                uploadResponse.ERROR
+                uploadResponse.error
                   ? "text-red-500 bg-red-100"
                   : "text-emerald-700 bg-emerald-100"
               }`}
             >
-              {uploadResponse.ERROR ? (
-                <>{uploadResponse.ERROR}</>
+              {uploadResponse.error ? (
+                <>{uploadResponse.error}</>
               ) : (
                 <>
                   {uploadResponse.SUCCESS} 
@@ -505,6 +481,7 @@ export default function FileUploadForm() {
   );
 }
 
+/** Returns the compact loading indicator used by the upload workflow. */
 function LoadingSpinner() {
   return (
     <>

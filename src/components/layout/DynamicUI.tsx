@@ -1,11 +1,11 @@
 
 "use client"
 import NavbarTop from "./NavbarTop";
-import {Nav_LINKS_LEFT, Nav_LINKS_TOP } from "./NavbarContentGetter";
-import {DiseaseSidebar} from "./SidebarLeft";
+import { Nav_LINKS_LEFT, Nav_LINKS_TOP } from "./NavbarContentGetter";
+import { DiseaseSidebar } from "./SidebarLeft";
 import { UIContextProvider, useUIContext } from "../contexts/UIContext";
 import { LayoutSizesT } from '@/app/const_store';
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import NavbarLeft from "./NavbarLeft";
 import FpsIndicator from "./FpsIndicator";
 import DemoModeDialog from "./DemoModeDialog";
@@ -17,7 +17,7 @@ import DisclaimerDialog from "./DisclaimerDialog";
  * @example
  * ```tsx
  * const props: DynamicUIProps = {
- *   children: <main>Public-health dashboard</main>,
+ *   children: <main>Public-health Vis. Interface</main>,
  *   layoutSizes: {
  *     rowSpanSize: 8.5,
  *     gapSize: 20,
@@ -43,31 +43,34 @@ interface DynamicUIProps {
  *
  * @remarks
  * This boundary owns shell state only. Linked visualization state must remain below `InterfaceContextProvider` in the
- * dashboard that coordinates the affected widgets.
+ * Vis. Interface that coordinates the affected widgets.
  */
-export default function DynamicUI({children, layoutSizes}: DynamicUIProps) {
+export default function DynamicUI({ children, layoutSizes }: DynamicUIProps) {
   const isLeftNavbar = false;
-  const isPerformanceIndicator = false;
+  const isPerformanceIndicator = true;
 
-  if(!isLeftNavbar) layoutSizes.leftNavbarWidth = 0;
-  if(isLeftNavbar) layoutSizes.leftSidebarWidth  = 20;
+  const adjustedLayoutSizes = useMemo(() => ({
+    ...layoutSizes,
+    leftNavbarWidth: isLeftNavbar ? layoutSizes.leftNavbarWidth : 0,
+    leftSidebarWidth: isLeftNavbar ? 20 : layoutSizes.leftSidebarWidth,
+  }), [layoutSizes, isLeftNavbar]);
 
-  return(
+  return (
     <>
-    <UIContextProvider>
-      <UpdateLayoutSizes newSizes={layoutSizes} />
-    <div className="flex h-screen" style={{ paddingLeft: layoutSizes.leftNavbarWidth }}>
-      {<DiseaseSidebar/>}
-      <div className="flex-1 ">
-        <NavbarTop navLinks={Nav_LINKS_TOP()} isOpen={true} />
-        {isLeftNavbar && (<NavbarLeft navLinks={Nav_LINKS_LEFT()} isOpen={false}/> )}
-        {children}
-      </div>
-    </div>
-    {isPerformanceIndicator && <FpsIndicator />}
-    <DemoModeDialog />
-    <DisclaimerDialog />
-    </UIContextProvider>
+      <UIContextProvider>
+        <UpdateLayoutSizes newSizes={adjustedLayoutSizes} />
+        <div id="app-shell" className="flex h-screen" style={{ paddingLeft: adjustedLayoutSizes.leftNavbarWidth }}>
+          {<DiseaseSidebar />}
+          <div className="flex-1 ">
+            <NavbarTop navLinks={Nav_LINKS_TOP()} isOpen={true} />
+            {isLeftNavbar && (<NavbarLeft navLinks={Nav_LINKS_LEFT()} isOpen={false} />)}
+            {children}
+          </div>
+        </div>
+        {isPerformanceIndicator && <FpsIndicator />}
+        <DemoModeDialog />
+        <DisclaimerDialog />
+      </UIContextProvider>
     </>
   )
 
@@ -75,20 +78,20 @@ export default function DynamicUI({children, layoutSizes}: DynamicUIProps) {
 
 
 
-  /**
-   * Synchronizes layout measurements from the server layout into the client UI context.
-   *
-   * @param props - New shared dashboard dimensions.
-   * @returns No visible output.
-   */
-  function UpdateLayoutSizes({newSizes}: {newSizes: LayoutSizesT}) {
-    const UI_contextT = useUIContext();
+/**
+ * Synchronizes layout measurements from the server layout into the client UI context.
+ *
+ * @param props - New shared Vis. Interface dimensions.
+ * @returns No visible output.
+ */
+function UpdateLayoutSizes({ newSizes }: { newSizes: LayoutSizesT }) {
+  const UI_contextT = useUIContext();
 
-    useEffect(() => {
-      if (UI_contextT && typeof UI_contextT.setLayoutDims === 'function') {
-        UI_contextT.setLayoutDims(newSizes);
-      }
-    }, [newSizes, UI_contextT]);
+  useEffect(() => {
+    if (UI_contextT && typeof UI_contextT.setLayoutDims === 'function') {
+      UI_contextT.setLayoutDims(newSizes);
+    }
+  }, [newSizes, UI_contextT]);
 
-    return null;
-  }
+  return null;
+}

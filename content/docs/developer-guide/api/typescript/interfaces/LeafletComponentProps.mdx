@@ -1,0 +1,99 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: LeafletComponentProps
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Base React-Leaflet map-container configuration shared by supported map layers.
+
+## Example
+
+```ts
+import type { LeafletComponentProps } from "@/framework";
+
+const baseMap: LeafletComponentProps = {
+  chartName: "global-albopictus-map",
+  dataURL: "/api/getMapData?mapName=world_map",
+  exampleVar: null,
+  center: [52.52, 13.405],
+  zoom: 2,
+  isProjection_equirectangular: true,
+};
+```
+
+## Properties
+
+### chartName
+
+> **chartName**: `string`
+
+Stable DOM identifier for the Leaflet container.
+
+***
+
+### children?
+
+> `optional` **children?**: `any`
+
+React-Leaflet layers and controls rendered inside `MapContainer`.
+
+***
+
+### dataURL
+
+> **dataURL**: `any`
+
+Source URL associated with the map configuration.
+
+***
+
+### exampleVar
+
+> **exampleVar**: `any`
+
+Legacy extension value retained for existing map consumers.
+
+***
+
+### center?
+
+> `optional` **center?**: \[`number`, `number`\]
+
+Initial `[latitude, longitude]` center used by React-Leaflet.
+
+#### Default Value
+
+```ts
+[51.505, -0.09]
+```
+
+***
+
+### zoom?
+
+> `optional` **zoom?**: `number`
+
+Initial Leaflet zoom.
+
+#### Default Value
+
+```ts
+2
+```
+
+***
+
+### isProjection\_equirectangular?
+
+> `optional` **isProjection\_equirectangular?**: `boolean`
+
+Whether to use `L.CRS.EPSG4326` instead of Web Mercator.
+
+#### Default Value
+
+```ts
+false
+```

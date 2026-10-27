@@ -1,0 +1,21 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: MapName
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **MapName** = `"germany_map_states"` \| `"germany_map_districts"` \| `"world_map"` \| `"usa_map"` \| `"capitals"`
+
+Supported Leaflet basemap asset identifiers accepted by `/api/getMapData`.
+
+## Example
+
+```ts
+import { apiRoutes, type MapName } from "@/framework";
+
+const publicHealthBasemap: MapName = "germany_map_districts";
+const url = apiRoutes.fetchMapData({ mapName: publicHealthBasemap });
+```

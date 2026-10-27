@@ -1,69 +1,39 @@
-"""
-===============================================================================
-RKI COVID-19 / SARS-CoV-2 Data Aggregation Module
-===============================================================================
-
-This module provides data aggregation capabilities for raw Robert Koch Institute 
-(RKI) COVID-19 / SARS-CoV-2 district-level infection datasets in PostgreSQL.
+"""Aggregate raw Robert Koch Institute (RKI) COVID-19 district-level infection datasets in PostgreSQL.
 
 Epidemiological Metrics & Processing Overview:
-----------------------------------------------
 1. Geographic Aggregation:
-   Maps 5-digit German district IDs (`idlandkreis` / `landkreis_id`) to 2-digit 
-   federal state IDs (`idbundesland` from '01' to '16') and maps them to standard 
-   German state names (e.g., 'Bayern', 'Berlin', 'Schleswig-Holstein').
-
+   Maps 5-digit German district IDs (``idlandkreis`` / ``landkreis_id``) to 2-digit
+   federal state IDs (``idbundesland`` from ``'01'`` to ``'16'``) and standard
+   German state names (e.g., ``'Bayern'``, ``'Berlin'``, ``'Schleswig-Holstein'``).
 2. Status Flag Filtering (RKI Standard Logic):
    Applies official RKI flag semantics for case, death, and recovery counts:
-     * Flag  0 : Historical valid record (already accounted for in baseline data; 
-                 included in valid counts where flag IN (1, 0)).
-     * Flag  1 : Valid record added/updated in current dataset snapshot 
-                 (included in valid counts where flag IN (1, 0)).
-     * Flag -1 : Audit marker for cases deleted in dataset snapshot 
-                 (omitted from valid epidemiological counts).
-     * Flag -9 : Outcome unknown or non-applicable (omitted from death/recovery counts).
-
+     * Flag ``0``: Historical valid record (included in valid counts where ``flag IN (1, 0)``).
+     * Flag ``1``: Valid record added/updated in current dataset snapshot (included where ``flag IN (1, 0)``).
+     * Flag ``-1``: Audit marker for cases deleted in dataset snapshot (omitted).
+     * Flag ``-9``: Outcome unknown or non-applicable (omitted from death/recovery counts).
 3. Metric Calculations:
-   Computes key epidemiological indicators per federal state per reporting date (`meldedatum`):
-     * Daily Metrics:
-        New cases (`newcases`),
-        new deaths (`newdeaths`),
-        new recoveries (`newrecovered`).
-     * 7-Day Rolling Windows:
-        7-day cumulative cases (`accucasesperweek`), 
-        7-day cumulative deaths (`accudeathsperweek`),
-        7-day cumulative recoveries (`accurecoveredperweek`).
-     * Cumulative History:
-        Total cases (`accucases`),
-        total deaths (`accudeaths`),
-        total recoveries (`accurecovered`) 
-        up to target date.
-
+   Computes key epidemiological indicators per federal state per reporting date (``meldedatum``):
+     * Daily metrics: ``newcases``, ``newdeaths``, ``newrecovered``.
+     * 7-day rolling windows: ``accucasesperweek``, ``accudeathsperweek``, ``accurecoveredperweek``.
+     * Cumulative history: ``accucases``, ``accudeaths``, ``accurecovered`` up to target date.
 4. Streamlined Window Aggregation Architecture:
-   - High-Performance Bulk Pre-Computation: Evaluates a complete Cartesian product grid 
-     (16 States x N Dates) via SQL Window Functions to compute all historical state-level 
-     time-series metrics in a single pass (< 100ms).
-   - Incremental Cache Check: Checks if the target date already exists in a populated 
-     target table (cache hit). If missing or incomplete, builds the full grid.
-
+   Evaluates a complete Cartesian product grid (16 states × N dates) via SQL
+   window functions in a single pass, with incremental cache checks per ``datenstand``.
 5. Caching, Metadata & Database Indexing:
-   - Ensures composite indexes exist on `(datenstand, idbundesland)` and `(meldedatum::date)`.
-   - Datatypes in the target table conform strictly to backend standard SQL schema:
-     `datenstand` DATE, `bundesland` VARCHAR(255), `idbundesland` VARCHAR(10),
-     metrics as INTEGER, and `geometry` TEXT.
-   - Automatically registers and populates per-relation column metadata entries in 
-     `column_metadata_en` and `column_metadata_de`.
-   - Invalidates backend API response cache (`backend.cache.response_cache`) whenever table changes occur.
+   Ensures composite indexes exist on ``(datenstand, idbundesland)`` and
+   ``(meldedatum::date)``, registers column metadata in ``column_metadata_en``
+   and ``column_metadata_de``, and invalidates ``response_cache`` on updates.
 
-Usage Example:
---------------
->>> from backend.routes.processData.aggregateRKIdata import aggregate_rki_data
->>> result = aggregate_rki_data(
-...     source_table="aktuell_deutschland_sarscov2_infektionen",
-...     target_table="aktuell_deutschland_sarscov2_infektionen_aggregated",
-...     targetDate="2021-05-15"
-... )
->>> print(result["insertedRows"])
+Example:
+    ```python
+    from backend.routes.processData.aggregateRKIdata import aggregate_rki_data
+
+    result = aggregate_rki_data(
+        source_table="aktuell_deutschland_sarscov2_infektionen",
+        target_table="aktuell_deutschland_sarscov2_infektionen_aggregated",
+        targetDate="2021-05-15",
+    )
+    ```
 """
 
 from datetime import date, datetime

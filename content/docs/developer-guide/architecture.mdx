@@ -1,0 +1,76 @@
+---
+title: Architecture
+description: Follow a request from a localized Vis. Interface through Flask, PostgreSQL, and the cache.
+---
+
+## System boundaries
+
+```text
+Browser: localized Next.js route and React views
+    | /api/*
+    v
+Next.js rewrite (next.config.mjs)
+    |
+    v
+Flask routes (backend/index.py and backend/routes/)
+    |                         |
+    v                         v
+PostgreSQL                 Redis
+datasets and metadata     upload state and cache invalidation epochs
+```
+
+The frontend composes Vis. Interface cards and sends requests to relative `/api/*` URLs. The rewrite sends those requests to Flask on port `5222`; the target host differs between local and Docker runs. Flask validates parameters, queries PostgreSQL, and returns JSON or generated assets. The [REST API guide](./api/rest-api) explains where to inspect endpoint contracts.
+
+## Frontend ownership
+
+| Location | Responsibility |
+| --- | --- |
+| `src/app` | Localized routes, application hooks, and the `apiRoutes` URL registry |
+| `src/components/plots` | Leaflet maps, D3 overlays, charts, and visualization helpers |
+| `src/components/contexts` | State shared by coordinated views |
+| `src/components/layout` | Vis. Interface cards and layout |
+| `src/framework/index.ts` | TypeDoc entry point and catalogue of documented TypeScript exports |
+| `content/docs` | Portal guides and generated reference |
+
+Standard 2D Vis. Interfaces use Leaflet as the map container. `LeafD3Map.tsx` combines Leaflet with D3 overlays and a WebGL canvas overlay for spatial grids and country polygons. Other Leaflet layers can use `L.GridLayer` raster tiles. Compose new Vis. Interface maps through these Leaflet contracts.
+
+### State and data flow
+
+1. Keep display-only state in the component that owns it.
+2. Use `ChartDatasetProvider` when sibling generic charts must share a dataset and row limit. Each chart retains its own axis selection.
+3. Use `InterfaceContextProvider` when maps, charts, or tables must coordinate selection or viewport state. Keep high-frequency pointer events in refs rather than updating context for every movement.
+4. Construct URLs with `apiRoutes` and use `useGetJSONData` for JSON reads. Narrow the task-dependent `DatabaseResponse.response` value before passing it to a visualization.
+
+The browser hook deduplicates requests for the same URL and holds a bounded, five-minute in-memory cache. Its cache disappears on page reload. It is separate from the Flask response cache.
+
+<ShowCovGuard>
+
+On the world COVID maps, the WebGL layer tests clicks against country polygons. A click without a polygon hit calls `onClickBackground`; `LeafD3Map` clears the local and shared country selection, clears `mapSelectionObj`, and rebuilds the unfiltered data URL. The Leaflet click handler still handles grid-cell selection.
+
+</ShowCovGuard>
+
+## Backend ownership
+
+Flask route families live in `backend/routes`; application-level endpoints and blueprint registration live in `backend/index.py`. `backend/API_docs/*.yml` supplies Flasgger endpoint descriptions. PostgreSQL queries use psycopg helpers and the database connection pool. Dataset uploads stream files to a temporary upload directory, return an upload ID, and continue processing in the background; the frontend polls `/api/uploadStatus` for progress.
+
+Importing `backend/index.py` also calls `ensure_metadata_tables()`. A missing or invalid `DATABASE_URL` can stop that import; connection or table-creation failures after URL parsing are logged without stopping it. A started Flask process alone does not prove metadata tables were created.
+
+Backend response values remain in each worker's process-local cache. Redis stores upload status and cache invalidation epochs, **not** response bodies. With Redis available, invalidation is visible across workers. If Redis is unavailable, upload state and cache invalidation fall back to process-local behavior, so another worker may not see the same state. See `backend/upload_state.py` and `backend/cache.py` before changing these contracts.
+
+Use [Backend overview](./backend-overview) to find route ownership, then follow a complete read in [Backend query flow](./backend-query-flow) or a mutation in [CSV upload flow](./backend-upload-flow). The upload job runs in its receiving worker rather than a durable queue. The relation-discovery exclusion list controls selector visibility; it does not authorize direct relation queries.
+
+## Public TypeScript surface
+
+TypeDoc generates the [TypeScript reference](./api/typescript/) from `src/framework/index.ts`. The `@/*` TypeScript alias makes `@/framework` resolvable within this repository, but application modules import their owning files directly. This keeps dependencies discoverable and avoids cycles through the barrel. It is not a published package. A symbol absent from the barrel is not part of the documented reusable surface. The map exports use Leaflet for the map container and expose a WebGL grid overlay within that container. Review each export's props, data contract, and runtime requirements before integrating it.
+
+## Where to change a feature
+
+| Change | Start here | Update with it |
+| --- | --- | --- |
+| Vis. Interface interaction | Route or component in `src/app` or `src/components` | Localized UI text and focused interaction checks |
+| Shared view state | `src/components/contexts` | Consumer behavior, provider scope, and TSDoc |
+| Data query or upload | Flask route and its database helpers | Matching `backend/API_docs` YAML, tests, and frontend URL builder when applicable |
+| Reusable TypeScript API | Implementation plus `src/framework/index.ts` | TSDoc, usage example, and generated TypeDoc pages |
+| User-visible workflow | `content/docs/user-guide` | English portal pages |
+
+For the concrete commands, continue with [Local development](./local-development). For composition patterns, see [Usage examples](./usage-examples).

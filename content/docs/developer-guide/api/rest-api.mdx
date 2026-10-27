@@ -1,0 +1,51 @@
+---
+title: REST API
+description: Locate and maintain the Flask endpoint contract.
+---
+
+## Request boundary
+
+Frontend callers use relative `/api/*` paths built by `apiRoutes`. `next.config.mjs` rewrites those paths to Flask on port `5222`, using a local or container hostname according to `IS_DOCKER`. Do not prepend a backend host in browser components.
+
+## Live reference
+
+When the backend is running, open [`/api-docs`](/api-docs) to inspect the Flasgger-rendered REST reference. Next.js rewrites this path to Flask's `/apidocs`. The page depends on a running backend and covers routes registered with Flasgger; it is not a validated inventory of every route. The app config declares Swagger 2 while some endpoint YAML uses OpenAPI 3-style `content` response fields. Check the rendered result and route implementation before relying on a schema detail.
+
+## Source of truth
+
+Endpoint descriptions live under `backend/API_docs` and are attached to Flask routes with `@swag_from` (including `columnMetadata`, `manageDB`, `get_uncertainty_svg`, cache utilities, and `/health`). Only the lightweight development routes `/api/python` and `/api/test` omit a Flasgger spec. The route code determines actual behavior. For a documented route, verify methods, parameters, status codes, response variants, cache headers, and examples against its spec and tests.
+
+## Response variants to handle
+
+- `/api/getDataFromDB` returns a common JSON envelope with `relationName`, `header`, `response`, and `error`. The response data varies by task. The multi-column `features` path also reports `rowLimit` and `isTruncated`.
+- In the current route, the multi-column `features` path selects columns and applies its row limit but does not apply `filterBy` or `filterValue`. Do not describe a `features` request as server-filtered.
+- The backend uses `null` for `error` on successful database responses. The current frontend `DatabaseResponse` declaration types it as `string`; check truthiness at the request boundary and reconcile the type when changing this contract.
+- This endpoint returns HTTP 200 for successful results **and many validation or query errors**. Check the envelope's `error` field as well as the HTTP status. Do not infer success from status alone.
+- `responseFormat=map-grid-v1` returns aligned column arrays and metadata instead of row objects. Consumers must keep array positions and latitude/longitude corner pairs together.
+- Upload submission at `/api/setFilesToDB` returns an upload ID for background processing. Poll `/api/uploadStatus?id=...` for progress and error state; a missing ID is HTTP 400.
+- `GET /api/getDataFromDB` only queries existing relations. To build or refresh RKI state data, submit a JSON body to `POST /api/processData/aggregateRKI`, then read the derived relation. `POST /api/processData/assignCountries` is the other database-processing command. GET on either command path returns HTTP 405.
+
+See `backend/API_docs/get_data_from_db.yml`, `backend/API_docs/process_aggregate_rki.yml`, `backend/API_docs/process_assign_countries.yml`, `backend/API_docs/set_files_to_db.yml`, and `backend/API_docs/get_upload_status.yml` for field-level details. For a frontend consumer, use [Usage examples](../usage-examples#fetch-typed-dataset-rows) and narrow the task-dependent `response` value at the boundary.
+
+For the end-to-end behavior behind these fields, follow [Backend query flow](../backend-query-flow) and [CSV upload flow](../backend-upload-flow). The hidden-relation list on `/api/getListOfRelationsDB` is a discovery filter, not authorization. `manageDB` has its own protected-relation set.
+
+`/health` returns a fixed liveness response; it does not verify PostgreSQL or Redis. The former `/api/db` development diagnostic has been removed.
+
+## Change checklist
+
+When changing an endpoint:
+
+1. Confirm the route decorator, method, query or form fields, and actual response variants.
+2. Update request validation and response behavior in the route.
+3. Update the matching Flasgger spec, if the route has one, and an example that exercises the changed variant.
+4. Add or update backend tests at the request/response boundary.
+5. Update `src/app/api_routes.ts` and its consumers when URL parameters change.
+6. Document a migration when existing clients must change.
+
+## Conventions
+
+- Report the status codes actually returned, including existing HTTP 200 error envelopes; do not claim all validation errors use 4xx until the implementation does.
+- Keep response shapes stable and document nullable or task-dependent fields.
+- Validate relation names, column names, URLs, and user-provided filters.
+- Bind SQL values and compose dynamic identifiers with `psycopg.sql.Identifier`.
+- Document cache behavior and limits for expensive queries. The backend caches values per worker and coordinates invalidation with Redis.

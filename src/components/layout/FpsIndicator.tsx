@@ -19,10 +19,24 @@ const MEM_COLOR = "#60a5fa"; // blue-400 for memory/DOM line
 /** Secondary diagnostic reported alongside FPS when browser heap metrics are or are not available. */
 type MetricMode = "ram" | "dom";
 
-/** Chromium-compatible extension of the browser Performance API memory counters. */
+/**
+ * Chromium-compatible extension of the browser Performance API memory counters.
+ *
+ * @example
+ * ```ts
+ * const memory: PerformanceMemory = {
+ *   usedJSHeapSize: 134_217_728,
+ *   totalJSHeapSize: 268_435_456,
+ *   jsHeapSizeLimit: 2_147_483_648,
+ * };
+ * ```
+ */
 interface PerformanceMemory {
+  /** Current JavaScript heap usage in bytes. */
   usedJSHeapSize: number;
+  /** Allocated JavaScript heap capacity in bytes. */
   totalJSHeapSize: number;
+  /** Browser-imposed JavaScript heap limit in bytes. */
   jsHeapSizeLimit: number;
 }
 
@@ -37,28 +51,18 @@ interface PerformanceMemory {
  */
 export default function FpsIndicator() {
   const [fps, setFps] = useState(0);
-  const [metricValue, setMetricValue] = useState("—");
-  const [metricMode, setMetricMode] = useState<MetricMode>("dom");
+  const [metric, setMetric] = useState<{ value: string; mode: MetricMode }>({ value: "—", mode: "dom" });
   const [visible, setVisible] = useState(true);
   const [expanded, setExpanded] = useState(false);
 
   const frameTimesRef = useRef<number[]>([]);
-  const lastTimeRef = useRef(performance.now());
+  const lastTimeRef = useRef(0);
   const rafRef = useRef<number>(0);
 
   const fpsHistoryRef = useRef<number[]>([]);
   const memHistoryRef = useRef<number[]>([]);    // raw values for graphing
   const svgRef = useRef<SVGSVGElement>(null);
   const d3InitedRef = useRef(false);
-  const metricModeRef = useRef<MetricMode>("dom");
-
-  // Detect metric mode once on mount
-  useEffect(() => {
-    const perf = performance as unknown as { memory?: PerformanceMemory };
-    const mode: MetricMode = perf.memory ? "ram" : "dom";
-    setMetricMode(mode);
-    metricModeRef.current = mode;
-  }, []);
 
   const getColor = useCallback((v: number) => {
     if (v >= 55) return "#4ade80";
@@ -66,60 +70,19 @@ export default function FpsIndicator() {
     return "#f87171";
   }, []);
 
-  /** Read the secondary metric and return { label, display, raw } */
+  /** Read the secondary metric and return its label, display value, and raw value. */
   const readMetric = useCallback(() => {
     const perf = performance as unknown as { memory?: PerformanceMemory };
-    if (metricModeRef.current === "ram" && perf.memory) {
+    if (perf.memory) {
       const mb = perf.memory.usedJSHeapSize / (1024 * 1024);
-      return { display: `${mb.toFixed(1)} MB`, raw: mb };
+      return { display: `${mb.toFixed(1)} MB`, raw: mb, mode: "ram" as const };
     }
     const count = document.querySelectorAll("*").length;
     if (count >= 1000) {
-      return { display: `${(count / 1000).toFixed(1)}k`, raw: count };
+      return { display: `${(count / 1000).toFixed(1)}k`, raw: count, mode: "dom" as const };
     }
-    return { display: `${count}`, raw: count };
+    return { display: `${count}`, raw: count, mode: "dom" as const };
   }, []);
-
-  // rAF tick
-  const tick = useCallback(() => {
-    const now = performance.now();
-    const delta = now - lastTimeRef.current;
-    lastTimeRef.current = now;
-    frameTimesRef.current.push(delta);
-
-    if (frameTimesRef.current.length >= 15) {
-      const avg =
-        frameTimesRef.current.reduce((a, b) => a + b, 0) /
-        frameTimesRef.current.length;
-      const currentFps = Math.round(1000 / avg);
-      setFps(currentFps);
-
-      fpsHistoryRef.current.push(currentFps);
-      if (fpsHistoryRef.current.length > MAX_HISTORY) {
-        fpsHistoryRef.current.shift();
-      }
-
-      // Read secondary metric
-      const metric = readMetric();
-      setMetricValue(metric.display);
-      memHistoryRef.current.push(metric.raw);
-      if (memHistoryRef.current.length > MAX_HISTORY) {
-        memHistoryRef.current.shift();
-      }
-
-      frameTimesRef.current = [];
-
-      // Update D3 graph directly via refs
-      updateGraph(currentFps);
-    }
-
-    rafRef.current = requestAnimationFrame(tick);
-  }, [readMetric]);
-
-  useEffect(() => {
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [tick]);
 
   // Initialize D3 elements once
   useEffect(() => {
@@ -163,7 +126,7 @@ export default function FpsIndicator() {
     d3InitedRef.current = false;
   }, [expanded]);
 
-  function updateGraph(currentFps: number) {
+  const updateGraph = useCallback((currentFps: number) => {
     if (!svgRef.current) return;
     const svg = d3.select(svgRef.current);
     const fpsData = fpsHistoryRef.current;
@@ -226,7 +189,39 @@ export default function FpsIndicator() {
         .attr("cx", xScale(memLastIdx + memOffset))
         .attr("cy", yScaleMem(memData[memLastIdx]));
     }
-  }
+  }, [getColor]);
+
+  // Sample animation frames only after the component has mounted.
+  useEffect(() => {
+    lastTimeRef.current = performance.now();
+    function tick() {
+      const now = performance.now();
+      const delta = now - lastTimeRef.current;
+      lastTimeRef.current = now;
+      frameTimesRef.current.push(delta);
+
+      if (frameTimesRef.current.length >= 15) {
+        const avg = frameTimesRef.current.reduce((a, b) => a + b, 0) / frameTimesRef.current.length;
+        const currentFps = Math.round(1000 / avg);
+        setFps(currentFps);
+
+        fpsHistoryRef.current.push(currentFps);
+        if (fpsHistoryRef.current.length > MAX_HISTORY) fpsHistoryRef.current.shift();
+
+        const nextMetric = readMetric();
+        setMetric({ value: nextMetric.display, mode: nextMetric.mode });
+        memHistoryRef.current.push(nextMetric.raw);
+        if (memHistoryRef.current.length > MAX_HISTORY) memHistoryRef.current.shift();
+
+        frameTimesRef.current = [];
+        updateGraph(currentFps);
+      }
+
+      rafRef.current = requestAnimationFrame(tick);
+    }
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [readMetric, updateGraph]);
 
   if (!visible) {
     return (
@@ -240,7 +235,7 @@ export default function FpsIndicator() {
   }
 
   const color = getColor(fps);
-  const metricLabel = metricMode === "ram" ? "RAM" : "DOM";
+  const metricLabel = metric.mode === "ram" ? "RAM" : "DOM";
 
   return (
     <div
@@ -263,7 +258,7 @@ export default function FpsIndicator() {
         </div>
         <div className="flex items-center gap-1.5" style={{ color: MEM_COLOR }}>
           <span className="opacity-50 text-[10px]">{metricLabel}</span>
-          <span className="text-xs font-semibold">{metricValue}</span>
+          <span className="text-xs font-semibold">{metric.value}</span>
         </div>
       </div>
       {expanded && (

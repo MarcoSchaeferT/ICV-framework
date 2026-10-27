@@ -16,8 +16,20 @@ Endpoints:
        → bulk-upserts a full set of rows for a relation + language
 """
 
+from pathlib import Path
+from typing import Optional
 from flask import request, jsonify, Blueprint
-from backend.routes.setFilesToDB.db_utils import get_db_connection_params, SQL_DATATYPES
+from flasgger import swag_from
+from pydantic import Field, ValidationError
+from backend.schemas import BaseSchema, RelationName, LangCode
+from backend.types import ColumnMetadataDict
+from backend.cache import response_cache
+from backend.routes.setFilesToDB.db_utils import (
+    get_db_connection,
+    get_db_connection_params,
+    SQL_DATATYPES,
+    db_error_response,
+)
 from backend.metadata_utils import loadMetadataCSV
 from backend.routes.processData.enso_schema import (
     enso_column_metadata,
@@ -27,6 +39,8 @@ import psycopg
 from psycopg import sql
 
 route_columnMetadata = Blueprint("columnMetadata", __name__)
+BACKEND_DIR: Path = Path(__file__).parent.parent.parent
+SWAGGER_YAML_PATH: Path = BACKEND_DIR / "API_docs"
 
 VALID_LANGS = {"en", "de"}
 _SQL_TO_METADATA_DATATYPE = {
@@ -35,16 +49,28 @@ _SQL_TO_METADATA_DATATYPE = {
 
 
 def _table_name(lang: str) -> str:
-    """Return the metadata table name for the given language."""
+    """Return the localized metadata table identifier for ``lang`` (``'en'`` or ``'de'``)."""
     return f"column_metadata_{lang}"
 
 
 def _alter_column_type(cur, relation_name: str, column_name: str, datatype: str):
-    """ALTER the column type in the actual data table if the datatype changed.
+    """Alter the physical PostgreSQL column type in ``relation_name`` when ``datatype`` changed.
 
-    Uses ``USING column::new_type`` so PostgreSQL can cast existing values.
-    If the cast fails (e.g. non-numeric strings → float4) the caller's
-    transaction will be rolled back by the context manager.
+    Uses ``ALTER TABLE ... ALTER COLUMN ... TYPE ... USING column::new_type`` so
+    PostgreSQL casts existing values in place.
+
+    Args:
+        cur: Active database cursor within the caller's transaction.
+        relation_name: Target data table name in schema ``public``.
+        column_name: Target column name within ``relation_name``.
+        datatype: Logical metadata datatype key (``'string'``, ``'float'``,
+            ``'int'``, or ``'date'``) mapped via ``SQL_DATATYPES``.
+
+    Raises:
+        psycopg.Error: If the ``USING`` cast fails for existing row values
+            (e.g. non-numeric strings cast to ``float4``), causing the caller's
+            transaction context manager to roll back both the metadata upsert
+            and the ``ALTER TABLE`` statement.
     """
     sql_type = SQL_DATATYPES.get(datatype)
     if sql_type is None:
@@ -86,7 +112,12 @@ def _alter_column_type(cur, relation_name: str, column_name: str, datatype: str)
 
 
 def _ensure_table(cur, lang: str):
-    """Create the metadata table if it does not exist yet."""
+    """Create the localized ``column_metadata_<lang>`` table and relation index if absent.
+
+    Args:
+        cur: Active PostgreSQL cursor.
+        lang: Two-letter language code (``'en'`` or ``'de'``).
+    """
     table = _table_name(lang)
     cur.execute(sql.SQL("""
         CREATE TABLE IF NOT EXISTS {} (
@@ -113,10 +144,14 @@ def ensure_metadata_tables():
     """Create column_metadata_en and column_metadata_de if they do not exist.
 
     Call this once at app startup so the tables are available without
-    relying on Prisma migrations or a JS client.
+    relying on an ORM migration or JavaScript client. Missing or invalid
+    ``DATABASE_URL`` can raise before the connection attempt; connection and
+    table-creation errors are logged without aborting startup.
     """
     conn_params = get_db_connection_params()
     try:
+        # This runs while Gunicorn preloads the app in its master process. Use
+        # one short-lived connection here so no pool threads exist before fork.
         with psycopg.connect(**conn_params) as conn:
             with conn.cursor() as cur:
                 for lang in VALID_LANGS:
@@ -134,12 +169,22 @@ def populate_column_metadata(
     resolved_sql_types: dict[str, str] | None = None,
     replace_existing: bool = False,
 ):
-    """Populate metadata for dataset columns.
+    """Populate English and German column metadata rows for a dataset relation.
 
-    Exact ENSO columns use the rolling schema metadata. Other columns first use
-    the static language CSV and then the SQL type resolved during upload.
-    ``replace_existing`` is reserved for full-snapshot uploads; partial callers
-    such as country assignment keep all unrelated metadata rows.
+    Exact ENSO suitability columns use the rolling schema metadata from
+    ``enso_column_metadata``. Other columns first look up the static language
+    CSV (``loadMetadataCSV``) and fall back to the SQL type resolved during
+    upload.
+
+    Args:
+        relation_name: Sanitized PostgreSQL relation name.
+        column_names: Raw or sanitized column names to register.
+        resolved_sql_types: Optional mapping from column name to PostgreSQL SQL
+            type (e.g. ``'float4'``, ``'int4'``, ``'date'``, ``'varchar'``).
+        replace_existing: When ``True``, deletes existing metadata rows for
+            ``relation_name`` before inserting (used for full-snapshot uploads).
+            Partial callers such as country assignment leave this ``False`` to
+            preserve existing column metadata.
     """
     print(f"[populate_column_metadata] Starting for relation='{relation_name}', columns={column_names}")
 
@@ -157,9 +202,8 @@ def populate_column_metadata(
         for name, sql_type in (resolved_sql_types or {}).items()
     }
 
-    conn_params = get_db_connection_params()
     try:
-        with psycopg.connect(**conn_params) as conn:
+        with get_db_connection() as conn:
             with conn.cursor() as cur:
                 for lang in VALID_LANGS:
                     _ensure_table(cur, lang)
@@ -224,32 +268,149 @@ def populate_column_metadata(
 
 
 # ────────────────────────────────────────────────
+#  Pydantic Request Schemas
+# ────────────────────────────────────────────────
+class ColumnMetadataQueryParams(BaseSchema):
+    """Query parameters for fetching localized column metadata.
+
+    Example:
+        ```python
+        params = ColumnMetadataQueryParams(relationName="observations", lang="en")
+        ```
+    """
+    relationName: RelationName
+    lang: LangCode = "en"
+
+
+class ColumnMetadataUpsertPayload(BaseSchema):
+    """Request payload for upserting metadata for a single column.
+
+    Example:
+        ```python
+        payload = ColumnMetadataUpsertPayload(
+            relationName="observations",
+            columnName="temperature",
+            lang="en",
+            datatype="float",
+            dimension="°C",
+            description="Ambient temperature",
+            availability=1,
+        )
+        ```
+    """
+    relationName: RelationName
+    columnName: str = Field(min_length=1)
+    """Target column name within the relation."""
+
+    lang: LangCode = "en"
+    datatype: str = "string"
+    """Logical datatype key ('string', 'float', 'int', 'date')."""
+
+    dimension: Optional[str] = ""
+    """Physical unit or dimension string."""
+
+    description: Optional[str] = ""
+    """Human-readable description."""
+
+    availability: int = 0
+    """Availability flag (0 or 1)."""
+
+
+class ColumnMetadataBulkItem(BaseSchema):
+    """Single column metadata row in a bulk upsert request.
+
+    Example:
+        ```python
+        item = ColumnMetadataBulkItem(
+            columnName="temperature",
+            datatype="float",
+            dimension="°C",
+            description="Ambient temperature",
+            availability=1,
+        )
+        ```
+    """
+    columnName: str = Field(min_length=1)
+    """Target column name within the relation."""
+
+    datatype: str = "string"
+    """Logical datatype key ('string', 'float', 'int', 'date')."""
+
+    dimension: Optional[str] = ""
+    """Physical unit or dimension string."""
+
+    description: Optional[str] = ""
+    """Human-readable description."""
+
+    availability: int = 0
+    """Availability flag (0 or 1)."""
+
+
+class ColumnMetadataBulkUpsertPayload(BaseSchema):
+    """Request payload for replacing all column metadata rows for a relation.
+
+    Example:
+        ```python
+        payload = ColumnMetadataBulkUpsertPayload(
+            relationName="observations",
+            lang="en",
+            columns=[
+                ColumnMetadataBulkItem(columnName="temperature", datatype="float")
+            ],
+        )
+        ```
+    """
+    relationName: RelationName
+    lang: LangCode = "en"
+    columns: list[ColumnMetadataBulkItem] = Field(
+        default_factory=list, description="List of column metadata items."
+    )
+
+
+# ────────────────────────────────────────────────
 #  GET  – list metadata for a relation
 # ────────────────────────────────────────────────
 @route_columnMetadata.route("", methods=["GET"])
+@swag_from(f"{SWAGGER_YAML_PATH}/get_column_metadata.yml")
 def get_column_metadata():
-    """Return all metadata rows for a given relation and language."""
-    relation_name = request.args.get("relationName", "")
-    lang = request.args.get("lang", "en").lower()
-    if lang not in VALID_LANGS:
-        return jsonify({"error": f"Invalid lang '{lang}'. Use 'en' or 'de'."}), 400
-    if not relation_name:
+    """Return all column metadata rows for a given relation and language.
+
+    Query Parameters:
+        relationName (str): Required database relation name.
+        lang (str): Metadata language code (``'en'`` or ``'de'``, default ``'en'``).
+
+    Returns:
+        Flask JSON response containing a list of metadata row dicts
+        (``id``, ``relation_name``, ``column_name``, ``datatype``, ``dimension``,
+        ``description``, ``availability``), or an ``{"error": ...}`` payload with
+        HTTP 400 (invalid parameters) or HTTP 500 (database error).
+    """
+    raw_lang = request.args.get("lang", "en").lower()
+    raw_relation_name = request.args.get("relationName", "")
+    if raw_lang not in VALID_LANGS:
+        return jsonify({"error": f"Invalid lang '{raw_lang}'. Use 'en' or 'de'."}), 400
+    if not raw_relation_name:
         return jsonify({"error": "Missing required query param 'relationName'."}), 400
 
-    table = _table_name(lang)
-    conn_params = get_db_connection_params()
     try:
-        with psycopg.connect(**conn_params) as conn:
+        query_params = ColumnMetadataQueryParams.model_validate({
+            "relationName": raw_relation_name,
+            "lang": raw_lang,
+        })
+    except ValidationError as err:
+        return jsonify({"error": str(err.errors()[0]["msg"] if err.errors() else err)}), 400
+
+    table = _table_name(query_params.lang)
+    try:
+        with get_db_connection() as conn:
             with conn.cursor() as cur:
-                _ensure_table(cur, lang)
-                conn.commit()
                 sql_query = sql.SQL("""
                     SELECT id, relation_name, column_name, datatype, dimension, description, availability
                     FROM {table}
                     WHERE relation_name = %s
                     ORDER BY id
                 """).format(table=sql.Identifier(table))
-                cur.execute(sql_query, (relation_name,))
+                cur.execute(sql_query, (query_params.relationName,))
                 cols = [d[0] for d in cur.description] if cur.description else []
                 rows = []
                 for r in cur.fetchall():
@@ -260,39 +421,48 @@ def get_column_metadata():
                     rows.append(row_dict)
         return jsonify(rows)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return db_error_response(e)
 
 
 # ────────────────────────────────────────────────
 #  POST – upsert a single metadata row
 # ────────────────────────────────────────────────
 @route_columnMetadata.route("", methods=["POST"])
+@swag_from(f"{SWAGGER_YAML_PATH}/upsert_column_metadata.yml")
 def upsert_column_metadata():
-    """Upsert a single metadata row (insert or update on conflict)."""
+    """Upsert a single column metadata row and align the underlying SQL column type.
+
+    Expects a JSON body with ``relationName``, ``columnName``, and optional
+    ``lang`` (``'en'`` or ``'de'``), ``datatype``, ``dimension``,
+    ``description``, and ``availability``. Also executes ``_alter_column_type``
+    within the same transaction and invalidates cached responses for the
+    relation and global metadata endpoint.
+
+    Returns:
+        Flask JSON response ``{"success": True, "id": <row_id>}`` on HTTP 200,
+        or ``{"error": ...}`` with HTTP 400 / 500 on validation or cast failure.
+    """
     body = request.get_json(silent=True)
-    if not body:
+    if not isinstance(body, dict):
         return jsonify({"error": "JSON body required."}), 400
 
-    lang = body.get("lang", "en").lower()
-    if lang not in VALID_LANGS:
-        return jsonify({"error": f"Invalid lang '{lang}'."}), 400
+    raw_lang = body.get("lang", "en")
+    if isinstance(raw_lang, str) and raw_lang.lower() not in VALID_LANGS:
+        return jsonify({"error": f"Invalid lang '{raw_lang}'."}), 400
 
-    relation_name = body.get("relationName", "")
-    column_name = body.get("columnName", "")
-    if not relation_name or not column_name:
+    if not body.get("relationName") or not body.get("columnName"):
         return jsonify({"error": "relationName and columnName are required."}), 400
 
-    datatype = body.get("datatype", "string")
-    dimension = body.get("dimension", "")
-    description = body.get("description", "")
-    availability = int(body.get("availability", 0))
-
-    table = _table_name(lang)
-    conn_params = get_db_connection_params()
     try:
-        with psycopg.connect(**conn_params) as conn:
+        payload = ColumnMetadataUpsertPayload.model_validate(body)
+    except ValidationError as err:
+        return jsonify({"error": str(err.errors()[0]["msg"] if err.errors() else err)}), 400
+
+    table = _table_name(payload.lang)
+    try:
+        with get_db_connection() as conn:
             with conn.cursor() as cur:
-                _ensure_table(cur, lang)
+                _ensure_table(cur, payload.lang)
                 cur.execute(
                     sql.SQL("""
                     INSERT INTO {table} (relation_name, column_name, datatype, dimension, description, availability)
@@ -304,70 +474,93 @@ def upsert_column_metadata():
                                   availability = EXCLUDED.availability
                     RETURNING id
                     """).format(table=sql.Identifier(table)),
-                    (relation_name, column_name, datatype, dimension, description, availability),
+                    (
+                        payload.relationName,
+                        payload.columnName,
+                        payload.datatype,
+                        payload.dimension or "",
+                        payload.description or "",
+                        payload.availability,
+                    ),
                 )
                 result = cur.fetchone()
                 row_id = result[0] if result else None
                 # Also update the actual data table column type
-                _alter_column_type(cur, relation_name, column_name, datatype)
+                _alter_column_type(cur, payload.relationName, payload.columnName, payload.datatype)
                 conn.commit()
+        response_cache.invalidate(payload.relationName)
+        response_cache.invalidate("__all_relations__")
+        return jsonify({"success": True, "id": row_id})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return db_error_response(e)
 
 
 # ────────────────────────────────────────────────
 #  PUT – bulk-upsert all rows for a relation
 # ────────────────────────────────────────────────
 @route_columnMetadata.route("", methods=["PUT"])
+@swag_from(f"{SWAGGER_YAML_PATH}/bulk_upsert_column_metadata.yml")
 def bulk_upsert_column_metadata():
-    """Bulk-upsert a full set of metadata rows for a relation and language."""
+    """Replace all metadata rows for a relation and language in a single transaction.
+
+    Expects a JSON body containing ``relationName``, optional ``lang``
+    (``'en'`` or ``'de'``), and a ``columns`` list of column metadata dicts.
+    Deletes existing rows for ``relation_name`` in ``column_metadata_<lang>``,
+    inserts the replacement rows, alters changed SQL column types in the
+    underlying data table, and invalidates cached responses for the relation.
+
+    Returns:
+        Flask JSON response ``{"success": True, "count": <len(columns)>}`` on
+        HTTP 200, or ``{"error": ...}`` with HTTP 400 / 500 on failure.
+    """
     body = request.get_json(silent=True)
-    if not body:
+    if not isinstance(body, dict):
         return jsonify({"error": "JSON body required."}), 400
 
-    lang = body.get("lang", "en").lower()
-    if lang not in VALID_LANGS:
-        return jsonify({"error": f"Invalid lang '{lang}'."}), 400
+    raw_lang = body.get("lang", "en")
+    if isinstance(raw_lang, str) and raw_lang.lower() not in VALID_LANGS:
+        return jsonify({"error": f"Invalid lang '{raw_lang}'."}), 400
 
-    relation_name = body.get("relationName", "")
-    columns = body.get("columns", [])
-    if not relation_name:
+    if not body.get("relationName"):
         return jsonify({"error": "relationName is required."}), 400
-    if not isinstance(columns, list):
+    if not isinstance(body.get("columns"), list):
         return jsonify({"error": "'columns' must be an array."}), 400
 
-    table = _table_name(lang)
-    conn_params = get_db_connection_params()
     try:
-        with psycopg.connect(**conn_params) as conn:
+        payload = ColumnMetadataBulkUpsertPayload.model_validate(body)
+    except ValidationError as err:
+        return jsonify({"error": str(err.errors()[0]["msg"] if err.errors() else err)}), 400
+
+    table = _table_name(payload.lang)
+    try:
+        with get_db_connection() as conn:
             with conn.cursor() as cur:
-                _ensure_table(cur, lang)
+                _ensure_table(cur, payload.lang)
                 # Delete existing rows for this relation so the PUT is a full replacement
                 cur.execute(
                     sql.SQL("DELETE FROM {table} WHERE relation_name = %s").format(table=sql.Identifier(table)),
-                    (relation_name,),
+                    (payload.relationName,),
                 )
-                for col in columns:
-                    column_name = col.get("columnName", "")
-                    if not column_name:
-                        continue
+                for col in payload.columns:
                     cur.execute(
                         sql.SQL("""
                         INSERT INTO {table} (relation_name, column_name, datatype, dimension, description, availability)
                         VALUES (%s, %s, %s, %s, %s, %s)
                         """).format(table=sql.Identifier(table)),
                         (
-                            relation_name,
-                            column_name,
-                            col.get("datatype", "string"),
-                            col.get("dimension", ""),
-                            col.get("description", ""),
-                            int(col.get("availability", 0)),
+                            payload.relationName,
+                            col.columnName,
+                            col.datatype,
+                            col.dimension or "",
+                            col.description or "",
+                            col.availability,
                         ),
                     )
                     # Also update the actual data table column type
-                    _alter_column_type(cur, relation_name, column_name, col.get("datatype", "string"))
+                    _alter_column_type(cur, payload.relationName, col.columnName, col.datatype)
                 conn.commit()
-        return jsonify({"success": True, "count": len(columns)})
+        response_cache.invalidate(payload.relationName)
+        response_cache.invalidate("__all_relations__")
+        return jsonify({"success": True, "count": len(payload.columns)})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return db_error_response(e)

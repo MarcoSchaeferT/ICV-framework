@@ -1,0 +1,88 @@
+tags:
+  - Utility Endpoints
+summary: Render cell-level uncertainty or ENSO suitability SVG
+description: >-
+  Renders and returns an `image/svg+xml` visualization for one spatial grid
+  cell (`cellID`), with process-local caching and `Cache-Control: no-cache`
+  headers.
+parameters:
+  - name: filename
+    in: query
+    required: true
+    description: >-
+      Target SVG artifact name (`climate_forecast_cell.svg`,
+      `seasonal_uncertainty_cell.svg`, or `seasonal_calibration_cell.svg`).
+    schema:
+      type: string
+      enum:
+        - "climate_forecast_cell.svg"
+        - "seasonal_uncertainty_cell.svg"
+        - "seasonal_calibration_cell.svg"
+      example: "seasonal_uncertainty_cell.svg"
+  - name: cellID
+    in: query
+    required: true
+    description: Non-negative database primary key `id` of the selected spatial grid cell.
+    schema:
+      type: integer
+      example: 200509
+  - name: dataset
+    in: query
+    required: false
+    description: Optional SEAS5 forecast relation name for `climate_forecast_cell.svg`.
+    schema:
+      type: string
+      example: "seas5_forecast_albopictus_habitat_probability"
+  - name: month
+    in: query
+    required: false
+    description: Optional three-letter month key (`jan`..`dec`) highlighted in `climate_forecast_cell.svg`.
+    schema:
+      type: string
+      example: "aug"
+  - name: locale
+    in: query
+    required: false
+    description: Plot label language (`en` or `de`) for `climate_forecast_cell.svg`.
+    schema:
+      type: string
+      enum: ["en", "de"]
+      default: "en"
+      example: "en"
+responses:
+  200:
+    description: Rendered SVG image bytes.
+    content:
+      image/svg+xml:
+        schema:
+          type: string
+  400:
+    description: Missing/invalid `filename` or `cellID`.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              example: "Invalid or missing cellID"
+  404:
+    description: No monthly uncertainty data found for `cellID`.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              example: "No data found for cellID 200509"
+  500:
+    description: Matplotlib or database error while rendering the SVG.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              example: "SVG generation failed"

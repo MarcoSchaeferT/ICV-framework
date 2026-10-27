@@ -1,0 +1,54 @@
+tags:
+  - Data processing
+summary: Build RKI state aggregates
+description: >-
+  Explicitly creates or refreshes the derived RKI state relation. This command
+  can create tables, indexes, and column metadata, and can rebuild aggregated
+  rows. Read the resulting relation with GET /api/getDataFromDB after success.
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: command
+    required: true
+    schema:
+      type: object
+      properties:
+        sourceTable:
+          type: string
+          default: aktuell_deutschland_sarscov2_infektionen
+          description: Raw RKI relation to aggregate.
+        targetTable:
+          type: string
+          description: Destination relation; defaults to sourceTable with _aggregated appended.
+        targetDate:
+          type: string
+          format: date
+          description: Target report date; defaults to the latest source date.
+      example:
+        targetDate: '2022-06-01'
+responses:
+  200:
+    description: Aggregation completed or the requested date was already available.
+    schema:
+      type: object
+      properties:
+        message:
+          type: string
+        sourceTable:
+          type: string
+        targetTable:
+          type: string
+        targetDate:
+          type: string
+          format: date
+        insertedRows:
+          type: integer
+  400:
+    description: Invalid JSON command, source relation, or date.
+  405:
+    description: GET is not supported for this write operation.
+  500:
+    description: Aggregation failed.

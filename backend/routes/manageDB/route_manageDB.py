@@ -1,12 +1,18 @@
 """ManageDB blueprint – list and delete database relations."""
 
+from pathlib import Path
 from flask import request, jsonify, Blueprint, Response
-from backend.routes.setFilesToDB.db_utils import query_raw, execute_raw
-from backend.cache import response_cache, make_cache_key
+from flasgger import swag_from
+from pydantic import ValidationError
+from backend.schemas import BaseSchema, RelationName
+from backend.routes.setFilesToDB.db_utils import query_raw, execute_raw, db_error_response
+from backend.cache import response_cache
 from psycopg import sql
 
 # Blueprint configuration
 route_manageDB = Blueprint('manageDB', __name__)
+BACKEND_DIR: Path = Path(__file__).parent.parent.parent
+SWAGGER_YAML_PATH: Path = BACKEND_DIR / "API_docs"
 
 # Tables that must never be deleted via this endpoint
 PROTECTED_TABLES = frozenset({
@@ -17,9 +23,25 @@ PROTECTED_TABLES = frozenset({
 })
 
 
+class DeleteRelationParams(BaseSchema):
+    """Query parameters for deleting a database relation.
+
+    Example:
+        ```python
+        params = DeleteRelationParams(relationName="old_dataset")
+        ```
+    """
+    relationName: RelationName
+
+
+@swag_from(f"{SWAGGER_YAML_PATH}/manage_db_list.yml")
 @route_manageDB.route("", methods=["GET"])
 async def list_relations() -> Response:
-    """Return every public-schema relation with its approximate row count."""
+    """List unprotected public tables with approximate row counts.
+
+    The route includes regular and partitioned tables. When PostgreSQL's
+    estimate is zero, it tries ``COUNT(*)`` and uses zero if that query fails.
+    """
     query = """
         SELECT
             c.relname                                    AS table_name,
@@ -30,13 +52,15 @@ async def list_relations() -> Response:
           AND c.relkind IN ('r', 'p')
         ORDER BY c.relname
     """
-    relations = await query_raw(query)
+    try:
+        relations = await query_raw(query)
+    except Exception as e:
+        return db_error_response(e, "Failed to list relations")
 
     # Filter out protected / internal tables
     result = [
         r for r in relations
         if r["table_name"] not in PROTECTED_TABLES
-           and not r["table_name"].startswith("_prisma")
     ]
 
     # For tables where pg_class statistics are stale (row_count == 0 but may
@@ -57,13 +81,26 @@ async def list_relations() -> Response:
     return jsonify(result)
 
 
+@swag_from(f"{SWAGGER_YAML_PATH}/manage_db_delete.yml")
 @route_manageDB.route("", methods=["DELETE"])
 async def delete_relation() -> Response:
-    """Drop a relation by name.  Protected tables cannot be deleted."""
-    relation_name: str | None = request.args.get("relationName")
+    """Drop an unprotected relation and its dependent objects with CASCADE.
 
-    if not relation_name:
+    The route then removes localized column metadata and invalidates cached
+    relation data. Missing ``relationName`` returns 400; protected names
+    return 403. The ``DROP TABLE IF EXISTS`` statement accepts an absent table.
+    """
+    raw_relation_name: str | None = request.args.get("relationName")
+
+    if not raw_relation_name:
         return jsonify({"error": "Missing required query parameter 'relationName'."}), 400
+
+    try:
+        params = DeleteRelationParams.model_validate({"relationName": raw_relation_name})
+    except ValidationError as err:
+        return jsonify({"error": str(err.errors()[0]["msg"] if err.errors() else err)}), 400
+
+    relation_name = params.relationName
 
     if relation_name in PROTECTED_TABLES:
         return jsonify({"error": f"Table '{relation_name}' is protected and cannot be deleted."}), 403
@@ -79,7 +116,7 @@ async def delete_relation() -> Response:
         await execute_raw("DELETE FROM column_metadata_en WHERE relation_name = %s", (relation_name,))
         await execute_raw("DELETE FROM column_metadata_de WHERE relation_name = %s", (relation_name,))
     except Exception as e:
-        return jsonify({"error": f"Failed to drop table: {e}"}), 500
+        return db_error_response(e, "Failed to drop table")
 
     # Invalidate cache entries for the deleted table — the Redis epoch bump
     # inside invalidate() makes ALL workers drop their entries, not just the
@@ -89,4 +126,5 @@ async def delete_relation() -> Response:
     print(f"[CACHE] Invalidated {evicted} local entries for table '{relation_name}'")
 
     return jsonify({"success": True, "deleted": relation_name})
+
 

@@ -114,15 +114,49 @@ import SC_Uncertainty_Vis_de from './pages/ShowCases/Uncertainty_Vis/mainInfo_de
 import SC_ENSO_Suitability_en from './pages/ShowCases/ENSO_Suitability/mainInfo_en.mdx';
 import SC_ENSO_Suitability_de from './pages/ShowCases/ENSO_Suitability/mainInfo_de.mdx';
 
+/**
+ * Localized MDX content rendered by a map's information and interaction cards.
+ *
+ * @example
+ * ```tsx
+ * import { MDXContentProvider, type HoverCardsContent } from "@messages/markdown/MDXContentProvider";
+ *
+ * const predictionCards: HoverCardsContent =
+ *   MDXContentProvider.en.pages.PredictionView.overview;
+ * const Information = predictionCards.Info;
+ * <Information />;
+ * ```
+ */
 export interface HoverCardsContent {
+    /** General information, usage instructions, and dataset details. */
     Info: React.FC; // general info + how to (+ data set details)
+    /** Map gestures and control instructions. */
     Interaction: React.FC; // interaction + UI elements
 }
 
+/**
+ * Per-locale registry of compiled end-user MDX components.
+ *
+ * @remarks
+ * This registry owns end-user copy, including page introductions, map controls,
+ * and the full documentation view. Developer API contracts live in TSDoc next
+ * to their TypeScript symbols. The two current locale entries are `en` and `de`.
+ *
+ * @example
+ * ```tsx
+ * import { MDXContentProvider, type MDXContentProviderType } from "@messages/markdown/MDXContentProvider";
+ *
+ * const germanContent: MDXContentProviderType = MDXContentProvider.de;
+ * const Introduction = germanContent.pages.PredictionView.mainInfo;
+ * <Introduction />;
+ * ```
+ */
 export interface MDXContentProviderType {
-    
+    /** Fallback illustration for otherwise empty content panels. */
     DummyContent: React.FC;
+    /** Footer content used by information cards. */
     FooterContent: React.FC;
+    /** Content associated with application routes and showcases. */
     pages: {
         About: {
             projectInfo: React.FC;
@@ -158,6 +192,7 @@ export interface MDXContentProviderType {
             ENSO_Suitability: React.FC;
         }
     }
+    /** Short descriptions for controls overlaid on a map. */
     MapUI: {
         DengueSerotypeCounts: React.FC;
         MosquitoPresenceData: React.FC;
@@ -168,14 +203,42 @@ export interface MDXContentProviderType {
         CalendarTimeRange: React.FC;
         CountrySelection: React.FC;
     }
+    /** Composed end-user documentation page for this locale. */
     FullDocu:{
         fullDocu: React.FC;
     }
    
     
 }
+/** Alias for the locale-specific end-user MDX registry shape.
+ *
+ * @example
+ * ```ts
+ * import { MDXContentProvider, type MDXContentProvider as MDXRegistry } from "@messages/markdown/MDXContentProvider";
+ *
+ * const englishContent: MDXRegistry = MDXContentProvider.en;
+ * ```
+ */
 export type MDXContentProvider = MDXContentProviderType
 
+/**
+ * Compiled MDX component registry keyed by `en` and `de`.
+ *
+ * @remarks
+ * Access with a supported locale. When a locale can come from an external
+ * source, use `MDXContentProvider[locale] ?? MDXContentProvider.en` to provide
+ * an English fallback. Keep new end-user MDX entries paired across locales.
+ *
+ * @example
+ * ```tsx
+ * import { MDXContentProvider } from "@messages/markdown/MDXContentProvider";
+ *
+ * const locale = "de";
+ * const localized = MDXContentProvider[locale] ?? MDXContentProvider.en;
+ * const Guide = localized.FullDocu.fullDocu;
+ * <Guide />;
+ * ```
+ */
 export const MDXContentProvider: Record<string, MDXContentProviderType> = {
     "en": {
        

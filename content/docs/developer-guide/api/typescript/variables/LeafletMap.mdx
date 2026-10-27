@@ -1,0 +1,27 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: LeafletMap
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> `const` **LeafletMap**: `React.FC`\<[`LeafletMapProps`](../interfaces/LeafletMapProps)\>
+
+Renders the supported Leaflet map boundary after dynamically loading browser-only dependencies.
+
+## Param
+
+**props**
+
+Child layers and map-container configuration.
+
+## Returns
+
+A React-Leaflet `MapContainer`, or a loading message before Leaflet is available.
+
+## Remarks
+
+Leaflet accesses browser globals and therefore must not be imported during server rendering. Analytical layers are
+supplied as children by `LeafD3Map` or companion map layers; this component owns only the map container and CRS.

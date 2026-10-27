@@ -1,11 +1,12 @@
 "use client";
 
 import { useRef, useEffect } from 'react'
-import CovidDataStates from '@/components/dataTableClasses/CovidDataStates';
+import { COVID_STATES_RELATION } from '@/app/covidStates';
 import {apiRoutes } from "@/app/api_routes";
+import { useRkiPreparation } from '@/app/hooks/useRkiPreparation';
 import { InterfaceContextProvider, useInterfaceContext } from '@/components/contexts/InterfaceContext';
 import LeafD3MapGermanyComponent, {LeafD3MapGermanyProps}  from '@/components/plots/maps/LeafD3MapGermanyCovid';
-import DataTableComponent from '@/components/DataTable';
+import CovidStateTable from '@/components/CovidStateTable';
 import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
 import { createSwapy, Swapy } from 'swapy';
@@ -20,23 +21,21 @@ import { MDXContentProvider } from '@messages/markdown/MDXContentProvider';
 import { Locale } from '@/i18n/routing';
 
 
-const isSWAPY = true;
-
 /**
- * Renders the supported Germany COVID-19 dashboard using linked Leaflet, table, and bar-chart views.
+ * Renders the supported Germany COVID-19 Vis. Interface using linked Leaflet, table, and bar-chart views.
  *
- * @returns Localized epidemiological dashboard content.
+ * @returns Localized epidemiological Vis. Interface content.
+ * @remarks Prepares the current RKI aggregate with a POST command before mounting
+ * the linked views. A failed command leaves a retry action visible.
  */
 export default function Home() {
+  const UI_contextT = useUIContext();
   const t = useTranslations("page_covidDashboard");
   const locale = useLocale() as Locale;
   let md = MDXContentProvider[locale];
-  let c = useInterfaceContext();
-  let dataSet = "covid_states_dat";
-  dataSet = "aktuell_deutschland_sarscov2_infektionen_aggregated";
-  let dataURL = apiRoutes.fetchDbData({ relationName: dataSet, feature: "" });
+  let dataURL = apiRoutes.fetchDbData({ relationName: COVID_STATES_RELATION, feature: "" });
+  const { status: aggregationStatus, error: aggregationError, retry: retryAggregation } = useRkiPreparation(true);
 
-  const UI_contextT = useUIContext();
   const layoutSizes = UI_contextT.layoutDims;
 
   // set up the map props
@@ -77,16 +76,13 @@ export default function Home() {
     ""
   );
 
-  // intitialize data table context
-  useInterfaceContext();
-
     // set up swapy (client side only)
     const swapyRef = useRef<Swapy | null>(null)
     const swapContainerRef = useRef<HTMLDivElement>(null)
     useEffect(() => {
       const container =swapContainerRef.current;
       console.log("container", container)
-      if(isSWAPY && container) {
+      if (container) {
         swapyRef.current = createSwapy(container,{
           animation: 'dynamic', // dynamic or spring or none
           manualSwap: false,
@@ -96,14 +92,14 @@ export default function Home() {
           // dragOnHold: true
         })
 
-        swapyRef.current?.enable(isSWAPY)
+        swapyRef.current.enable(true)
 
       return () => {
         // Destroy the swapy instance on component destroy
         swapyRef.current?.destroy()
       }
     };
-  }, []);
+  }, [aggregationStatus]);
 
   // build the page
   return (
@@ -112,6 +108,14 @@ export default function Home() {
     <InterfaceContextProvider>
       <ViewMainInfoComponent heading={t('mainInfo.heading')} mdxContent={md.pages.ShowCases.HistoricalDataCOVID} />
 
+      {aggregationStatus === 'loading' && <p role="status" className="p-6">{t('preparing')}</p>}
+      {aggregationStatus === 'error' && (
+        <div role="alert" className="p-6">
+          <p>{t('preparationError')}: {aggregationError}</p>
+          <button type="button" className="mt-2 underline" onClick={retryAggregation}>{t('retry')}</button>
+        </div>
+      )}
+      {aggregationStatus === 'ready' && <>
       {/*** START: grid layout ***/}
       <div ref={swapContainerRef} className={`w-full grid grid-cols-12 md:grid-cols-12 pl-0`} style={{
               gridTemplateRows: `repeat(auto-fill, minmax(${layoutSizes.rowSpanSize}vh, ${layoutSizes.rowSpanSize}vh))`,
@@ -124,50 +128,38 @@ export default function Home() {
         {/*** Grid Cells ***/}
         <SGridPlotCard rowColSpan={[9,4]} cardProps={mapCardProps}> <LeafD3MapGermanyComponent props={mapPropsGermany}/> </SGridPlotCard>
         <SGridPlotCard rowColSpan={[5,8]} cardProps={covidDataStatesPpros}>
-          <DataTableComponent
-          cardProps={covidDataStatesPpros}
-          refDataTableClass={CovidDataStates}
-          onClickEvent={(row,key, dataTableCONTEXT)=>{
-              dataTableCONTEXT.setTableRow(row);
-              let mapID = CovidDataStates.mapperFunctions.mapper__TableMap__ID_to_ID(Number(row["id"])+1)
-              dataTableCONTEXT.setSelectedStateID(mapID);
-            }
-          }  />
+          <CovidStateTable cardProps={covidDataStatesPpros} />
         </SGridPlotCard>
-       <DynamicBarChart featureRaw="accucasesperweek" name="accuCasesPerWeek "/>
+       <DynamicBarChart featureRaw="accucasesperweek" />
 
        {/* <SGridPlotCard rowColSpan={[3,2]}  cardProps={CardPropsClass("Map2","Map2","","")}> <D3MapComponent D3MapPorps={mapPropsGermany}/> </SGridPlotCard>*/}
-        {/*<div className={`${leftDataTableStyle}`}><CardWrapper headline={"Covid Data Districts"} component={<DataTableCovid constructor={CovidDataDistricts}  />} /></div>*/}
       </div>
+      </>}
     </InterfaceContextProvider>
     </main>
     </>
   );
 }
 
-function DynamicBarChart({ featureRaw, name }: { featureRaw: string, name: string }) {
+/**
+ * Renders the COVID-19 state distribution for the active feature and date.
+ *
+ * @param featureRaw - Stable feature identifier used for the card and chart IDs.
+ * @returns A bar-chart card linked to the map's current context selection.
+ * @remarks Metadata labels are fetched through `useGetJSONData`. Changes to
+ * `curFeature` or `targetDate` rebuild the aggregated database request.
+ */
+function DynamicBarChart({ featureRaw }: { featureRaw: string }) {
   let c = useInterfaceContext();
   const locale = useLocale();
   const t = useTranslations("covid_view_barchart");
   const tPage = useTranslations("page_covidDashboard");
-  let dataSet = "aktuell_deutschland_sarscov2_infektionen_aggregated";
-
-  let feature = featureRaw;
-  const [isLoading_Metadata, rawMetaData] = useGetJSONData(apiRoutes.getDatasetsMetadata({ LANGID: locale }));
+  const [, rawMetaData] = useGetJSONData(apiRoutes.getDatasetsMetadata({ LANGID: locale }));
 
   const metaData = rawMetaData as unknown as metaDataT;
 
-  if(dataSet === null || feature === null)   return (
-    <SGridPlotCard rowColSpan={[4,8]} cardProps={CardPropsClass(featureRaw+"Barchart", name, "", "")}> ERROR</SGridPlotCard>
-  );
-
-  let dataURL = apiRoutes.fetchDbData({ relationName: dataSet, feature: c.curFeature, targetDate: c.targetDate });
-  let bchartProps = BarchartProps("Barchart", dataURL , "exampleVar");
-
-  bchartProps.chartName = feature+"Barchart";
-  bchartProps.dataURL = dataURL;
-  bchartProps.locale = locale;
-  bchartProps.translations = t;
+  const dataURL = apiRoutes.fetchDbData({ relationName: COVID_STATES_RELATION, feature: c.curFeature, targetDate: c.targetDate });
+  const bchartProps = BarchartProps(featureRaw + "Barchart", dataURL, locale, t);
 
   const curFeatureMeta = metaData && c.curFeature ? metaData[c.curFeature] : undefined;
 

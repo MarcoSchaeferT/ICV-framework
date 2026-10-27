@@ -1,0 +1,11 @@
+{
+  "title": "Python & OpenAPI",
+  "pages": [
+    "index",
+    "core",
+    "query-routes",
+    "upload-pipeline",
+    "processing-analytics",
+    "metadata-admin"
+  ]
+}

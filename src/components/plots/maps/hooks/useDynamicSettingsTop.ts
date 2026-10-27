@@ -3,15 +3,15 @@ import { useState, useRef, useEffect } from 'react';
 /**
  * Dynamically computes the vertical pixel offset (`top`) for positioning the map settings gear button.
  *
- * Traverses up the DOM to find the parent dashboard card (`.cardWrapper` or `[data-swapy-slot]`), inspects header element bounding rectangles,
+ * Traverses up the DOM to find the parent Vis. Interface card (`.cardWrapper` or `[data-swapy-slot]`), inspects header element bounding rectangles,
  * and centers the gear button relative to the card title row.
  *
- * @param defaultTop - Fallback pixel offset if no header or title element is found. @default 6
- * @param buttonHeight - Outer pixel height of the gear button for vertical centering calculations. @default 32
+ * @param defaultTop - Fallback pixel offset if no header or title element is found.
+ * @param buttonHeight - Outer pixel height of the gear button for vertical centering calculations.
  * @returns Object containing `containerRef` to attach to the map root container and computed `settingsTop` pixel offset.
  *
  * @remarks
- * In multi-view dashboard grid layouts, cards may have varying header heights, badges, or title rows. Hardcoding absolute pixel offsets
+ * In multi-view Vis. Interface grid layouts, cards may have varying header heights, badges, or title rows. Hardcoding absolute pixel offsets
  * causes the gear button to misalign with card headers. Using a `ResizeObserver` on the parent card wrapper guarantees seamless vertical alignment
  * during dynamic container resizes or dynamic card expansions.
  *

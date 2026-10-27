@@ -5,6 +5,11 @@ import * as SwitchPrimitive from "@radix-ui/react-switch"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Renders a keyboard-accessible binary switch with checked-state styling.
+ *
+ * @returns A styled Radix switch forwarding root props to its control.
+ */
 function Switch({
   className,
   ...props

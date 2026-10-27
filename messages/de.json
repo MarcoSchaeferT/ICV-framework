@@ -172,7 +172,22 @@
                 },
                 "coefficientMap": "Globale Variationskoeffizienten-Karte",
                 "temporalUncertaintyPlot": "Temporale Unsicherheit",
-                "calibrationPlot": "Probabilistische Kalibrierungskurve"
+                "calibrationPlot": "Probabilistische Kalibrierungskurve",
+                "selectCellPrompt": "Wählen Sie eine Gitterzelle auf der Karte aus, um die Diagramme zu laden.",
+                "chartNoData": "Für diese Zelle sind keine Unsicherheitsdaten verfügbar.",
+                "chartLoadError": "Die Unsicherheitsdiagramme für diese Zelle konnten nicht geladen werden.",
+                "monthAxis": "Monat",
+                "suitabilityAxis": "Vorhergesagte Habitateignung",
+                "predictedMean": "Vorhergesagter Mittelwert",
+                "standardDeviation": "Standardabweichung",
+                "confidenceBand": "Mittelwert ±2 SD",
+                "simulatedValue": "Gezogene Simulation",
+                "simulatedNote": "Die Kalibrierung verwendet gezogene Modellsimulationen, keine beobachteten Werte.",
+                "expectedProportion": "Erwarteter Anteil",
+                "observedProportion": "Ermittelter Anteil",
+                "deviation": "Differenz",
+                "ideal": "Ideale Kalibrierung",
+                "miscalibrationArea": "Fehlkalibrierungsfläche"
             },
             "page_ENSO_Suitability": {
                 "mainInfo": {
@@ -188,7 +203,10 @@
                 "forecastMonth": "Vorhersagemonat",
                 "forecast": "Vorhersage",
                 "overview": "Übersicht",
-                "selectCellPrompt": "Wählen Sie eine Gitterzelle auf der Karte aus, um Klimafaktoren- und Vorhersagediagramme zu laden",
+                "selectCellPrompt": "Wählen Sie eine Gitterzelle auf der Karte aus, um Klimafaktoren und Vorhersagen zu laden",
+                "chartLoadError": "Das Klimadiagramm für diese Zelle konnte nicht geladen werden.",
+                "chartNoData": "Für diese Zelle sind keine Klimadaten verfügbar.",
+                "selected": "ausgewählt",
                 "noForecastMonths": "Keine Vorhersagemonate verfügbar",
                 "svg": {
                     "alt": "Klimafaktoren und vorhergesagte Habitateignung für die ausgewählte Gitterzelle",
@@ -216,6 +234,7 @@
                     "title": "SEAS5-Vorhersage vs. ERA5 2000–2025 (Mittelwert ±1 Standardabweichung)",
                     "reference_legend": "ERA5-Mittelwert (2000–2025)",
                     "forecast_legend": "SEAS5-Vorhersage",
+                    "suitability_forecast_legend": "Vorhersage Habitateignung",
                     "no_data": "Keine Daten für Zellen-ID={cell_id}\nTabelle={dataset}"
                 }
             }
@@ -265,7 +284,7 @@
         "disable": "Komponententausch deaktivieren"
     },
     "component_infoCard": {
-        "openFullDocs": "in Dokumentation öffnen",
+        "openFullDocs": "Dokumentation öffnen",
         "headingInteractions": "Info",
         "headingComponentInfo": "Info"
     },
@@ -326,6 +345,9 @@
         }
     },
     "page_covidDashboard": {
+        "preparing": "COVID-19-Daten der Bundesländer werden vorbereitet…",
+        "preparationError": "COVID-19-Daten der Bundesländer konnten nicht vorbereitet werden",
+        "retry": "Erneut versuchen",
         "mainInfo": {
             "heading": "Historische Daten zu COVID-19 für Deutschland"
         },
@@ -343,6 +365,9 @@
         }
     },
     "page_covidWorldView": {
+        "preparing": "COVID-19-Daten für die Weltansicht werden vorbereitet…",
+        "preparationError": "RKI-Bundeslanddaten konnten nicht vorbereitet werden; die Karten verwenden für Deutschland stattdessen die weltweiten Daten",
+        "retry": "Erneut versuchen",
         "mainInfo": {
             "heading": "Historische Daten zu COVID-19 weltweit"
         },
@@ -423,7 +448,13 @@
     },
     "navbar_top": {
         "mode": "Modus",
-        "home": "Startseite"
+        "home": "Startseite",
+        "helpMenu": {
+            "quickHelp": "-Schnellhilfe & Datensatzdetails-",
+            "userGuide": "Benutzerhandbuch (EN)",
+            "developerGuide": "Entwicklerdokumentation (EN)",
+            "swaggerUi": "Swagger UI (REST API)"
+        }
     },
     "page_metadata": {
         "heading": "Metadaten Editor",

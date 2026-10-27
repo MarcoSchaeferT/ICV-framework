@@ -1,0 +1,6 @@
+{
+  "title": "User Guide",
+  "description": "Task-oriented instructions for people using ICV",
+  "root": true,
+  "pages": ["index", "getting-started", "uploading-data", "exploring-data", "maps-and-linked-views", "troubleshooting"]
+}

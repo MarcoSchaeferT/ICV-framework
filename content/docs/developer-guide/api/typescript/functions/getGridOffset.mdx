@@ -1,0 +1,52 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: getGridOffset
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **getGridOffset**(`latGeometryTopLeft`, `lngGeometryTopLeft`, `gridSizeDegreesLat`, `gridSizeDegreesLng`): `object`
+
+Calculates spatial grid snapping offset coordinates relative to a zero-origin angular grid.
+
+## Parameters
+
+### latGeometryTopLeft
+
+`number`
+
+Latitude coordinate of top-left geometry corner in degrees.
+
+### lngGeometryTopLeft
+
+`number`
+
+Longitude coordinate of top-left geometry corner in degrees.
+
+### gridSizeDegreesLat
+
+`number`
+
+Grid cell height in latitude degrees.
+
+### gridSizeDegreesLng
+
+`number`
+
+Grid cell width in longitude degrees.
+
+## Returns
+
+`object`
+
+Angular offset object `{ lat, lng }`.
+
+### lat
+
+> **lat**: `number`
+
+### lng
+
+> **lng**: `number`

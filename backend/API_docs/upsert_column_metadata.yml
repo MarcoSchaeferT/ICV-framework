@@ -1,0 +1,78 @@
+tags:
+  - Data Management Endpoints
+summary: Upsert a single column metadata row
+description: >-
+  Inserts or updates one localized column metadata entry in
+  `column_metadata_<lang>` and alters the underlying PostgreSQL column type when
+  `datatype` changed. Invalidates cached responses for the relation and global
+  metadata endpoint.
+parameters:
+  - name: body
+    in: body
+    required: true
+    description: Column metadata payload.
+    schema:
+      type: object
+      required:
+        - relationName
+        - columnName
+      properties:
+        lang:
+          type: string
+          enum: ["en", "de"]
+          default: "en"
+          example: "en"
+        relationName:
+          type: string
+          example: "dengue_serotype_counts"
+        columnName:
+          type: string
+          example: "serotype_count"
+        datatype:
+          type: string
+          enum: ["string", "float", "int", "date"]
+          default: "string"
+          example: "int"
+        dimension:
+          type: string
+          example: "counts"
+        description:
+          type: string
+          example: "Reported dengue serotype sequence count"
+        availability:
+          type: integer
+          default: 0
+          example: 1
+responses:
+  200:
+    description: Upsert succeeded and column type aligned.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            id:
+              type: integer
+              example: 42
+  400:
+    description: Missing JSON body, required fields, or invalid `lang`.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+              example: "relationName and columnName are required."
+  500:
+    description: Database error or incompatible `ALTER TABLE ... TYPE` cast.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            error:
+              type: string

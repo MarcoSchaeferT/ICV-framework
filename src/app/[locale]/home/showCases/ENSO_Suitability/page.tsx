@@ -1,8 +1,7 @@
 "use client";
 
-import { useRef, useEffect, useState } from 'react'
+import React, { useRef, useEffect, useState } from 'react'
 import { apiRoutes } from "@/app/api_routes";
-import React from 'react';
 import { InterfaceContextProvider, useInterfaceContext } from '@/components/contexts/InterfaceContext';
 import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
@@ -15,7 +14,7 @@ import { Locale, useLocale, useTranslations } from "next-intl";
 import { t_richConfig } from "@/app/const_store";
 import { useUIContext } from '@/components/contexts/UIContext';
 import { availableColorMapsNames } from '@/components/plots/maps/constants';
-import { useLoadingTask, LoadingSpinnerAnimation } from '@/components/plots/maps/utils/loadingSpinner';
+import EnsoClimateChart from "./EnsoClimateChart";
 import {
   Select,
   SelectContent,
@@ -33,24 +32,59 @@ import {
 const isSWAPY = true;
 
 // ── Forecast configuration ────────────────────────────────────────────────
+/** Supported mosquito-vector species for the paired SEAS5 forecast tables.
+ *
+ * @example
+ * ```ts
+ * const vectorSpecies: SpeciesKey = "albopictus";
+ * ```
+ */
 type SpeciesKey = "albopictus" | "aegypti";
+/** Display labels for the supported forecast species. */
 const SPECIES: Record<SpeciesKey, string> = {
   albopictus: "Aedes albopictus",
   aegypti: "Aedes aegypti",
 };
 
-/** Representative, data-complete 0.25° cell near Medellín, Colombia. */
+/**
+ * Initial grid-cell and database-row selection for the ENSO showcase.
+ *
+ * @remarks `gridCellId` identifies the client-side map cell while `dbRowId`
+ * identifies its database row for the backend climate-forecast SVG request.
+ */
 const DEFAULT_ENSO_CELL = {
   dbRowId: 48292,
   gridCellId: 300625,
 } as const;
 
-/** One consolidated DB table per species (all 6 forecast months in it). */
+/**
+ * Resolves the consolidated SEAS5 habitat-probability relation for a species.
+ *
+ * @param species - Mosquito species key selected in the showcase.
+ * @returns Relation containing the forecast and reference columns for that species.
+ *
+ * @example
+ * ```ts
+ * tableName("albopictus"); // "seas5_forecast_albopictus_habitat_probability"
+ * ```
+ */
 function tableName(species: SpeciesKey): string {
   return `seas5_forecast_${species}_habitat_probability`;
 }
 
-/** Pretty label for a forecast column: forecast_aug_2026 -> "Forecast: Aug 2026". */
+/**
+ * Formats a forecast column for the month selector and status badge.
+ *
+ * @param col - Forecast column in `forecast_<month>_<year>` form.
+ * @param prefix - Localized label before the month.
+ * @param monthLabel - Localized month name; otherwise capitalizes the schema abbreviation.
+ * @returns Human-readable label, or the unchanged input for an invalid column.
+ *
+ * @example
+ * ```ts
+ * prettyFcLabel("forecast_aug_2026", "Forecast", "August"); // "Forecast: August 2026"
+ * ```
+ */
 function prettyFcLabel(col: string, prefix = "Forecast", monthLabel?: string): string {
   const forecast = parseEnsoForecastColumn(col);
   if (!forecast) return col;
@@ -58,7 +92,17 @@ function prettyFcLabel(col: string, prefix = "Forecast", monthLabel?: string): s
   return `${prefix}: ${month} ${forecast.year}`;
 }
 
-/** (year, month) sort key for a forecast column; last if it doesn't match. */
+/**
+ * Creates a chronological sort key from a forecast column.
+ *
+ * @param col - Candidate forecast column name.
+ * @returns `[year, one-based month]`, or `[Infinity, Infinity]` for a non-forecast field.
+ *
+ * @example
+ * ```ts
+ * fcColSortKey("forecast_aug_2026"); // [2026, 8]
+ * ```
+ */
 function fcColSortKey(col: string): [number, number] {
   const forecast = parseEnsoForecastColumn(col);
   return forecast
@@ -67,12 +111,25 @@ function fcColSortKey(col: string): [number, number] {
 }
 
 /**
- * Returns the cell-linked ENSO Suitability visualization showcase.
+ * Renders the cell-linked ENSO habitat-suitability showcase route.
+ *
+ * @returns The localized selector, paired Leaflet maps, and cell-level climate chart.
  *
  * @remarks
- * Displays backend-rendered static climate forecast charts (4 climate factors +
- * habitat suitability) alongside side-by-side Forecast (Prediction) and Reference
- * maps for SEAS5 forecast data.
+ * Species selects a consolidated SEAS5 relation. Forecast columns are discovered
+ * from that relation and sorted chronologically; the chosen month determines both
+ * the forecast feature and its fixed-period reference feature. The forecast map
+ * publishes viewport coordinates while the reference map receives them. The
+ * `InterfaceContextProvider` seeds a corresponding grid-cell/database-row pair,
+ * allowing the climate chart to request JSON for the selected cell.
+ * `SGridPlotCard` supplies per-card loading state and Swapy layout behavior.
+ * Column discovery currently uses an effect-scoped `fetch` with a cancellation
+ * guard, so it does not participate in the shared JSON hook's cache or request
+ * deduplication.
+ *
+ * @see {@link parseEnsoForecastColumn} for accepted forecast column names.
+ * @see {@link referenceColumnForForecast} for month-paired reference fields.
+ * @see {@link EnsoClimateChart} for the cell-level interactive chart.
  */
 export default function Home() {
   const t = useTranslations("page_home.ShowCases.page_ENSO_Suitability");
@@ -119,7 +176,6 @@ export default function Home() {
 
   const activeFcCol = fcColumns[fcIdx] ?? "";
   const activeRefCol = referenceColumnForForecast(activeFcCol);
-  const activeMonthAbbr = parseEnsoForecastColumn(activeFcCol)?.month ?? "";
 
   // ── 1. Forecast Map Props (Left Map) ──
   let forecastMapProps = LeafD3MapLayerProps();
@@ -209,6 +265,7 @@ export default function Home() {
   referenceMapProps.mapInteractions = { disableMouse: true, disableScroll: true, disableClick: false };
   
 
+  /** Returns a localized rich-text label as a string, using the supplied fallback when unavailable. */
   const getTranslation = (key: string, fallback: string) => {
     try {
       if (t.has(key as any)) {
@@ -220,6 +277,7 @@ export default function Home() {
     return fallback;
   };
 
+  /** Combines the parsed forecast date with localized month and prefix labels. */
   const formatForecastLabel = (column: string) => {
     const forecast = parseEnsoForecastColumn(column);
     const fallbackMonth = forecast
@@ -383,12 +441,12 @@ export default function Home() {
               paddingLeft: `${layoutSizes.gapSize}px`,
             }}>
 
-              {/*** Top Card: 4 Climatic Factors + Suitability (Backend SVG) ***/}
+              {/*** Top Card: 4 Climatic Factors + Suitability ***/}
               <SGridPlotCard rowColSpan={[4, 6]} cardProps={climateFactorsCardProps}>
-                <ClimateForecastStaticChartComponent
-                  fileName="climate_forecast_cell.svg"
+                <EnsoClimateChart
                   dataset={currentTableName}
-                  month={activeMonthAbbr}
+                  activeMonth={parseEnsoForecastColumn(activeFcCol)?.monthIndex}
+                  activeYear={parseEnsoForecastColumn(activeFcCol)?.year}
                 />
               </SGridPlotCard>
 
@@ -422,106 +480,5 @@ export default function Home() {
         </InterfaceContextProvider>
       </main>
     </>
-  );
-}
-
-/**
- * Renders backend-generated static SVG/PNG charts for climate factors & forecasts for selected cell.
- */
-function ClimateForecastStaticChartComponent({
-  fileName,
-  dataset,
-  month,
-}: {
-  fileName: string;
-  dataset?: string;
-  month?: string;
-}) {
-  const t = useTranslations("page_home.ShowCases.page_ENSO_Suitability");
-  const svgLocale = useLocale() === "de" ? "de" : "en";
-  const contexT = useInterfaceContext();
-  const rowID = contexT.dbRowID_of_selectedGridcellID;
-  const requestedSrc = rowID !== -1
-    ? apiRoutes.getUncertaintySvg({ filename: fileName, cellID: rowID, dataset, month, locale: svgLocale })
-    : "";
-  const [displayedSrc, setDisplayedSrc] = useState("");
-
-  return (
-    <StaticSvgChart
-      key={requestedSrc || "empty"}
-      requestedSrc={requestedSrc}
-      displayedSrc={displayedSrc}
-      onLoaded={setDisplayedSrc}
-      alt={t("svg.alt")}
-      emptyLabel={t("selectCellPrompt")}
-    />
-  );
-}
-
-function StaticSvgChart({
-  requestedSrc,
-  displayedSrc,
-  onLoaded,
-  alt,
-  emptyLabel,
-}: {
-  requestedSrc: string;
-  displayedSrc: string;
-  onLoaded: (src: string) => void;
-  alt: string;
-  emptyLabel: string;
-}) {
-  const [isLoading, setIsLoading] = useState(
-    Boolean(requestedSrc && requestedSrc !== displayedSrc),
-  );
-  const L_svgLoader = useLoadingTask('Climate Forecast Chart');
-  const shownSrc = requestedSrc ? displayedSrc : "";
-
-  useEffect(() => {
-    if (isLoading) {
-      L_svgLoader.start();
-    } else {
-      L_svgLoader.stop();
-    }
-  }, [isLoading, L_svgLoader]);
-
-  return (
-    <div className="relative w-full h-full">
-      {shownSrc ? (
-        // The SVG is generated dynamically by the backend and has no fixed size.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={shownSrc}
-          alt={alt}
-          style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '8px' }}
-          className={isLoading ? "opacity-40 blur-[1px] transition-all duration-300" : "transition-all duration-300"}
-        />
-      ) : (
-        <div className="flex items-center justify-center h-full text-slate-400 text-sm italic">
-          {emptyLabel}
-        </div>
-      )}
-
-      {isLoading && requestedSrc && (
-        // Preload the new SVG while the previous one remains visible.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={requestedSrc}
-          alt=""
-          className="hidden"
-          onLoad={() => {
-            onLoaded(requestedSrc);
-            setIsLoading(false);
-          }}
-          onError={() => setIsLoading(false)}
-        />
-      )}
-
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/30 backdrop-blur-[1px] z-10">
-          <LoadingSpinnerAnimation />
-        </div>
-      )}
-    </div>
   );
 }

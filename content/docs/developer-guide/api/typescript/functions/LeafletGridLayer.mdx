@@ -1,0 +1,82 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: LeafletGridLayer
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **LeafletGridLayer**(`props`): `Element`
+
+Primary ICV map component that composites a Leaflet base map with
+D3-powered analytical overlays.
+
+Renders up to four visual layers on a single Leaflet map instance:
+1. **Country polygons** – GeoJSON boundaries with hover/click interaction.
+2. **Grid data overlay** – canvas-rendered cells coloured by a sequential
+   D3 colour map (e.g. habitat-suitability predictions).
+3. **Presence data** – point observations drawn as circles or canvas dots.
+4. **Sequence metadata** – D3 donut/pie charts anchored to country centroids.
+
+State is synchronised across multiple map instances via `InterfaceContext`
+(see `isApplyContextData` / `isSyncMapCoordsOnTheFly_SETTER`).
+
+## Parameters
+
+### props
+
+Fully-defaulted configuration created by the
+               [LeafD3MapLayerProps](LeafD3MapLayerProps) factory function.
+
+#### props
+
+[`LeafD3MapLayerProps`](../interfaces/LeafD3MapLayerProps)
+
+## Returns
+
+`Element`
+
+A Leaflet map with the configured analytical layers and controls.
+
+## Remarks
+
+- The component contains several nested "hook-functions" (`MapDrawLayer_*`,
+  `MapMouseEvents`) that are called unconditionally at the top level of
+  the render function. They use `useEffect` internally and **must not**
+  be called conditionally to comply with the Rules of Hooks.
+- During animated `flyTo` transitions, `gridLayerTransitionRef` guards
+  linked updates while the active canvas overlay defers work during map movement.
+- JSON dataset requests use [useGetJSONData](useGetJSONData) for bounded caching and
+  in-flight request deduplication.
+
+## Example
+
+```tsx
+import { LeafletGridLayer, LeafD3MapLayerProps } from "@/framework";
+
+const mapProps = LeafD3MapLayerProps(
+  "habitat-suitability",
+  undefined,
+  undefined,
+  {
+    defaultDatasetName: "t_2024_monthly_mean_7_ocsvm_albopictus_predictions_2023_mod",
+    defaultFeatureName: "prob_7",
+    defaultFeatureColorMap: "interpolateInferno",
+    isPresenceData: true,
+    isPresenceDataChecked: true,
+  },
+);
+
+export default function HabitatPage() {
+  return (
+    <div className="w-full h-[600px]">
+      <LeafletGridLayer props={mapProps} />
+    </div>
+  );
+}
+```
+
+## See
+
+[LeafD3MapLayerProps](LeafD3MapLayerProps) (interface & factory)

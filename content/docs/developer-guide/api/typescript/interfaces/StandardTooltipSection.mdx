@@ -1,0 +1,55 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: StandardTooltipSection
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Optional second metric rendered below the primary tooltip value.
+
+## Example
+
+```ts
+import type { StandardTooltipSection } from "@/framework";
+
+const habitatProbability: StandardTooltipSection = {
+  label: "Aedes albopictus suitability",
+  value: 0.42,
+  unit: "probability",
+  description: "SEAS5 forecast for August 2026",
+};
+```
+
+## Properties
+
+### label?
+
+> `optional` **label?**: `string`
+
+Short heading identifying the metric or selected field.
+
+***
+
+### value
+
+> **value**: `string` \| `number`
+
+Inspected numerical or string value.
+
+***
+
+### unit?
+
+> `optional` **unit?**: `string`
+
+Physical dimension unit string.
+
+***
+
+### description?
+
+> `optional` **description?**: `string`
+
+Human-readable metadata description.

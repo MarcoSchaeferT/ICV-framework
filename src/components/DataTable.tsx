@@ -1,24 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect, useRef, useMemo } from "react";
-import  CovidDataStates from "./dataTableClasses/CovidDataStates";
-import type { interfaceContextI } from "./contexts/InterfaceContext";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
-  FilterFn,
   ColumnDef,
   flexRender,
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  getFacetedRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getFacetedMinMaxValues,
-  getFacetedUniqueValues,
   RowSelectionState,
-  Row,
   SortingState,
+  useTable,
 } from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
@@ -40,23 +29,20 @@ import {
 } from "@/components/ui/select";
 
 import {
-  EditPencil,
-  EyeSolid,
-  MoreHorizCircle,
   NavArrowDown,
   NavArrowUp,
   Search,
-  Bin,
 } from "iconoir-react";
 import { twMerge } from "tailwind-merge";
-import { rankItem, RankingInfo } from "@tanstack/match-sorter-utils";
-import { useInterfaceContext } from "./contexts/InterfaceContext";
+import {
+  dataTableFeatures,
+  type DataTableData,
+  type DataTableFeatures,
+  type DataTableRow,
+} from "./dataTableFeatures";
 import { CardPropsClass } from './layout/CardWrapper';
 
-import {
-  metaDataT,
-  alignFeature_to_Metadata,
-} from '@/components/plots/MetaDataHandler';
+import { metaDataT } from '@/components/plots/MetaDataHandler';
 import { apiRoutes } from '@/app/api_routes';
 import { useLocale ,useTranslations } from "next-intl";
 import { t_richConfig, dbDATA } from '@/app/const_store';
@@ -65,63 +51,51 @@ import { useGetJSONData } from '@/app/hooks/useFetchAndCache';
 import { useLoadingTask, LoadingSpinnerAnimation } from "./plots/maps/utils/loadingSpinner";
 
 // Stable references to prevent re-render loops
-const EMPTY_ARRAY: any[] = [];
-const NO_DATA_FALLBACK: any[] = [{ no_data: "" }];
+const EMPTY_ARRAY: DataTableData[] = [];
+const NO_DATA_FALLBACK: DataTableData[] = [{ no_data: "" }];
 
 /**
- * Configuration contract for the linked, virtualized public-health data table.
+ * Configuration for a database-backed data table.
  *
  * @remarks
- * `refDataTableClass` supplies the dataset-specific columns and URL contract. Row clicks may update `InterfaceContext`
- * so maps and charts can brush the same selected record.
+ * Columns come from the database response. `relationName` selects the dataset;
+ * optional row-selection fields let a linked view identify a matching record.
+ * `targetDate` narrows relations that support dated snapshots.
+ * Row clicks can notify a parent through `onClickEvent`; no Vis. Interface context is required.
+ * An external selection opens its page and scrolls the row into view.
  *
  * @example
  * ```tsx
- * const config: dataTableComponentT = {
- *   refDataTableClass: new CovidDataStates(),
+ * import { CardPropsClass, type DataTableProps } from "@/framework";
+ *
+ * const config: DataTableProps = {
+ *   relationName: "dengue_serotypes",
  *   cardProps: CardPropsClass(
- *     "germany-state-table",
- *     "COVID-19 by state",
- *     "Select a state to link all views",
- *     "Source: RKI",
+ *     "regional-data-table",
+ *     "Regional observations",
+ *     "Select a row to coordinate linked views",
+ *     "Source: Surveillance",
  *   ),
- *   onClickEvent: (row, key, context) => context.setTableRowID(key),
+ *   onClickEvent: (row) => console.log(row.original),
  * };
  * ```
  */
 export interface dataTableComponentT {
-  /** Dataset-specific columns, mapping behavior, and endpoint builder. */
-  refDataTableClass: any,
-  /** Standard dashboard-card presentation. */
+  /** Public database relation whose current snapshot populates the table. */
+  relationName: string,
+  /** Optional date filter for relations with dated snapshots. */
+  targetDate?: string,
+  /** Column containing a unique, stable row key; defaults to `id`, then the source index. @defaultValue "id" */
+  rowKeyColumn?: string,
+  /** Standard Vis. Interface card presentation. */
   cardProps: CardPropsClass,
-  /** Optional linked-view row-selection handler. */
-  onClickEvent?: (row: Row<unknown>, key: number, context: interfaceContextI) => void,
+  /** Optional row-click handler receiving the record and its stable table key. */
+  onClickEvent?: (row: DataTableRow, rowKey: string) => void,
+  /** Column used to match an external selection; the matching row is paged into view. */
+  selectedRowColumn?: string,
+  /** Value to locate in `selectedRowColumn`; omit to disable linked selection. */
+  selectedRowValue?: string | number,
 };
-
-
-
-declare module "@tanstack/react-table" {
-  /** ICV-specific fuzzy filter registered with TanStack Table. */
-  interface FilterFns {
-    fuzzy: FilterFn<unknown>;
-  }
-  /** Ranking metadata attached to a fuzzy-filtered cell. */
-  interface FilterMeta {
-    itemRank: RankingInfo;
-  }
-}
-
-/***************************
-****** FILTER FUNCTION *****
-****************************/
-// the search field filter function
-function fuzzyFilter(row: any, columnId: string, value: any, addMeta: any) {
-  const itemRank = rankItem(row.getValue(columnId), value);
-
-  addMeta({ itemRank });
-
-  return itemRank.passed;
-}
 
 
 
@@ -140,15 +114,11 @@ function DebouncedInput({
   onChange: (value: string | number) => void;
 } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange">) {
   const [value, setValue] = React.useState(initialValue);
-  React.useEffect(() => {
+  const [previousInitialValue, setPreviousInitialValue] = React.useState(initialValue);
+  if (initialValue !== previousInitialValue) {
+    setPreviousInitialValue(initialValue);
     setValue(initialValue);
-  }, [initialValue]);
-
-  /*
-  React.useEffect(() => {
-    setValue(dictStates[c.selectedStateID]);
-  }, [c.selectedStateID]);
-  */
+  }
 
   React.useEffect(() => {
     const timeout = setTimeout(() => {
@@ -176,19 +146,44 @@ function DebouncedInput({
 }
 
 
-/********************************
-****** DATA TABLE COMPONENT *****
-*********************************
-
-@params refDataClass: dataTypeClass (reference to dataTableClass)
-*/
-const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: dataTableComponentT) => {
-
-  // activate dataTableContext
-  let dataTableCONTEXT = useInterfaceContext();
-
-  // create a new instance of the class
-  const DataTableObject = useMemo(() => new refDataTableClass, [refDataTableClass]);
+/**
+ * Renders a searchable, sortable, and paginated data table backed by a database relation.
+ *
+ * Fetches all columns (`feature: "ALL"`) for `relationName` via {@link useGetJSONData} and
+ * aligns numeric feature values with localized physical units from {@link alignFeature_to_Metadata}.
+ *
+ * @param props - Relation, card, and optional linked-selection settings defined in {@link dataTableComponentT}.
+ * @returns A rendered table view with debounced global search, column sorting, pagination, and linked row selection.
+ *
+ * @remarks
+ * When `selectedRowColumn` and `selectedRowValue` match a row in the dataset, the table
+ * automatically switches to the page containing that record and scrolls the row into view.
+ *
+ * @see {@link dataTableComponentT} for configuration options.
+ * @see {@link dataTableFeatures} for the registered TanStack Table feature bundle.
+ *
+ * @example
+ * ```tsx
+ * import { CardPropsClass, DataTable } from "@/framework";
+ *
+ * const cardProps = CardPropsClass(
+ *   "surveillance-table",
+ *   "Dengue Surveillance Records",
+ *   "Click a row to inspect regional observations",
+ *   "Source: ECDC / WHO",
+ * );
+ *
+ * <DataTable
+ *   relationName="dengue_serotypes"
+ *   cardProps={cardProps}
+ *   selectedRowColumn="country"
+ *   selectedRowValue="Brazil"
+ *   onClickEvent={(row, rowKey) => console.log(rowKey, row.original)}
+ * />
+ * ```
+ */
+const DataTableComponent = (props: dataTableComponentT) => {
+  const { relationName, targetDate, rowKeyColumn = "id", onClickEvent, selectedRowColumn, selectedRowValue } = props;
 
   // get current locale/language
   const locale = useLocale() as Locale;
@@ -197,16 +192,20 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
 
   // state variables and setters
   const [globalFilter, setGlobalFilter] = React.useState("");
-  const [rowHoverID, setRowHoverID] = useState<number>(-1);
-
-  const [rowSelectID, setRowSelectID] = useState<number>(-1);
-  const [onTableName, setOnTableName] = useState<string>(DataTableObject.getTableName());
+  const [rowHoverID, setRowHoverID] = useState<string | null>(null);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const selectedRowRef = useRef<HTMLTableRowElement>(null);
 
   const [sorting, setSorting] = useState<SortingState>([]) // can set initial sorting state here
 
 
   // data loading
-  const [isLoading_TableData, rawTableData] = useGetJSONData(DataTableObject.getURL(dataTableCONTEXT.targetDate));
+  const [isLoading_TableData, rawTableData] = useGetJSONData(apiRoutes.fetchDbData({
+    relationName,
+    feature: "ALL",
+    targetDate,
+  }));
 
   const L_tableLoader = useLoadingTask('Table Data');
   useEffect(() => {
@@ -216,18 +215,16 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
       L_tableLoader.stop();
     }
   }, [isLoading_TableData, L_tableLoader]);
-  const [isLoading_Metadata, rawMetaData] = useGetJSONData(apiRoutes.getDatasetsMetadata({ LANGID: locale }));
-  
-  const tableName: string = DataTableObject.getTableName();
+  const [, rawMetaData] = useGetJSONData(apiRoutes.getDatasetsMetadata({ LANGID: locale }));
   
   // *** SAFEGUARD 1: Default to empty object if rawTableData is null/undefined ***
   const tableData = (rawTableData || {}) as dbDATA;
-  const metaData = (rawMetaData || {}) as unknown as metaDataT;
+  const metaData = useMemo(() => (rawMetaData || {}) as unknown as metaDataT, [rawMetaData]);
 
   // *** SAFEGUARD 2: Extract response array safely ***
   
   const responseArray = tableData.response;
-  const safeTableData = useMemo(() => 
+  const safeTableData: DataTableData[] = useMemo(() =>
     Array.isArray(responseArray) && responseArray.length > 0 
       ? responseArray 
       : EMPTY_ARRAY,
@@ -235,9 +232,9 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
   );
   const hasData = safeTableData.length > 0;
 
-  // get the table columns from the class
-  const columns: ColumnDef<unknown, any>[] = useMemo(() => {
-    const columnDefs: ColumnDef<unknown, any>[] = [];
+  // Build columns from the database response and its metadata.
+  const columns: ColumnDef<DataTableFeatures, DataTableData, any>[] = useMemo(() => {
+    const columnDefs: ColumnDef<DataTableFeatures, DataTableData, any>[] = [];
 
     // If loading, we might return empty or specific skeleton columns (returning empty for now)
     if (isLoading_TableData) return columnDefs;
@@ -276,29 +273,34 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
 
 
 
-  // ToDo: pass data specific OnClick function to DataTableComponent
-  function SetOnClickEvents(row: Row<unknown>, id: number) {
+  function handleRowClick(row: DataTableRow) {
     if(!hasData) return; // Prevent clicking on "No Data" row
-    
-    // call the passed onClickEvent function
-    onClickEvent && onClickEvent(row, id, dataTableCONTEXT);
-    dataTableCONTEXT.setTableName(DataTableObject.getTableName());
-    setOnTableName(DataTableObject.getTableName());
+
+    table.setRowSelection({ [row.id]: true });
+    onClickEvent?.(row, row.id);
   }
 
   // *** setup table config **** //
-  const table = useReactTable({
+  const table = useTable({
+    features: dataTableFeatures,
     // *** SAFEGUARD 5: Ensure data matches the fallback column ***
 
     data: hasData ? safeTableData : NO_DATA_FALLBACK, 
     columns,
-    filterFns: {
-      fuzzy: fuzzyFilter,
+    getRowId: (row, index) => {
+      const value: unknown = row[rowKeyColumn];
+      const hasKey = (typeof value === "string" && value.length > 0)
+        || (typeof value === "number" && Number.isFinite(value));
+      const key = hasKey
+        ? `key:${String(value)}`
+        : `index:${index}`;
+      return `${relationName}:${key}`;
     },
     enableMultiRowSelection: false,
     state: {
       globalFilter,
       sorting,
+      rowSelection,
     },
     initialState: {
       pagination: {
@@ -307,67 +309,64 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
       },
     },
     onSortingChange: setSorting,
+    onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
-    globalFilterFn: fuzzyFilter,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getFacetedRowModel: getFacetedRowModel(),
-    getFacetedUniqueValues: getFacetedUniqueValues(),
-    getFacetedMinMaxValues: getFacetedMinMaxValues(),
+    globalFilterFn: "fuzzy",
     debugTable: false,
     debugHeaders: false,
     debugColumns: false,
   });
 
 
-  // consume changes from the DataTableContext
-  // set the selected row for local context
-  // Track if component is mounted to prevent state updates during navigation
-  const isMounted = useRef(false);
-  useEffect(() => {
-    isMounted.current = true;
-    return () => { isMounted.current = false; };
-  }, []);
+  const selectedRowId = Object.keys(rowSelection)[0];
+  const pageIndex = table.state.pagination.pageIndex;
+  const pageSize = table.state.pagination.pageSize;
 
+  // Link an external selection to the source row independently of pagination.
   useEffect(() => {
-    if (!isMounted.current) return; // Skip on initial mount during page transition
-    if (
-      dataTableCONTEXT.selectedTableName === DataTableObject.getTableName() &&
-      dataTableCONTEXT.selectedTableRowID != -1
-    ) {
-      setRowSelectID(dataTableCONTEXT.selectedTableRowID);
-    }
+    if (!hasData || !selectedRowColumn || selectedRowValue === undefined || selectedRowValue === "") return;
+
+    const matchingRow = table.getCoreRowModel().rows.find(
+      row => String(row.original?.[selectedRowColumn]) === String(selectedRowValue)
+    );
+    if (matchingRow && !rowSelection[matchingRow.id]) table.setRowSelection({ [matchingRow.id]: true });
+  // useTable returns a new facade on render; the relation and source rows are the triggers.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataTableCONTEXT.selectedTableRowID, dataTableCONTEXT.selectedTableName]);
+  }, [hasData, selectedRowColumn, selectedRowValue, safeTableData, relationName, rowKeyColumn]);
 
-
-  // *** APPLY EXTERNAL SELECTIONS TO TABLE **** //
-  // when selectedStateID changes, update the selected row in the table
-  
-  const selectedStateID = dataTableCONTEXT.selectedStateID;
+  // Keep the selected row on the correct page after selection, sorting, or filtering.
   useEffect(() => {
-    if(!hasData || !isMounted.current) return;
-    if(selectedStateID === -1) return; // no selection — nothing to sync
-    
-    const sortedRows = table.getSortedRowModel().rows;
-
-    const stateName = CovidDataStates.mapperFunctions.Map__ID_to_State(selectedStateID);
-    // Use optional chaining for safety
-    const matchingRow = sortedRows.findIndex(row => (row.original as any)?.bundesland === stateName)
-    const pageSize = table.getState().pagination.pageSize;
-    const curPage = Math.floor(matchingRow / pageSize);
-    const curPageRow= matchingRow % pageSize;
-    console.log("matchingRow for state", stateName, "is", matchingRow, curPageRow);
-    
-    if (matchingRow !== -1) {
-      setRowSelectID(curPageRow);
-      // Navigate to the correct page
-      table.setPageIndex(curPage);
-    }
+    if (!selectedRowId) return;
+    const visibleIndex = table.getPrePaginatedRowModel().rows.findIndex(row => row.id === selectedRowId);
+    if (visibleIndex < 0) return;
+    const targetPage = Math.floor(visibleIndex / pageSize);
+    if (targetPage !== table.state.pagination.pageIndex) table.setPageIndex(targetPage);
+  // Current page and the useTable facade are excluded so manual pagination remains possible.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStateID, sorting, hasData, safeTableData.length]);
+  }, [selectedRowId, sorting, globalFilter, pageSize, safeTableData]);
+
+  // Scroll only the table viewport after the selected row has rendered on its page.
+  useEffect(() => {
+    if (!selectedRowId || isLoading_TableData) return;
+    const frame = requestAnimationFrame(() => {
+      const container = scrollContainerRef.current;
+      const selectedRow = selectedRowRef.current;
+      if (!container || !selectedRow || !container.contains(selectedRow)) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const rowRect = selectedRow.getBoundingClientRect();
+      const headerHeight = container.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+      const visibleTop = containerRect.top + headerHeight;
+      const visibleBottom = containerRect.top + container.clientHeight;
+      if (rowRect.top >= visibleTop && rowRect.bottom <= visibleBottom) return;
+
+      const centerOffset = Math.max(0, (container.clientHeight - headerHeight - rowRect.height) / 2);
+      const top = container.scrollTop + rowRect.top - containerRect.top - headerHeight - centerOffset;
+      const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+      container.scrollTo({ top: Math.max(0, top), behavior });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selectedRowId, pageIndex, pageSize, sorting, globalFilter, safeTableData, isLoading_TableData]);
 
 
   // *** create the table **** //
@@ -386,7 +385,7 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
             className={!hasData ? "opacity-50 cursor-not-allowed" : ""}
           />
           <Select
-            value={String(table.getState().pagination.pageSize)}
+            value={String(table.state.pagination.pageSize)}
             onValueChange={(selectedValue) => {
               table.setPageSize(Number(selectedValue));
             }}
@@ -412,8 +411,10 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
           </Select>
         </div>
        
-          <div className={`size-full flex-col flex overflow-auto rounded-lg border border-surface" id="tableHere`}>
-            <Table className=" ">
+            <Table
+              containerRef={scrollContainerRef}
+              containerClassName="min-h-0 flex-auto rounded-lg border border-surface"
+            >
               <TableHeader className="min-h-10 border-b sticky top-0 border-surface-default bg-surface-default text-sm text-text-dark">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>
@@ -452,19 +453,20 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
                 ))}
               </TableHeader>
     
-              <TableBody className="group flex-1 min-h-0 size-full text-sm border-surface-default bg-surface-light dark:text-white">
-                {table.getRowModel().rows.map((row, key) => (
+              <TableBody className="group text-sm border-surface-default bg-surface-light dark:text-white">
+                {table.getRowModel().rows.map((row) => (
                     <tr
-                    onMouseEnter={() => hasData && setRowHoverID(key)}
-                    onMouseLeave={() => hasData && setRowHoverID(-1)}
-                    onClick={() => SetOnClickEvents(row, key)}
-                    key={key}
+                    onMouseEnter={() => hasData && setRowHoverID(row.id)}
+                    onMouseLeave={() => hasData && setRowHoverID(null)}
+                    onClick={() => handleRowClick(row)}
+                    key={row.id}
+                    ref={row.getIsSelected() ? selectedRowRef : null}
                     className={`border-b border-surface last:border-0 ${
                       !hasData 
                       ? "cursor-not-allowed opacity-60"
-                      : rowSelectID == key && onTableName === tableName
+                      : row.getIsSelected()
                       ? "bg-[#ffc46c] cursor-pointer"
-                      : rowHoverID == key
+                      : rowHoverID === row.id
                       ? "bg-primary-foreground cursor-pointer"
                       : "bg-secondary-light cursor-pointer"
                     } `}
@@ -488,14 +490,13 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
                 ))}
               </TableBody>
             </Table>
-            </div> 
          
 
           <div className="mt-2 flex flex-wrap justify-between gap-4">
             <span className="flex items-center gap-1 ">
               <div className="text-sm ml-1 text-text-foreground ">{t?.rich('page', {...t_richConfig})}</div>
               <div className="text-sm text-text-foreground ">
-                {table.getState().pagination.pageIndex + 1} {t?.rich('pageOf', {...t_richConfig})}{" "}
+                {table.state.pagination.pageIndex + 1} {t?.rich('pageOf', {...t_richConfig})}{" "}
                 {table.getPageCount().toLocaleString()}
               </div>
             </span>
@@ -529,6 +530,6 @@ const DataTableComponent = ({ cardProps, refDataTableClass, onClickEvent }: data
   }   
  
 
-/** Default export for the linked public-health data table. */
+/** Default export for the database-backed data table. */
 export default DataTableComponent;
 

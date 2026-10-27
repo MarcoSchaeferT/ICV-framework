@@ -1,33 +1,21 @@
 
-/**
- * Displays a main information panel with a heading and content.
- *
- * This component renders a styled container with an info icon, a heading, and a description.
- * It uses layout sizes from the `layoutSizes` constant for spacing and sizing.
- * If no `heading` or `content` is provided, default values are used.
- *
- * @param props.heading - The heading text to display at the top of the panel.
- * @param props.content - The main content or description to display below the heading.
- * @returns A React functional component rendering the main info view.
- */
-import { layoutSizes } from '@/app/const_store';
-import { Info, SquareChevronDown, CircleX, MessageSquareShare } from "lucide-react"
+import { layoutSizes, t_richConfig } from '@/app/const_store';
+import { Info, SquareChevronDown, CircleX, MessageSquareShare, InfoIcon } from "lucide-react"
 import { Button } from "@/components/ui/button";
-import { useEffect, useState} from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "@/i18n/routing";
 import { OpenInBrowser} from "iconoir-react";
-import { InfoIcon } from "lucide-react"
 import { useLocale ,useTranslations } from "next-intl";
-import { t_richConfig} from '@/app/const_store';
 
 
 
 import MdxLayout from '@/mdx-layout';
 
-import { ReactNode } from "react";
 
 /**
- * Renders collapsible introductory content above a dashboard, optionally from localized MDX.
+ * Renders collapsible introductory content above a Vis. Interface, optionally from localized MDX.
+ * The panel displays an info icon, heading, and description, with spacing based on `layoutSizes`.
+ * If no heading or content is provided, default values are used.
  *
  * @param props - Heading plus either React content or a compiled MDX component.
  * @returns The information panel and map scroll anchor, or `null` after dismissal.
@@ -69,7 +57,7 @@ useEffect(() => {
     return () => {
       window.removeEventListener('scroll', handleScroll);
     };
-}, [isSpacerVisible]);
+}, [isSpacerVisible, isClosed]);
 
 if (isClosed) {
     return null; // Do not render anything if closed

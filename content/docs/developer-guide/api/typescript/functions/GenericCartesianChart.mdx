@@ -1,0 +1,64 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: GenericCartesianChart
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **GenericCartesianChart**(`props`): `Element`
+
+Renders a configurable line, bar, or pie chart for a shared dataset.
+
+## Parameters
+
+### props
+
+Unique chart ID, renderer kind, and optional per-chart row limit.
+
+#### chartName
+
+`string`
+
+#### kind
+
+[`GenericChartKind`](../type-aliases/GenericChartKind)
+
+#### rowLimit?
+
+`number` \| `null`
+
+## Returns
+
+`Element`
+
+Axis controls and a chart or a loading/error/empty state.
+
+## Remarks
+
+When `rowLimit` is omitted, uses the value from [useChartDataset](useChartDataset) (defaults to 100).
+Passing `null` requests an unbounded result.
+
+Reads the selected relation from [ChartDatasetProvider](ChartDatasetProvider) while keeping
+X and Y axis choices local to this chart. Requests localized column metadata
+and the selected columns through `useGetJSONData`, then registers loading
+with the nearest `LoadingSpinnerProvider`. The chart must be rendered below
+both providers, as `SGridPlotCard` does for card-level loading state.
+
+## Example
+
+```tsx
+import { GenericCartesianChart, ChartDatasetProvider } from "@/framework";
+import { LoadingSpinnerProvider } from "@/components/plots/maps/utils/loadingSpinner";
+
+function MosquitoTrendCard() {
+  return (
+    <ChartDatasetProvider>
+      <LoadingSpinnerProvider>
+        <GenericCartesianChart chartName="albopictus-trend" kind="line" rowLimit={100} />
+      </LoadingSpinnerProvider>
+    </ChartDatasetProvider>
+  );
+}
+```

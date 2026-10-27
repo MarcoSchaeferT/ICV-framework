@@ -1,3 +1,4 @@
+import React from "react";
 import { dictStates_mapGermany, dictStates_TableGermany, dictStates_AbbrGermany, dbDATA } from "./const_store";
 
 
@@ -95,27 +96,6 @@ class stateMappersGermany {
    ****************************/
 
   /**
-   * Maps a state name to its corresponding ID in the table representation using the map representation.
-   * @param stateName - The name of the state.
-   * @returns The ID of the state, or -1 if the state name is not found.
-   */
-  public static mapper__MapTable__State_to_ID(stateName: string): number {
-    return dictStates_TableGermany[stateName] != undefined
-      ? dictStates_TableGermany[stateName]
-      : -1;
-  }
-
-  /**
-   * Maps a state ID to its corresponding name in the map representation.
-   * @param stateID - The ID of the state.
-   * @returns The name of the state.
-   */
-  public static mapper__MapTable__ID_to_State(stateID: number): string {
-    const stateMap = this.Map__ID_to_State(stateID);
-    return stateMap;
-  }
-
-  /**
    * Maps a state ID from the map representation to its corresponding ID in the table representation.
    * @param stateID - The ID of the state in the map representation.
    * @returns The ID of the state in the table representation.
@@ -129,27 +109,6 @@ class stateMappersGermany {
   /***************************
    *** Table to Map Mappers ***
    ****************************/
-
-  /**
-   * Maps a state name to its corresponding ID in the map representation using the table representation.
-   * @param stateName - The name of the state.
-   * @returns The ID of the state, or -1 if the state name is not found.
-   */
-  public static mapper__TableMap__State_to_ID(stateName: string): number {
-    return dictStates_mapGermany[stateName] != undefined
-      ? dictStates_mapGermany[stateName]
-      : -1;
-  }
-
-  /**
-   * Maps a state ID to its corresponding name in the table representation.
-   * @param stateID - The ID of the state.
-   * @returns The name of the state.
-   */
-  public static mapper__TableMap__ID_to_State(stateID: number): string {
-    const stateTable = this.Table__ID_to_State(stateID);
-    return stateTable;
-  }
 
   /**
    * Maps a state ID from the table representation to its corresponding ID in the map representation.
@@ -170,10 +129,11 @@ class stateMappersGermany {
  * @param data - Standard Flask response wrapper.
  * @returns The error string when available, otherwise `undefined`.
  */
-function handleLoadDataError(isLoading: boolean, data: dbDATA): any | undefined {
-  if (!isLoading) {
-    if (data.error != undefined) {
-      return String(data.error);
+function handleLoadDataError(isLoading: boolean, data: dbDATA): string | undefined {
+  if (!isLoading && data && typeof data === "object") {
+    const rawError = data.error;
+    if (typeof rawError === "string" && rawError !== "" && rawError !== "false") {
+      return rawError;
     }
   }
   return undefined;
@@ -197,17 +157,25 @@ const PrintDataLoadingErrors = ({
 }) => {
 
   // remove duplicate errors and undefined values
-  const uniqueErrors = [...new Set(listOfErrors.filter(e => e !== undefined))];
+  const uniqueErrors = [...new Set(listOfErrors.filter(e => e !== undefined && e !== null && e !== ""))];
   return (
     <div
-      className={`${position} bottom-0 left-[-8px] m-2 p-1 border w-full bg-white bg-opacity-75 z-10000 ${
+      className={`${position} bottom-0 left-0 m-2 p-2.5 border border-red-300 rounded-lg bg-white/95 backdrop-blur-sm shadow-lg max-h-60 max-w-[calc(100%-1rem)] overflow-x-auto overflow-y-auto z-10000 flex flex-col gap-2 ${
       uniqueErrors.length > 0 ? "" : "hidden"
       }`}
     >
       {uniqueErrors.map((error, index) => (
-      <div key={index} className=" text-red-500 wrap-break-word">
-        {error}
-      </div>
+        <div
+          key={index}
+          className="flex items-start gap-2 p-2 rounded-md bg-red-50 border border-red-200 text-xs text-red-700 shadow-xs"
+        >
+          <span className="text-red-500 shrink-0 select-none font-semibold" aria-hidden="true">
+            ⚠️
+          </span>
+          <div className="flex-1 whitespace-pre-wrap break-words min-w-0">
+            {typeof error === "string" ? error : React.isValidElement(error) ? error : String(error)}
+          </div>
+        </div>
       ))}
     </div>
   );
@@ -217,5 +185,3 @@ const PrintDataLoadingErrors = ({
 export default stateMappersGermany;
 /** Public loading-error extraction and presentation helpers. */
 export { handleLoadDataError, PrintDataLoadingErrors };
-/** Type-only export for the German state mapper class. */
-export type { stateMappersGermany as stateMappersGermanyT };

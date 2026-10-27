@@ -172,7 +172,22 @@
                 },
                 "coefficientMap": "Global Coefficient of Variation Map",
                 "temporalUncertaintyPlot": "Temporal Uncertainty",
-                "calibrationPlot": "Probabilistic Calibration Plot"
+                "calibrationPlot": "Probabilistic Calibration Plot",
+                "selectCellPrompt": "Select a grid cell on the map to load its charts.",
+                "chartNoData": "No uncertainty data is available for this cell.",
+                "chartLoadError": "Could not load the uncertainty charts for this cell.",
+                "monthAxis": "Month",
+                "suitabilityAxis": "Predicted habitat suitability",
+                "predictedMean": "Predicted mean",
+                "standardDeviation": "Standard deviation",
+                "confidenceBand": "Mean ±2 SD",
+                "simulatedValue": "Sampled simulation",
+                "simulatedNote": "Calibration uses sampled model simulations, not observed outcomes.",
+                "expectedProportion": "Expected proportion",
+                "observedProportion": "Observed proportion",
+                "deviation": "Difference",
+                "ideal": "Ideal calibration",
+                "miscalibrationArea": "Miscalibration area"
             },
             "page_ENSO_Suitability": {
                 "mainInfo": {
@@ -188,7 +203,10 @@
                 "forecastMonth": "Forecast Month",
                 "forecast": "Forecast",
                 "overview": "Overview",
-                "selectCellPrompt": "Select a grid cell on the map to load static climate factor & forecast plots",
+                "selectCellPrompt": "Select a grid cell on the map to load climate factors and forecasts",
+                "chartLoadError": "Could not load the climate chart for this cell.",
+                "chartNoData": "No climate data is available for this cell.",
+                "selected": "selected",
                 "noForecastMonths": "No forecast months available",
                 "svg": {
                     "alt": "Climate factors and habitat suitability forecast for the selected grid cell",
@@ -216,6 +234,7 @@
                     "title": "SEAS5 Forecast vs. ERA5 2000–2025 (mean ±1 standard deviation)",
                     "reference_legend": "ERA5 Mean (2000–2025)",
                     "forecast_legend": "SEAS5 Forecast",
+                    "suitability_forecast_legend": "Suitability Forecast",
                     "no_data": "No data for cell ID={cell_id}\ntable={dataset}"
                 }
             }
@@ -326,6 +345,9 @@
         }
     },
     "page_covidDashboard": {
+        "preparing": "Preparing COVID-19 state data…",
+        "preparationError": "Could not prepare COVID-19 state data",
+        "retry": "Retry",
         "mainInfo": {
             "heading": "Historical COVID-19 Data for Germany"
         },
@@ -343,6 +365,9 @@
         }
     },
     "page_covidWorldView": {
+        "preparing": "Preparing COVID-19 data for the world view…",
+        "preparationError": "Could not prepare RKI state data; the maps use global data for Germany instead",
+        "retry": "Retry",
         "mainInfo": {
             "heading": "Historical COVID-19 Data Worldwide"
         },
@@ -423,7 +448,13 @@
     },
     "navbar_top": {
         "mode": "Mode",
-        "home": "Home"
+        "home": "Home",
+        "helpMenu": {
+            "quickHelp": "-Quick help & dataset details-",
+            "userGuide": "User guide",
+            "developerGuide": "Developer documentation",
+            "swaggerUi": "Swagger UI (REST API)"
+        }
     },
     "page_metadata": {
         "heading": "Metadata Editor",

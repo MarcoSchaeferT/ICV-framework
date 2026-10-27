@@ -167,7 +167,7 @@ class TableReplacementTests(unittest.IsolatedAsyncioTestCase):
         ):
             result = await create_table_module.createTable(self._data())
 
-        self.assertIn("invalid schema", result["ERROR"])
+        self.assertIn("invalid schema", result["error"])
         self.assertIs(connection_context.__exit__.call_args.args[0], RuntimeError)
 
 
@@ -221,6 +221,18 @@ class NativeCopyUploadTests(unittest.IsolatedAsyncioTestCase):
 
 
 class CountryAssignmentVectorizationTests(unittest.TestCase):
+    def test_packaged_world_map_assigns_a_known_country(self):
+        country_module._load_country_index.cache_clear()
+        try:
+            country_index = country_module._load_country_index()
+            updates = country_module._country_updates(
+                [(1, "POINT (13.405 52.52)")], country_index
+            )
+        finally:
+            country_module._load_country_index.cache_clear()
+
+        self.assertEqual(updates, [(1, "DEU", "Germany")])
+
     def test_batch_parsing_and_spatial_query_support_wkt_and_geojson(self):
         countries = [box(0, 0, 10, 10), box(10, 0, 20, 10)]
         tree = STRtree(countries)

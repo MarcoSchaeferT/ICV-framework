@@ -5,6 +5,7 @@ import * as LabelPrimitive from "@radix-ui/react-label"
 
 import { cn } from "@/lib/utils"
 
+/** Renders a Radix label with styles for disabled associated controls. */
 function Label({
   className,
   ...props

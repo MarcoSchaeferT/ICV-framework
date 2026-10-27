@@ -15,7 +15,7 @@ import { ChartDatasetProvider } from '@/components/contexts/ChartDatasetContext'
 const isSWAPY = true;
 
 /**
- * 2-2 Columns Dashboard Grid Layout Template Page.
+ * 2-2 Columns Vis. Interface Grid Layout Template Page.
  *
  * @returns Non-scrolling 2x2 grid layout with interactive Swapy cards and a right sidebar chart registry.
  *

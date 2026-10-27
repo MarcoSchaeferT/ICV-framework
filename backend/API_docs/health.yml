@@ -1,0 +1,17 @@
+tags:
+  - Utility Endpoints
+summary: Liveness health check
+description: >-
+  Returns a fixed liveness status for container orchestration without querying
+  PostgreSQL or Redis.
+responses:
+  200:
+    description: Process is alive.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: "healthy"

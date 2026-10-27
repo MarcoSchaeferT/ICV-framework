@@ -1,0 +1,114 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: StandardTooltipProps
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Properties for standard HTML and React map tooltip renderers.
+
+## Example
+
+```ts
+import type { StandardTooltipProps } from "@/framework";
+
+const tooltip: StandardTooltipProps = {
+  value: 0.73,
+  unit: "probability",
+  description: "Modeled habitat suitability",
+  rows: [{ label: "Species", value: "Aedes albopictus" }],
+  chartId: "albopictus-habitat-tooltip",
+};
+```
+
+## Properties
+
+### compact?
+
+> `optional` **compact?**: `boolean`
+
+Use reduced width, spacing, and typography for compact chart cards.
+
+#### Default Value
+
+```ts
+false
+```
+
+***
+
+### valueLabel?
+
+> `optional` **valueLabel?**: `string`
+
+Short heading identifying the primary metric or selected field.
+
+***
+
+### value
+
+> **value**: `string` \| `number`
+
+Inspected primary numerical or string feature value
+
+***
+
+### unit?
+
+> `optional` **unit?**: `string`
+
+Physical dimension unit string (e.g. "°C", "mm", "%").
+
+#### Default Value
+
+```ts
+""
+```
+
+***
+
+### description?
+
+> `optional` **description?**: `string`
+
+Variable description text
+
+***
+
+### rows
+
+> **rows**: [`StandardTooltipRow`](StandardTooltipRow)[]
+
+Array of attribute rows matching [StandardTooltipRow](StandardTooltipRow)
+
+***
+
+### secondarySection?
+
+> `optional` **secondarySection?**: [`StandardTooltipSection`](StandardTooltipSection)
+
+Optional metric displayed below the primary value using identical styling.
+
+***
+
+### chartId?
+
+> `optional` **chartId?**: `string`
+
+DOM container element ID.
+
+#### Default Value
+
+```ts
+"tooltip"
+```
+
+***
+
+### colorBarHtml?
+
+> `optional` **colorBarHtml?**: `string`
+
+Optional HTML snippet for color bar previews

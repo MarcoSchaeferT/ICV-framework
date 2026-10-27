@@ -1,20 +1,16 @@
 
 "use client";
 
-import { useRef, useEffect, useMemo, useState } from 'react'
-import CovidDataStates from '@/components/dataTableClasses/CovidDataStates';
+import React, { useRef, useEffect, useMemo, useState } from 'react'
 import {apiRoutes } from "@/app/api_routes";
-import React from 'react';
 import { InterfaceContextProvider, useInterfaceContext, interfaceContextI } from '@/components/contexts/InterfaceContext';
 import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
 import { availableColorMapsNames } from '@/components/plots/maps/constants';
-
 import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '@/components/plots/maps/LeafD3Map';
 import D3ExampleChartComponent, { ExampleChartProps } from '@/components/plots/templates/plotTemplate';
 import { createSwapy, Swapy } from 'swapy';
 import LinechartComponent, { LinechartProps } from '@/components/plots/linechart/linechart';
-
 import { LeafletComponentProps } from '@/components/plots/maps/BaseMap';
 import { useLocale ,useTranslations } from "next-intl";
 import { t_richConfig } from "@/app/const_store";
@@ -25,11 +21,22 @@ import { useUIContext } from '@/components/contexts/UIContext';
 import { MDXContentProvider } from '@messages/markdown/MDXContentProvider';
 import { Locale } from '@/i18n/routing';
 
-
-
 const isSWAPY = true;
 
-/** Returns the linked climate, habitat-model, and observation-data showcase dashboard. */
+/**
+ * Renders the linked climate and mosquito-habitat showcase.
+ *
+ * @returns Localized introduction plus five map/chart pairs in a Swapy grid.
+ *
+ * @remarks The view begins with April (`defaultMonth = "4"`) and compares
+ * habitat suitability with precipitation, temperature, dew point, and wind
+ * speed. The suitability map publishes viewport coordinates to
+ * `InterfaceContext`; the climate maps receive them. Line charts use the
+ * selected geography to query the corresponding feature series. Each
+ * `SGridPlotCard` owns its own loading state.
+ *
+ * @see {@link DynamicLineChart} for feature and geography query assembly.
+ */
 export default function Home() {
   
   const locale = useLocale() as Locale;
@@ -263,6 +270,16 @@ let p2 = mapPropsWorld_prediction
 }
 
 
+/**
+ * Formats a selected dataset, feature, country, or color-map summary card.
+ *
+ * @param props - Summary key, locale, and translation function.
+ * @returns A compact value card or a metadata-loading spinner.
+ *
+ * @remarks This helper is retained for optional summary cards; its JSX call
+ * sites are currently commented out in the active showcase grid. Feature
+ * descriptions come from localized dataset metadata through `useGetJSONData`.
+ */
 function ShowDataSet({ query, locale, t }: { query: string ; locale: string; t: any }) {
   let c = useInterfaceContext();
   let queryV = query; 
@@ -346,6 +363,22 @@ function ShowDataSet({ query, locale, t }: { query: string ; locale: string; t: 
 }
 
 
+/**
+ * Builds a geography-filtered line-chart card for one monthly climate feature.
+ *
+ * @param props - Raw feature key such as `tp_4` and localized card name.
+ * @returns A configured line-chart card or a loading placeholder.
+ *
+ * @remarks The active country code comes from the shared map selection.
+ * Habitat-probability features use the model relation and a 0–100 Y domain;
+ * climate features use the currently selected relation. Month-suffixed
+ * features are converted to the backend wildcard form before building the URL.
+ *
+ * @example
+ * ```tsx
+ * <DynamicLineChart featureRaw="tp_4" name="Precipitation" />
+ * ```
+ */
 function DynamicLineChart({ featureRaw, name }: { featureRaw: string, name: string }) {
   let c = useInterfaceContext();
   const locale = useLocale();
@@ -407,6 +440,7 @@ function DynamicLineChart({ featureRaw, name }: { featureRaw: string, name: stri
 }
 
 
+/** Renders the local fallback spinner while a summary or line chart lacks data. */
 function LoadingSpinner() {
   return (
     <>

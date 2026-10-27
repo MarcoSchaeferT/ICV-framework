@@ -1,9 +1,16 @@
 import type { MDXComponents } from 'mdx/types'
 import React from 'react';
-import customMDXlink from './cutomMDXlink';
+import defaultMdxComponents from 'fumadocs-ui/mdx';
+import CustomMDXLink from './cutomMDXlink';
 import { useLocale } from 'next-intl';
 import { Locale } from './i18n/routing';
 import alertTypeTranslations from '@messages/markdown/markdownAlertTypes';
+import ShowCovGuard from '@/components/ShowCovGuard';
+import { Tabs, Tab } from 'fumadocs-ui/components/tabs';
+import { Steps, Step } from 'fumadocs-ui/components/steps';
+import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
+import { Files, Folder, File } from 'fumadocs-ui/components/files';
+import { TypeTable } from 'fumadocs-ui/components/type-table';
  
 /**
  * Extracts a GitHub-style alert marker such as `[!NOTE]` from MDX blockquote children.
@@ -48,22 +55,21 @@ const getAlertType = (children: React.ReactNode): string => {
 };
 
 
-/** Shared MDX element overrides used by localized end-user and developer documentation. */
-const baseComponents: MDXComponents = {
-  //
-  // @ts-ignore: MDXComponents allows lowercase 'blockquote' for custom mapping
-  blockquote: (props) => {
-    const GetLocale = () => {
-      return useLocale() as Locale;
-    }
-    const locale = GetLocale();
-    const type = getAlertType(props.children);
+/** Renders legacy GitHub-style alerts without involving Fumadocs components. */
+function LegacyBlockquote({
+  children,
+  className,
+  style,
+  ...props
+}: React.ComponentPropsWithoutRef<'blockquote'>) {
+    const locale = useLocale() as Locale;
+    const type = getAlertType(children);
     //console.log('Alert type:', type,props.children);
     const alertClass = type
       ? `markdown-alert markdown-alert-${type}`
       : 'markdown-alert';
     
-      let cleanedChildren = React.Children.map(props.children, (child) => {
+      let cleanedChildren: React.ReactNode = React.Children.map(children, (child) => {
         if (
           React.isValidElement(child) &&
           child.type === 'p' &&
@@ -97,28 +103,46 @@ const baseComponents: MDXComponents = {
         }
         return child;
       });
-      if (type && typeof props.children === 'string') {
-        cleanedChildren = props.children.replace(`[!${type.toUpperCase()}]`, '');
-          console.log('Alert class:', `[!${type.toUpperCase()}]`, cleanedChildren);
+      if (type && typeof children === 'string') {
+        cleanedChildren = children.replace(`[!${type.toUpperCase()}]`, '');
       }
+    const divProps = props as React.HTMLAttributes<HTMLDivElement>;
+
     return (
       <div
-        className={alertClass}
+        className={`${alertClass} ${className ?? ''}`.trim()}
         style={{
           borderLeft: `2px solid var(--github-alert-${type || 'default'}-color)`,
           backgroundColor: `color-mix(in srgb, var(--github-alert-${type || 'default'}-color) 10%, transparent)`,
-         // padding: '0.75em 1em',
-         // margin: '1em 0',
+          ...style,
         }}
-        {...props}
-      ><div className={`markdown-alert-title`}>{alertTypeTranslations[locale][type.toLowerCase()]}</div>
+        {...divProps}
+      >{type && <div className="markdown-alert-title">{alertTypeTranslations[locale][type]}</div>}
         {cleanedChildren}
       </div>
     );
-  },
+}
 
+/** Legacy MDX element overrides used by the existing localized application pages. */
+const baseComponents: MDXComponents = {
+  blockquote: LegacyBlockquote,
 };
  
+/** Interactive Fumadocs documentation components for tabs, steps, accordions, and file trees. */
+const interactiveComponents: MDXComponents = {
+  Tabs,
+  Tab,
+  Steps,
+  Step,
+  Accordion,
+  Accordions,
+  Files,
+  FileTree: Files,
+  Folder,
+  File,
+  TypeTable,
+};
+
 /**
  * Supplies application-specific element renderers to compiled MDX content.
  *
@@ -128,10 +152,36 @@ const baseComponents: MDXComponents = {
  * The hook is part of the Next.js MDX integration contract. Keeping custom links here ensures internal documentation
  * navigation remains locale-aware while external links retain normal anchor behavior.
  */
-export function useMDXComponents(): MDXComponents {
-  const components = {
-    a: customMDXlink,
+export function getMDXComponents(components?: MDXComponents): MDXComponents {
+  return {
+    ...defaultMdxComponents,
+    ...interactiveComponents,
+    ShowCovGuard,
+    a: CustomMDXLink,
     ...baseComponents,
+    ...components,
   };
-  return components;
+}
+
+/**
+ * Supplies the component registry expected by the existing application MDX.
+ *
+ * Fumadocs components intentionally stay out of this global hook so they cannot
+ * replace headings, code blocks, tables, or colors on legal and framework pages.
+ */
+export function useMDXComponents(components?: MDXComponents): MDXComponents {
+  return {
+    Callout: defaultMdxComponents.Callout,
+    Card: defaultMdxComponents.Card,
+    Cards: defaultMdxComponents.Cards,
+    ...interactiveComponents,
+    ShowCovGuard,
+    a: CustomMDXLink,
+    ...baseComponents,
+    ...components,
+  };
+}
+
+declare global {
+  type MDXProvidedComponents = ReturnType<typeof getMDXComponents>;
 }

@@ -1,5 +1,6 @@
 import { apiRoutes } from '../src/app/api_routes';
 
+/** Localized disease articles and source links for the vector information view. */
 const blogDiseases = {
         "en": [
         {
@@ -242,6 +243,7 @@ const blogDiseases = {
     };
   
   
+  /** Localized mosquito-vector articles for the information view. */
   const blogVectors = {
     "en":
     [

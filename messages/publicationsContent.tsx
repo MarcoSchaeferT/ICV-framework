@@ -1,19 +1,53 @@
+/**
+ * Metadata used to render and filter one ICV publication entry.
+ *
+ * @remarks `date` is an ISO calendar date and `type` selects the publication
+ * badge. DOI and venue fields are optional because preprints and conference
+ * contributions may provide different identifiers.
+ *
+ * @example
+ * ```ts
+ * const forecastingPaper: PublicationI = {
+ *   id: "forecasting-review-2025",
+ *   title: "Holistic Forecasting for Future Pandemics",
+ *   authors: ["Luis Roger Esquivel Gomez", "Nadezdha Malysheva"],
+ *   date: "2025-04-30",
+ *   type: "journal",
+ *   journal: "Discover Public Health",
+ *   doi: "10.1186/s12982-025-00573-y",
+ *   abstract: "A review of data and models for epidemic forecasting.",
+ *   tags: ["Disease forecasting", "Public health"],
+ * };
+ * ```
+ */
 interface PublicationI {
+  /** Stable key for rendering and filtering. */
   id: string
+  /** Publication title. */
   title: string
+  /** Authors in display order. */
   authors: string[]
+  /** Publication date in `YYYY-MM-DD` form. */
   date: string
+  /** Publication category for the UI badge. */
   type: 'conference' | 'journal' | 'preprint' | 'workshop'
+  /** Conference or workshop name when applicable. */
   conference?: string
+  /** Journal name when applicable. */
   journal?: string
+  /** Digital object identifier, when assigned. */
   doi?: string
+  /** External destination for the publication. */
   url?: string
+  /** Abstract shown in the publication detail view. */
   abstract: string
+  /** Search/filter keywords. */
   tags: string[]
 }
 
 
 
+/** Maintained publication catalog consumed by the localized publications page. */
 const PUBLICATIONS_LIST: PublicationI[] = [
   {
     id: '1',

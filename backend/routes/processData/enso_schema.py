@@ -39,6 +39,11 @@ _CLIMATE_FORECAST_COLUMN_RE = re.compile(
 
 @dataclass(frozen=True)
 class EnsoSuitabilityColumn:
+    """Parsed suitability field with a one-based month and optional baseline years.
+
+    Example:
+        EnsoSuitabilityColumn(kind="forecast", month=8, year=2026)
+    """
     kind: EnsoSuitabilityColumnKind
     month: int
     year: int | None = None
@@ -48,6 +53,11 @@ class EnsoSuitabilityColumn:
 
 @dataclass(frozen=True)
 class EnsoClimateColumn:
+    """Parsed climate field for a forecast or monthly reference statistic.
+
+    Example:
+        EnsoClimateColumn(kind="reference_mean", variable="t2m", month=8)
+    """
     kind: EnsoClimateColumnKind
     variable: EnsoClimateVariable
     month: int

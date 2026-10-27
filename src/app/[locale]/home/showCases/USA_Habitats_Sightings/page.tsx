@@ -1,33 +1,43 @@
 
 "use client";
 
-import { useRef, useEffect } from 'react'
-import {apiRoutes } from "@/app/api_routes";
-import React from 'react';
+import React, { useRef, useEffect } from 'react'
+import { apiRoutes } from "@/app/api_routes";
 import { InterfaceContextProvider, useInterfaceContext } from '@/components/contexts/InterfaceContext';
 import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
-import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '@/components/plots/maps/LeafD3Map';
+import LeafD3MapLayerComponent, { LeafD3MapLayerProps } from '@/components/plots/maps/LeafD3Map';
 import { createSwapy, Swapy } from 'swapy';
 import { MDXContentProvider } from '@messages/markdown/MDXContentProvider';
-import {ViewMainInfoComponent} from '@/components/ViewPageMainInfo';
+import { ViewMainInfoComponent } from '@/components/ViewPageMainInfo';
 import { Locale, useLocale, useTranslations } from "next-intl";
 import { t_richConfig } from "@/app/const_store";
 import { availableColorMapsNames } from '@/components/plots/maps/constants';
 import { useUIContext } from '@/components/contexts/UIContext';
 
-
 const isSWAPY = true;
 
-/** Returns the linked United States habitat suitability and mosquito-observation showcase. */
+/**
+ * Renders the United States habitat-suitability and mosquito-sighting showcase.
+ *
+ * @returns A localized introduction and a Leaflet map inside a Swapy card.
+ *
+ * @remarks The map starts with the 2019 `albopictus` probability relation and
+ * overlays presence observations as points. The map's dataset selector remains
+ * available while the color and feature controls are fixed for this view.
+ * `InterfaceContextProvider` owns linked selection state; the card provides
+ * independent loading feedback and localized MDX information.
+ *
+ * @see {@link LeafD3MapLayerProps} for the configured layer flags.
+ */
 export default function Home() {
 
-const t = useTranslations("page_home.ShowCases.page_USA_Habitats_Sightings");
-const locale = useLocale() as Locale;
-let md = MDXContentProvider[locale];
+  const t = useTranslations("page_home.ShowCases.page_USA_Habitats_Sightings");
+  const locale = useLocale() as Locale;
+  let md = MDXContentProvider[locale];
 
- const UI_contextT = useUIContext();
- const layoutSizes = UI_contextT.layoutDims;
+  const UI_contextT = useUIContext();
+  const layoutSizes = UI_contextT.layoutDims;
 
   // set up the map props
   let worldMapProsp = LeafD3MapLayerProps();
@@ -53,9 +63,9 @@ let md = MDXContentProvider[locale];
   p1.mapUIsettings.isAutoHideSettingsToggle = false;
   p1.mapUIsettings.isSettingsBlendAnimation = false;
   p1.isStaticAutoFitFullSize = false;
-  p1.isApplyContextData = false;  
+  p1.isApplyContextData = false;
   p1.isProjection_equirectangular = false;
-  p1.mapUIsettings.filterStringForAvailableDatasetInclude = "probability";
+  p1.mapUIsettings.filterStringForAvailableDatasetInclude = "t_2019_ocsvm_albopictus_probability_predictions_named";
   p1.mapUIsettings.defaultDatasetName = "t_2019_ocsvm_albopictus_probability_predictions_named";
   p1.mapUIsettings.defaultFeatureName = "prob_1";
   p1.mapUIsettings.defaultFeatureColorMap = availableColorMapsNames.interpolateViridis;
@@ -72,65 +82,65 @@ let md = MDXContentProvider[locale];
     isPresenceData: true,
     isSequenceMetaData: false
   };
-  
+
 
   let mainInfoHeading = t('mainInfo.heading');
 
   // intitialize data table context
-   useInterfaceContext();
- 
- 
-   // set up swapy (client side only)
-   const swapyRef = useRef<Swapy | null>(null)
-   const swapContainerRef = useRef<HTMLDivElement>(null)
-   useEffect(() => {
-     const container =swapContainerRef.current;
-     console.log("container", container)
-     if(isSWAPY && container) {
-       swapyRef.current = createSwapy(container,{
-         animation: 'dynamic', // dynamic or spring or none
-         manualSwap: false,
-         swapMode: 'hover', //'hover' | 'drop';
-         autoScrollOnDrag: true,
-         // dragAxis: 'x',
-         // dragOnHold: true
-       })
-       swapyRef.current?.enable(isSWAPY)
+  useInterfaceContext();
 
-       return () => {
-         // Destroy the swapy instance on component destroy
-         swapyRef.current?.destroy()
-       }
-     }
-   }, []);
 
-    let d3MapCardProps_overview = CardPropsClass(
-      t.rich('headingOverview', {...t_richConfig})?.toString() || '',
-      t.rich('headingOverview', {...t_richConfig})?.toString() || '',"","");
-      d3MapCardProps_overview.infoCard = {content: md.pages.PredictionView.overview.Info, footer: undefined};
-    let d3MapCardProps2_overveiwDetail = CardPropsClass(
-      t.rich('headingDetailView', {...t_richConfig})?.toString() || '',
-      t.rich('headingDetailView', {...t_richConfig})?.toString() || '',"","");
+  // set up swapy (client side only)
+  const swapyRef = useRef<Swapy | null>(null)
+  const swapContainerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const container = swapContainerRef.current;
+    console.log("container", container)
+    if (isSWAPY && container) {
+      swapyRef.current = createSwapy(container, {
+        animation: 'dynamic', // dynamic or spring or none
+        manualSwap: false,
+        swapMode: 'hover', //'hover' | 'drop';
+        autoScrollOnDrag: true,
+        // dragAxis: 'x',
+        // dragOnHold: true
+      })
+      swapyRef.current?.enable(isSWAPY)
 
-   // build the page
-    return (
+      return () => {
+        // Destroy the swapy instance on component destroy
+        swapyRef.current?.destroy()
+      }
+    }
+  }, []);
+
+  let d3MapCardProps_overview = CardPropsClass(
+    t.rich('headingOverview', { ...t_richConfig })?.toString() || '',
+    t.rich('headingOverview', { ...t_richConfig })?.toString() || '', "", "");
+  d3MapCardProps_overview.infoCard = { content: md.pages.PredictionView.overview.Info, footer: undefined };
+  let d3MapCardProps2_overveiwDetail = CardPropsClass(
+    t.rich('headingDetailView', { ...t_richConfig })?.toString() || '',
+    t.rich('headingDetailView', { ...t_richConfig })?.toString() || '', "", "");
+
+  // build the page
+  return (
     <>
-      <main className="flex max-h-fit flex-col items-center justify-between " style={{paddingTop: layoutSizes.gapSize}}>
-      <InterfaceContextProvider>
-      <ViewMainInfoComponent heading={mainInfoHeading} mdxContent={md.pages.ShowCases.USAHabitatsSightings} />
-        {/*** START: grid layout ***/}
-        <div ref={swapContainerRef} className={`w-full grid grid-cols-6 `} style={{
-              gridTemplateRows: `repeat(auto-fill, minmax(${layoutSizes.rowSpanSize}vh, ${layoutSizes.rowSpanSize}vh))`,
-              gap: `${layoutSizes.gapSize}px`,
-              height: `calc(110vh - ${layoutSizes.topNavbarHeight}px - ${layoutSizes.gapSize}px)`,
-               
-             paddingRight: `${layoutSizes.gapSize}px`,
-             paddingLeft: `${layoutSizes.gapSize}px`,
-            }}>
-              {/*** Grid Cells ***/}
-              <SGridPlotCard rowColSpan={[9,6]}  cardProps={d3MapCardProps_overview}><LeafD3MapLayerComponent props={worldMapProsp}/></SGridPlotCard>
-            </div>
-      </InterfaceContextProvider>
+      <main className="flex max-h-fit flex-col items-center justify-between " style={{ paddingTop: layoutSizes.gapSize }}>
+        <InterfaceContextProvider>
+          <ViewMainInfoComponent heading={mainInfoHeading} mdxContent={md.pages.ShowCases.USAHabitatsSightings} />
+          {/*** START: grid layout ***/}
+          <div ref={swapContainerRef} className={`w-full grid grid-cols-6 `} style={{
+            gridTemplateRows: `repeat(auto-fill, minmax(${layoutSizes.rowSpanSize}vh, ${layoutSizes.rowSpanSize}vh))`,
+            gap: `${layoutSizes.gapSize}px`,
+            height: `calc(110vh - ${layoutSizes.topNavbarHeight}px - ${layoutSizes.gapSize}px)`,
+
+            paddingRight: `${layoutSizes.gapSize}px`,
+            paddingLeft: `${layoutSizes.gapSize}px`,
+          }}>
+            {/*** Grid Cells ***/}
+            <SGridPlotCard rowColSpan={[9, 6]} cardProps={d3MapCardProps_overview}><LeafD3MapLayerComponent props={worldMapProsp} /></SGridPlotCard>
+          </div>
+        </InterfaceContextProvider>
       </main>
     </>
   );

@@ -1,0 +1,28 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: DataTableData
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **DataTableData** = `Record`\<`string`, `any`\>
+
+Flexible database row shape before dataset-specific column narrowing.
+
+## Remarks
+
+Rows from heterogeneous relations are narrowed by the table's
+column definitions and linked-view selection callbacks.
+
+## Example
+
+```ts
+import type { DataTableData } from "@/framework";
+const mosquitoObservation: DataTableData = {
+  id: 200509,
+  species: "albopictus",
+  mosquito_amount: 18,
+};
+```

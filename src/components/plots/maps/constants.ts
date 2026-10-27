@@ -2,9 +2,9 @@
 import * as d3 from 'd3';
 
 
-/** Maximum longitude range bound in degrees ($\pm 180^\circ$) */
+/** Maximum longitude range bound: 180 degrees in either direction. */
 export const RANGE_LONG = 180;
-/** Maximum latitude range bound in degrees ($\pm 90^\circ$) */
+/** Maximum latitude range bound: 90 degrees in either direction. */
 export const RANGE_LAT = 90;
 /** Maximum Leaflet zoom level limit */
 export const MAX_ZOOM = 13;
@@ -15,7 +15,7 @@ export const ZOOM_STEP = 0.01;
 /** Precision decimal places count for coordinate comparisons */
 export const NUMBERS_AFTER_COMMA = 3;
 /**
- * Coordinate precision scaling factor ($10^{\text{NUMBERS\_AFTER\_COMMA}} = 1000$).
+ * Coordinate precision scaling factor: 10 to the power of `NUMBERS_AFTER_COMMA` (1000).
  *
  * Used by {@link useMapPosition} to eliminate floating-point coordinate feedback loops.
  */
@@ -70,7 +70,7 @@ export const availableColorMapsAll = {
  * Includes perceptually uniform (Viridis, Inferno, Cividis), sequential (Blues, Greens), and colorblind-safe diverging (RdBu) palettes.
  *
  * @see {@link ColorMapLegend} for legend rendering.
- * @see {@link useGridLayer} for tile canvas coloring.
+ * @see {@link useWebGLGridLayer} for raster grid canvas coloring.
  */
 export const availableColorMaps = {
     "interpolateBlues": d3.interpolateBlues,

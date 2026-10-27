@@ -1,3 +1,4 @@
+/** Localized labels for MDX alert variants, including the fallback label. */
 const alertTypeTranslations: Record<string, Record<string, string>> = {
   de: {
     note: 'Hinweis',

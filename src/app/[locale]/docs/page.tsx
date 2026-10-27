@@ -1,34 +1,30 @@
-"use client"
-import MdxLayout from '@/mdx-layout'
-import { Locale } from '@/i18n/routing';
-import { useLocale, useTranslations } from 'next-intl';
+"use client";
+
+import MdxLayout from '@/mdx-layout';
+import { useTranslations } from 'next-intl';
 import { useUIContext } from '@/components/contexts/UIContext';
 
 /**
  * Renders the localized MDX document currently selected through `UIContext`.
  *
- * @returns The documentation reading surface and active compiled MDX content.
+ * @returns The original ICV documentation reading surface and active MDX content.
  */
-export default function Page() {
-  const locale = useLocale() as Locale;
-  const UI_contextT = useUIContext();
-
-  const t = useTranslations("page_docs");
+export default function DocumentationPage() {
+  const uiContext = useUIContext();
+  const t = useTranslations('page_docs');
 
   return (
-    <>
-      <div className="flex items-center justify-center  mt-6">
-        <div className=" min-w-4xl max-w-7xl justify-center">
-          <div className="overflow-y-auto z-1000 rounded-lg shadow-lg bg-white border-4 border-gray-200 p-4">
-            <div className="flex flex-row gap-4 ml-6 mr-6">
-              <MdxLayout>
-                <h1 className="text-2xl font-bold mb-4">{t.rich("heading")}</h1>
-                {UI_contextT.curDocsMDXContent}
-              </MdxLayout>
-            </div>
+    <div className="mt-6 flex items-center justify-center">
+      <div className="min-w-4xl max-w-7xl justify-center">
+        <div className="z-1000 overflow-y-auto rounded-lg border-4 border-gray-200 bg-white p-4 shadow-lg">
+          <div className="mx-6 flex flex-row gap-4">
+            <MdxLayout>
+              <h1 className="mb-4 text-2xl font-bold">{t.rich('heading')}</h1>
+              {uiContext.curDocsMDXContent}
+            </MdxLayout>
           </div>
         </div>
       </div>
-    </>
-  )
+    </div>
+  );
 }

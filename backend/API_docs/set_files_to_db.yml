@@ -1,7 +1,12 @@
 tags:
   - REST Endpoints
 summary: Upload CSV files to database
-description: Uploads one or more CSV files to the database, creating new tables or updating existing ones. The files are saved and the endpoint returns immediately with an upload_id; parsing and insertion continue in the background. Poll /api/uploadStatus?id=<upload_id> for progress and errors.
+description: >-
+  Streams one or more CSV files into an upload-specific temporary directory
+  and returns an upload_id after scheduling background ingestion. Poll
+  /api/uploadStatus?id=<upload_id> for progress and processing errors. The
+  temporary files are removed after the batch succeeds or fails; processing
+  errors are reported through upload status, not this initial response.
 consumes:
   - multipart/form-data
 parameters:
@@ -30,11 +35,11 @@ responses:
               type: array
               items:
                 type: string
-              description: List of file paths where the files were saved.
-              example: ["/backend/assets/uploads_tmp/mosquito_data.csv"]
+              description: Temporary work paths, removed after background processing.
+              example: ["/data/uploads/3fa85f64-5717-4562-b3fc-2c963f66afa6/mosquito_data.csv"]
             table_exist:
               type: boolean
-              description: Whether a table for the uploaded file already existed (upload updates it instead of creating it).
+              description: Best-effort existence check for the last uploaded file's table; false if the check fails.
               example: false
   400:
     description: Bad request - no files provided or invalid request
@@ -57,7 +62,7 @@ responses:
               value:
                 ERROR: "No files were saved"
   500:
-    description: Internal server error during file processing or database insertion
+    description: Error finalizing a streamed upload file before background processing starts.
     content:
       application/json:
         schema:
@@ -66,4 +71,4 @@ responses:
             ERROR:
               type: string
               description: Detailed error message.
-              example: "Error saving file: Permission denied"
+              example: "Error finalizing file: Upload stream has no filesystem destination"

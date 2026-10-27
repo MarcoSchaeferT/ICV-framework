@@ -12,6 +12,8 @@ import type { VisDataT, GridCellSize, MapGridResponseV1 } from '../types';
  *
  * @example
  * ```ts
+ * import type { UseGridDataParserParams } from "@/framework";
+ *
  * const cellSize = { current: { lat: 0.25, lng: 0.25 } };
  * const params: UseGridDataParserParams = {
  *   isLoading: false,
@@ -25,7 +27,7 @@ import type { VisDataT, GridCellSize, MapGridResponseV1 } from '../types';
 export interface UseGridDataParserParams {
     /** Whether the raw dataset query is still loading */
     isLoading: boolean;
-    /** The raw database payload containing polygon strings and numerical features */
+    /** Row-oriented WKT polygons or a compact `map-grid-v1` response. */
     rawData: {
         response?: Array<{ geometry: string; feature: string; id?: number }> | MapGridResponseV1;
         error?: unknown;
@@ -39,24 +41,45 @@ export interface UseGridDataParserParams {
  *
  * @example
  * ```ts
+ * import type { UseGridDataParserResult } from "@/framework";
+ *
  * const result: UseGridDataParserResult = {
  *   gridData: new Map([[42, { geometry: [[52, 13], [52, 13.25], [51.75, 13.25], [51.75, 13], [52, 13]], feature: 0.73 }]]),
  *   parseErrors: [],
+ *   featureRange: [0.73, 0.73],
+ *   cellSize: { lat: 0.25, lng: 0.25 },
  * };
  * ```
  */
 export interface UseGridDataParserResult {
     /** Map mapping unique spatial grid cell index keys to parsed visual cell data */
     gridData: Map<number, VisDataT>;
-    /** List of string parsing error messages encountered during data ingestion */
+    /** Parsing errors reported while converting a response. */
     parseErrors: string[];
-    /** Minimum and maximum numerical feature values. */
+    /** Backend range for compact data, or range derived from parsed numeric values; `[0, 0]` if unavailable. */
     featureRange: [number, number];
-    /** Uniform grid-cell dimensions derived from response metadata. */
+    /** Grid dimensions from compact metadata or the first row-oriented polygon. */
     cellSize: GridCellSize;
 }
 
+/**
+ * Cached parsed grid plus its derived cell dimensions.
+ *
+ * @remarks Instances are stored in a `WeakMap` keyed by raw JSON objects so
+ * multiple map cards can reuse parsing work without retaining expired data.
+ *
+ * @example
+ * ```ts
+ * const emptyGrid: ParsedGridResource = {
+ *   gridData: new Map(),
+ *   parseErrors: [],
+ *   featureRange: [0, 0],
+ *   cellSize: { lat: 0, lng: 0 },
+ * };
+ * ```
+ */
 interface ParsedGridResource extends UseGridDataParserResult {
+    /** Cell dimensions retained alongside the cached parsed grid. */
     cellSize: GridCellSize;
 }
 
@@ -81,26 +104,41 @@ function isCompactGridResponse(value: unknown): value is MapGridResponseV1 {
 }
 
 /**
- * Ingests raw SQL geometry payloads into an indexed `Map<gridCellIndex, VisDataT>` for fast spatial lookup.
+ * Converts a grid response into cells keyed by their spatial grid index.
  *
- * Computes grid cell dimensions ($\Delta\text{lat}, \Delta\text{lng}$) from the first polygon boundary rectangle,
- * derives 2D grid cell indices from polygon centroids, and returns a memoized Map.
- *
- * @param params - Input configuration containing raw dataset response and target cell size ref.
- * @returns Object containing the parsed spatial `gridData` Map and any encountered `parseErrors`.
+ * @param params - Loading state, raw response, and mutable cell-size ref.
+ * @returns Indexed cells, parse errors, feature range, and cell dimensions.
  *
  * @remarks
- * Ingesting high-density environmental grid data (e.g. 50,000 spatial cells) requires efficient parsing.
- * Memoizing the result via `useMemo` ensures that polygon string parsing occurs only when `rawData.response` changes.
+ * Accepts row-oriented WKT polygons and column-oriented `map-grid-v1` data.
+ * Compact geometry prefers exact corner columns, then exact bounds, then
+ * legacy latitude/longitude anchors. Invalid compact cells are skipped.
+ * Row-oriented cell dimensions come from the first polygon; compact dimensions
+ * come from `cellSize`. The result is memoized by raw response identity and
+ * writes its dimensions to `gridcellSizeRef.current` after rendering.
  *
  * @example
- * ```tsx
- * const cellSizeRef = useRef<GridCellSize>({ lat: 0.25, lng: 0.25 });
- * const { gridData, parseErrors } = useGridDataParser({
- *   isLoading: false,
- *   rawData: dbResponse,
- *   gridcellSizeRef: cellSizeRef,
- * });
+ * ```ts
+ * import { useRef } from "react";
+ * import { useGridDataParser, type GridCellSize } from "@/framework";
+ *
+ * const rawData = {
+ *   response: [{
+ *     id: 42,
+ *     geometry: "POLYGON ((13 52, 13.25 52, 13.25 51.75, 13 51.75, 13 52))",
+ *     feature: "0.73",
+ *   }],
+ * };
+ *
+ * function ParsedCellCount() {
+ *   const cellSizeRef = useRef<GridCellSize>({ lat: 0.25, lng: 0.25 });
+ *   const { gridData, parseErrors } = useGridDataParser({
+ *     isLoading: false,
+ *     rawData,
+ *     gridcellSizeRef: cellSizeRef,
+ *   });
+ *   return parseErrors.length ? "Parse failed" : `${gridData.size} cells`;
+ * }
  * ```
  */
 export function useGridDataParser({

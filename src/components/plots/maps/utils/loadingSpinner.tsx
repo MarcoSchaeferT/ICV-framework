@@ -1,10 +1,28 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 
-/** Internal loading-task registry shared by one dashboard card. */
+/**
+ * Internal loading-task registry shared by one Vis. Interface card.
+ *
+ * @example
+ * ```ts
+ * const active = new Set<string>();
+ * const tasks: LoadingContextType = {
+ *   get isLoading() { return active.size > 0; },
+ *   get activeTasks() { return [...active]; },
+ *   startLoading(taskId) { active.add(taskId); },
+ *   stopLoading(taskId) { active.delete(taskId); },
+ * };
+ * tasks.startLoading("ENSO forecast");
+ * ```
+ */
 type LoadingContextType = {
+  /** Whether at least one registered task is active. */
   isLoading: boolean;
+  /** IDs of the currently registered loading tasks. */
   activeTasks: string[];
+  /** Registers one task ID as active. */
   startLoading: (taskId: string) => void;
+  /** Removes one active task ID. */
   stopLoading: (taskId: string) => void;
 };
 
@@ -53,7 +71,7 @@ export const LoadingSpinnerProvider: React.FC<{ children: React.ReactNode }> = (
  * Registers a named asynchronous operation with the nearest loading provider.
  *
  * @param taskId - Stable human-readable task identifier such as `"Grid Layer"` or `"Metadata"`.
- * @param autoTrigger - Starts the task when mounted. @default false
+ * @param autoTrigger - Starts the task when mounted.
  * @returns Stable `start` and `stop` callbacks for the task.
  *
  * @remarks

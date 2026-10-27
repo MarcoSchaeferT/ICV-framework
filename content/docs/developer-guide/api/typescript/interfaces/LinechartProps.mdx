@@ -1,0 +1,110 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: LinechartProps
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Configuration contract for `LinechartComponent`.
+
+## Remarks
+
+The line chart visualizes temporal feature values for the active linked-view selection and reads localized metadata
+through the shared data-fetching pipeline.
+
+## Example
+
+```tsx
+import { apiRoutes, type LinechartProps } from "@/framework";
+
+// Replace the relation name with one available in your deployment.
+const props: LinechartProps = {
+  chartName: "albopictus-monthly-habitat",
+  dataURL: apiRoutes.fetchDbData({
+    relationName: "t_2024_monthly_albopictus_predictions",
+    feature: "mean",
+    filterBy: "cellID",
+    filterValue: "200509",
+  }),
+  locale: "en",
+  yDomain: [0, 1],
+};
+```
+
+## Properties
+
+### chartName
+
+> **chartName**: `string`
+
+Stable chart/container identifier.
+
+***
+
+### dataURL
+
+> **dataURL**: `string`
+
+URL produced by `apiRoutes.fetchDbData`.
+
+***
+
+### locale?
+
+> `optional` **locale?**: `string`
+
+Locale used for value and metadata formatting.
+
+#### Default Value
+
+```ts
+"en"
+```
+
+***
+
+### translations?
+
+> `optional` **translations?**: `any`
+
+`next-intl` translator for chart labels and tooltips.
+
+***
+
+### isDummyMode?
+
+> `optional` **isDummyMode?**: `boolean`
+
+Uses bundled demonstration data instead of the backend.
+
+#### Default Value
+
+```ts
+false
+```
+
+***
+
+### yDomain?
+
+> `optional` **yDomain?**: \[`number`, `number`\]
+
+Optional fixed numeric extent for the Y axis.
+
+***
+
+### dataMode?
+
+> `optional` **dataMode?**: `"linked"` \| `"generic"`
+
+Selects the reusable row-oriented chart adapter used by layout templates.
+
+***
+
+### rowLimit?
+
+> `optional` **rowLimit?**: `number` \| `null`
+
+Maximum number of generic dataset rows rendered before truncation.

@@ -2,6 +2,11 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Renders the shared multiline input with focus, invalid, and disabled states.
+ *
+ * @returns A native textarea with forwarded HTML attributes.
+ */
 function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
   return (
     <textarea

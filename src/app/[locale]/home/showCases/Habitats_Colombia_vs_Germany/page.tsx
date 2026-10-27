@@ -1,32 +1,42 @@
 
 "use client";
 
-import { useRef, useEffect, useState } from 'react'
-import {apiRoutes } from "@/app/api_routes";
-import React from 'react';
+import React, { useRef, useEffect, useState } from 'react'
+import { apiRoutes } from "@/app/api_routes";
 import { InterfaceContextProvider, useInterfaceContext, interfaceContextI } from '@/components/contexts/InterfaceContext';
 import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
-import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '@/components/plots/maps/LeafD3Map';
+import LeafD3MapLayerComponent, { LeafD3MapLayerProps } from '@/components/plots/maps/LeafD3Map';
 import { createSwapy, Swapy } from 'swapy';
 import { MDXContentProvider } from '@messages/markdown/MDXContentProvider';
-import {ViewMainInfoComponent} from '@/components/ViewPageMainInfo';
+import { ViewMainInfoComponent } from '@/components/ViewPageMainInfo';
 import { Locale, useLocale, useTranslations } from "next-intl";
 import { t_richConfig } from "@/app/const_store";
 import { useUIContext } from '@/components/contexts/UIContext';
 
-
 const isSWAPY = true;
 
-/** Returns the linked Colombia-versus-Germany habitat comparison showcase. */
+/**
+ * Renders the linked Colombia-versus-Germany habitat comparison.
+ *
+ * @returns A localized introduction and two Leaflet maps in Swapy cards.
+ *
+ * @remarks The Colombia map seeds the shared dataset and selected feature in
+ * `InterfaceContext`. The Germany map applies shared context data while
+ * `isDoNotApplyCountryFromContext` keeps its geographic focus independent.
+ * Both maps begin on the same probability relation and can show mosquito
+ * presence observations for cross-country comparison.
+ *
+ * @see {@link useInterfaceContext} for the linked-view state contract.
+ */
 export default function Home() {
 
-const t = useTranslations("page_home.ShowCases.page_Habitats_Colombia_vs_Germany");
-const locale = useLocale() as Locale;
-let md = MDXContentProvider[locale];
+  const t = useTranslations("page_home.ShowCases.page_Habitats_Colombia_vs_Germany");
+  const locale = useLocale() as Locale;
+  let md = MDXContentProvider[locale];
 
- const UI_contextT = useUIContext();
- const layoutSizes = UI_contextT.layoutDims;
+  const UI_contextT = useUIContext();
+  const layoutSizes = UI_contextT.layoutDims;
 
   // set up the map props
   let worldMapProsp = LeafD3MapLayerProps();
@@ -56,7 +66,7 @@ let md = MDXContentProvider[locale];
   p1.isApplyContextData = false;
   p1.isApplyTransitions = false;
   p1.isProjection_equirectangular = false;
-  p1.mapUIsettings.filterStringForAvailableDatasetInclude = "probability";
+  p1.mapUIsettings.filterStringForAvailableDatasetInclude = "t_2019_ocsvm_albopictus_probability_predictions_named";
   p1.mapUIsettings.defaultDatasetName = "t_2019_ocsvm_albopictus_probability_predictions_named";
   p1.mapUIsettings.defaultFeatureName = "prob_1";
   p1.mapUIsettings.isPresenceData = true;
@@ -74,8 +84,8 @@ let md = MDXContentProvider[locale];
     isPresenceData: true,
     isSequenceMetaData: true,
   };
-  p1.mapStyles.strokeWidth = 3; 
-  
+  p1.mapStyles.strokeWidth = 3;
+
 
   let mapPropsWorld2 = LeafD3MapLayerProps();
   let p2 = mapPropsWorld2
@@ -107,78 +117,78 @@ let md = MDXContentProvider[locale];
   p2.mapUIsettings.defaultDatasetName = "";
   p2.mapUIsettings.defaultFeatureName = "prob_1";
   p2.isApplyContextData = true;
-  p2.mapUIsettings.defaultDatasetName =   p1.mapUIsettings.defaultDatasetName ;
+  p2.mapUIsettings.defaultDatasetName = p1.mapUIsettings.defaultDatasetName;
   p2.mapInteractions = {
     disableMouse: true,
     disableScroll: true,
     disableClick: true
   };
- p2.mapDataSets = {
+  p2.mapDataSets = {
     isGridData: true,
     isPresenceData: true,
     isSequenceMetaData: false,
   };
-  p2.mapStyles.strokeWidth = 3; 
+  p2.mapStyles.strokeWidth = 3;
 
   let mainInfoHeading = t('mainInfo.heading');
 
-   // intitialize data table context
-    useInterfaceContext();
-  
-  
-    // set up swapy (client side only)
-    const swapyRef = useRef<Swapy | null>(null)
-    const swapContainerRef = useRef<HTMLDivElement>(null)
-    useEffect(() => {
-      const container =swapContainerRef.current;
-      console.log("container", container)
-      if(isSWAPY && container) {
-        swapyRef.current = createSwapy(container,{
-          animation: 'dynamic', // dynamic or spring or none
-          manualSwap: false,
-          swapMode: 'hover', //'hover' | 'drop';
-          autoScrollOnDrag: true,
-          // dragAxis: 'x',
-          // dragOnHold: true
-        })
-        swapyRef.current?.enable(isSWAPY)
-  
-        return () => {
-          // Destroy the swapy instance on component destroy
-          swapyRef.current?.destroy()
-        }
-      }
-    }, []);
-  
+  // intitialize data table context
+  useInterfaceContext();
 
-    let d3MapCardProps_overview = CardPropsClass(
-      t.rich('headingOverview', {...t_richConfig})?.toString() || '',
-      t.rich('headingOverview', {...t_richConfig})?.toString() || '',"","");
-      d3MapCardProps_overview.infoCard = {content: md.pages.PredictionView.overview.Info, footer: undefined};
-    let d3MapCardProps2_overveiwDetail = CardPropsClass(
-      t.rich('headingDetailView', {...t_richConfig})?.toString() || '',
-      t.rich('headingDetailView', {...t_richConfig})?.toString() || '',"","");
-    
-     // build the page
-   return (
+
+  // set up swapy (client side only)
+  const swapyRef = useRef<Swapy | null>(null)
+  const swapContainerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const container = swapContainerRef.current;
+    console.log("container", container)
+    if (isSWAPY && container) {
+      swapyRef.current = createSwapy(container, {
+        animation: 'dynamic', // dynamic or spring or none
+        manualSwap: false,
+        swapMode: 'hover', //'hover' | 'drop';
+        autoScrollOnDrag: true,
+        // dragAxis: 'x',
+        // dragOnHold: true
+      })
+      swapyRef.current?.enable(isSWAPY)
+
+      return () => {
+        // Destroy the swapy instance on component destroy
+        swapyRef.current?.destroy()
+      }
+    }
+  }, []);
+
+
+  let d3MapCardProps_overview = CardPropsClass(
+    t.rich('headingOverview', { ...t_richConfig })?.toString() || '',
+    t.rich('headingOverview', { ...t_richConfig })?.toString() || '', "", "");
+  d3MapCardProps_overview.infoCard = { content: md.pages.PredictionView.overview.Info, footer: undefined };
+  let d3MapCardProps2_overveiwDetail = CardPropsClass(
+    t.rich('headingDetailView', { ...t_richConfig })?.toString() || '',
+    t.rich('headingDetailView', { ...t_richConfig })?.toString() || '', "", "");
+
+  // build the page
+  return (
     <>
-     <main className="flex max-h-fit flex-col items-center justify-between " style={{paddingTop: layoutSizes.gapSize}}>
-      <InterfaceContextProvider>
-      <ViewMainInfoComponent heading={mainInfoHeading} mdxContent={md.pages.ShowCases.HabitatsComparison} />
-        {/*** START: grid layout ***/}
-        <div ref={swapContainerRef} className={`w-full grid grid-cols-6 `} style={{
-              gridTemplateRows: `repeat(auto-fill, minmax(${layoutSizes.rowSpanSize}vh, ${layoutSizes.rowSpanSize}vh))`,
-              gap: `${layoutSizes.gapSize}px`,
-              height: `calc(110vh - ${layoutSizes.topNavbarHeight}px - ${layoutSizes.gapSize}px)`,
-              
-             paddingRight: `${layoutSizes.gapSize}px`,
-             paddingLeft: `${layoutSizes.gapSize}px`,
-            }}>
-          {/*** Grid Cells ***/}
-          <SGridPlotCard rowColSpan={[9,3]}  cardProps={d3MapCardProps_overview}><LeafD3MapLayerComponent props={worldMapProsp}/></SGridPlotCard>
-          <SGridPlotCard rowColSpan={[9,3]}  cardProps={d3MapCardProps2_overveiwDetail}><LeafD3MapLayerComponent props={mapPropsWorld2}/></SGridPlotCard>
-        </div>
-      </InterfaceContextProvider>
+      <main className="flex max-h-fit flex-col items-center justify-between " style={{ paddingTop: layoutSizes.gapSize }}>
+        <InterfaceContextProvider>
+          <ViewMainInfoComponent heading={mainInfoHeading} mdxContent={md.pages.ShowCases.HabitatsComparison} />
+          {/*** START: grid layout ***/}
+          <div ref={swapContainerRef} className={`w-full grid grid-cols-6 `} style={{
+            gridTemplateRows: `repeat(auto-fill, minmax(${layoutSizes.rowSpanSize}vh, ${layoutSizes.rowSpanSize}vh))`,
+            gap: `${layoutSizes.gapSize}px`,
+            height: `calc(110vh - ${layoutSizes.topNavbarHeight}px - ${layoutSizes.gapSize}px)`,
+
+            paddingRight: `${layoutSizes.gapSize}px`,
+            paddingLeft: `${layoutSizes.gapSize}px`,
+          }}>
+            {/*** Grid Cells ***/}
+            <SGridPlotCard rowColSpan={[9, 3]} cardProps={d3MapCardProps_overview}><LeafD3MapLayerComponent props={worldMapProsp} /></SGridPlotCard>
+            <SGridPlotCard rowColSpan={[9, 3]} cardProps={d3MapCardProps2_overveiwDetail}><LeafD3MapLayerComponent props={mapPropsWorld2} /></SGridPlotCard>
+          </div>
+        </InterfaceContextProvider>
       </main>
     </>
   );

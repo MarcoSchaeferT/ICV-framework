@@ -1,7 +1,6 @@
 
-import { Row } from '@tanstack/react-table';
-import { createContext, useCallback, useContext, useMemo, useState, useRef } from 'react'
-import React from 'react';
+import type { DataTableRow } from '../dataTableFeatures';
+import React, { createContext, useCallback, useContext, useMemo, useState, useRef } from 'react';
 
 
 const GinterfaceContext = createContext({} as interfaceContextI);
@@ -9,7 +8,7 @@ const GinterfaceContext = createContext({} as interfaceContextI);
 /**
  * Global reactive state interface for the ICV (Interactive Context-rich Views) framework.
  *
- * Serves as the central event bus and synchronized state contract across multi-view dashboard elements,
+ * Serves as the central event bus and synchronized state contract across multi-view Vis. Interface elements,
  * coordinating state parameters between spatial maps, time-series line charts, data tables, and donut overlays.
  *
  * @remarks
@@ -18,12 +17,15 @@ const GinterfaceContext = createContext({} as interfaceContextI);
  * are routed through `mouseEvent` (a React `MutableRefObject`) to bypass React re-render cycles during rapid cursor movements.
  *
  * @see {@link InterfaceContextProvider} for the React context provider implementation.
- * @see {@link useInterfaceContext} for consuming this context within React dashboard widgets.
- * @see {@link LeafD3Map} for Leaflet spatial map consumer implementation.
- * @see {@link useFetchAndCache} for data fetching hooks driven by state context parameters.
+ * @see {@link useInterfaceContext} for consuming this context within React Vis. Interface widgets.
+ * @see {@link LeafD3MapLayerProps} for the Leaflet spatial-layer contract.
+ * @see {@link useGetJSONData} for the shared data-fetching hook.
  *
  * @example
  * ```tsx
+ * import { useInterfaceContext } from "@/framework";
+ *
+ * function SelectionControls() {
  * const {
  *   curFeature,
  *   setCurFeature,
@@ -33,8 +35,10 @@ const GinterfaceContext = createContext({} as interfaceContextI);
  *   setIsPresenceData,
  * } = useInterfaceContext();
  *
- * // Update selected public health vector feature
- * setCurFeature("mosquito_density_albopictus");
+ *   return <button onClick={() => setCurFeature("mosquito_density_albopictus")}>
+ *     Select mosquito density at zoom {mapCoords.zoom}
+ *   </button>;
+ * }
  * ```
  */
 export interface interfaceContextI {
@@ -43,9 +47,9 @@ export interface interfaceContextI {
     /** Dispatcher to set selected table row ID */
     setTableRowID: React.Dispatch<React.SetStateAction<number>>;
     /** Currently selected TanStack Table row instance */
-    selectedTableRow: Row<unknown>;
+    selectedTableRow: DataTableRow;
     /** Dispatcher to set selected table row instance */
-    setTableRow: React.Dispatch<React.SetStateAction<Row<unknown>>>;
+    setTableRow: React.Dispatch<React.SetStateAction<DataTableRow>>;
     /** Active database table name associated with selected row */
     selectedTableName: string;
     /** Dispatcher to set active table name */
@@ -178,7 +182,9 @@ export interface interfaceContextI {
  *
  * @example
  * ```ts
- * const hoverEvent: mapMouseEvents = {
+ * import type { MapMouseEvents } from "@/framework";
+ *
+ * const hoverEvent: MapMouseEvents = {
  *   type: "hover",
  *   position: [420, 180],
  *   country: "Germany",
@@ -198,25 +204,61 @@ export interface mapMouseEvents {
 
 
 /**
- * React Context Provider component wrapping ICV multi-view dashboard applications.
- *
- * @param props - Component children elements to be wrapped by the context provider.
+ * Initial selection and child content for the linked-view context provider.
  *
  * @remarks
- * Instantiates initial state defaults for public health datasets (e.g. mosquito presence datasets,
- * Dengue serotype distributions, spatial layer opacity default 0.85).
+ * The optional grid-cell index and database row ID identify different keys;
+ * UQ/XAI SVG endpoints require the database row ID for the selected cell.
+ *
+ * @example
+ * ```tsx
+ * import type { InterfaceContextProviderProps } from "@/framework";
+ *
+ * const initialSelection: InterfaceContextProviderProps = {
+ *   children: <div>Habitat suitability map</div>,
+ *   initialSelectedGridcellID: 300625,
+ *   initialDbRowIDOfSelectedGridcell: 48292,
+ * };
+ * ```
  *
  * @see {@link useInterfaceContext} to consume state in child components.
  * @see {@link interfaceContextI} for complete shape of context state.
  */
-interface InterfaceContextProviderProps {
+export interface InterfaceContextProviderProps {
+    /** React subtree sharing Vis. Interface selection state. */
     children: React.ReactNode;
-    /** Optional initial spatial grid key for showcases with a meaningful default cell. */
+    /** Optional initial spatial grid key for showcases with a meaningful default cell. @defaultValue -1 */
     initialSelectedGridcellID?: number;
-    /** Optional initial database row ID corresponding to the selected spatial cell. */
+    /** Optional initial database row ID corresponding to the selected spatial cell. @defaultValue 200509 */
     initialDbRowIDOfSelectedGridcell?: number;
 }
 
+/**
+ * Provides shared selection and viewport state to a multi-view Vis. Interface.
+ *
+ * @param props - Children and optional initial grid-cell/database-row keys.
+ * @returns A context provider wrapping the linked visualizations.
+ *
+ * @remarks
+ * Initial state defaults: spatial-layer opacity starts at 0.85; the selected grid cell
+ * defaults to -1 unless `initialSelectedGridcellID` is supplied.
+ *
+ * The provider owns dataset, feature, time, geography, and map-viewport state.
+ * High-frequency mouse events remain in a mutable ref and notify explicit
+ * subscribers, avoiding a full context update on each pointer move.
+ *
+ * @example
+ * ```tsx
+ * import { InterfaceContextProvider } from "@/framework";
+ *
+ * <InterfaceContextProvider
+ *   initialSelectedGridcellID={300625}
+ *   initialDbRowIDOfSelectedGridcell={48292}
+ * >
+ *   <div>ENSO forecast maps and climate chart</div>
+ * </InterfaceContextProvider>
+ * ```
+ */
 function InterfaceContextProvider({
     children,
     initialSelectedGridcellID = -1,
@@ -224,7 +266,7 @@ function InterfaceContextProvider({
 }: InterfaceContextProviderProps) {
 
     const [selectedTableRowID, setTableRowID] = useState<number>(-1)
-    const [selectedTableRow, setTableRow] = useState<Row<unknown>>({} as Row<unknown>);
+    const [selectedTableRow, setTableRow] = useState<DataTableRow>({} as DataTableRow);
     const [selectedTableName, setTableName] = useState<string>("empty")
     const [selectedStateID, setSelectedStateID] = useState<number>(-1)
     const [selectedGridcellID, setSelectedGridcellID] = useState<number>(initialSelectedGridcellID)
@@ -358,6 +400,8 @@ function InterfaceContextProvider({
  *
  * @example
  * ```tsx
+ * import { useInterfaceContext } from "@/framework";
+ *
  * function MosquitoMapWidget() {
  *   const { curFeature, mapCoords } = useInterfaceContext();
  *   return <div>Inspecting {curFeature} at zoom {mapCoords.zoom}</div>;

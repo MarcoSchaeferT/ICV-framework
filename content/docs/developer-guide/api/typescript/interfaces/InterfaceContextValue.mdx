@@ -1,0 +1,603 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: InterfaceContextValue
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Global reactive state interface for the ICV (Interactive Context-rich Views) framework.
+
+Serves as the central event bus and synchronized state contract across multi-view Vis. Interface elements,
+coordinating state parameters between spatial maps, time-series line charts, data tables, and donut overlays.
+
+## Remarks
+
+To prevent infinite render loops when multiple visual widgets receive state updates, components accept
+boolean flags like `isApplyContextData` and `isSetIntialContextDataFromComponent`. High-frequency mouse events
+are routed through `mouseEvent` (a React `MutableRefObject`) to bypass React re-render cycles during rapid cursor movements.
+
+## See
+
+ - [InterfaceContextProvider](../functions/InterfaceContextProvider) for the React context provider implementation.
+ - [useInterfaceContext](../functions/useInterfaceContext) for consuming this context within React Vis. Interface widgets.
+ - [LeafD3MapLayerProps](../functions/LeafD3MapLayerProps) for the Leaflet spatial-layer contract.
+ - [useGetJSONData](../functions/useGetJSONData) for the shared data-fetching hook.
+
+## Example
+
+```tsx
+import { useInterfaceContext } from "@/framework";
+
+function SelectionControls() {
+const {
+  curFeature,
+  setCurFeature,
+  mapCoords,
+  setMapCoords,
+  isPresenceData,
+  setIsPresenceData,
+} = useInterfaceContext();
+
+  return <button onClick={() => setCurFeature("mosquito_density_albopictus")}>
+    Select mosquito density at zoom {mapCoords.zoom}
+  </button>;
+}
+```
+
+## Properties
+
+### selectedTableRowID
+
+> **selectedTableRowID**: `number`
+
+Currently selected data table row ID (-1 if unselected)
+
+***
+
+### setTableRowID
+
+> **setTableRowID**: `Dispatch`\<`SetStateAction`\<`number`\>\>
+
+Dispatcher to set selected table row ID
+
+***
+
+### selectedTableRow
+
+> **selectedTableRow**: [`DataTableRow`](../type-aliases/DataTableRow)
+
+Currently selected TanStack Table row instance
+
+***
+
+### setTableRow
+
+> **setTableRow**: `Dispatch`\<`SetStateAction`\<[`DataTableRow`](../type-aliases/DataTableRow)\>\>
+
+Dispatcher to set selected table row instance
+
+***
+
+### selectedTableName
+
+> **selectedTableName**: `string`
+
+Active database table name associated with selected row
+
+***
+
+### setTableName
+
+> **setTableName**: `Dispatch`\<`SetStateAction`\<`string`\>\>
+
+Dispatcher to set active table name
+
+***
+
+### selectedStateID
+
+> **selectedStateID**: `number`
+
+Selected subregion / administrative state ID
+
+***
+
+### setSelectedStateID
+
+> **setSelectedStateID**: `Dispatch`\<`SetStateAction`\<`number`\>\>
+
+Dispatcher to set selected state ID
+
+***
+
+### selectedGridcellID
+
+> **selectedGridcellID**: `number`
+
+Selected spatial 2D grid cell index
+
+***
+
+### setSelectedGridcellID
+
+> **setSelectedGridcellID**: `Dispatch`\<`SetStateAction`\<`number`\>\>
+
+Dispatcher to set selected grid cell index
+
+***
+
+### dbRowID\_of\_selectedGridcellID
+
+> **dbRowID\_of\_selectedGridcellID**: `number`
+
+SQL primary key row ID corresponding to `selectedGridcellID`
+
+***
+
+### setDbRowID\_of\_selectedGridcellID
+
+> **setDbRowID\_of\_selectedGridcellID**: `Dispatch`\<`SetStateAction`\<`number`\>\>
+
+Dispatcher to set SQL primary key row ID for selected grid cell
+
+***
+
+### selectedFilter
+
+> **selectedFilter**: `string`
+
+Filter mode selection string (e.g. "gridcell", "country", "subregion")
+
+***
+
+### setSelectedFilter
+
+> **setSelectedFilter**: `Dispatch`\<`SetStateAction`\<`string`\>\>
+
+Dispatcher to set filter mode selection string
+
+***
+
+### selectedCountry
+
+> **selectedCountry**: `string`
+
+ISO or localized name of currently selected country
+
+***
+
+### setSelectedCountry
+
+> **setSelectedCountry**: `Dispatch`\<`SetStateAction`\<`string`\>\>
+
+Dispatcher to set selected country name
+
+***
+
+### mapSelectionObj
+
+> **mapSelectionObj**: `any`
+
+Active GeoJSON selection feature object for animated camera transitions
+
+***
+
+### setMapSelectionObj
+
+> **setMapSelectionObj**: `Dispatch`\<`any`\>
+
+Dispatcher to set map selection feature object
+
+***
+
+### curColorMap
+
+> **curColorMap**: `string`
+
+Active D3 sequential or diverging color map palette key (e.g. "interpolateInferno")
+
+***
+
+### setCurColorMap
+
+> **setCurColorMap**: `Dispatch`\<`SetStateAction`\<`string`\>\>
+
+Dispatcher to set active color map palette key
+
+***
+
+### curFeature
+
+> **curFeature**: `string`
+
+Currently selected dataset feature column name (e.g. "mosquito_amount")
+
+***
+
+### setCurFeature
+
+> **setCurFeature**: `Dispatch`\<`SetStateAction`\<`string`\>\>
+
+Dispatcher to set dataset feature column name
+
+***
+
+### curDatasetURL
+
+> **curDatasetURL**: `string`
+
+Active backend API URL string for fetching grid dataset payloads
+
+***
+
+### setCurDatasetURL
+
+> **setCurDatasetURL**: `Dispatch`\<`SetStateAction`\<`string`\>\>
+
+Dispatcher to set active backend API URL string
+
+***
+
+### curLayerOpacity
+
+> **curLayerOpacity**: `number`
+
+Active spatial layer alpha opacity (0 to 1)
+
+***
+
+### setCurLayerOpacity
+
+> **setCurLayerOpacity**: `Dispatch`\<`SetStateAction`\<`number`\>\>
+
+Dispatcher to set layer opacity
+
+***
+
+### curFeatureValue
+
+> **curFeatureValue**: `string`
+
+Formatted string representation of currently inspected feature value
+
+***
+
+### setCurFeatureValue
+
+> **setCurFeatureValue**: `Dispatch`\<`SetStateAction`\<`string`\>\>
+
+Dispatcher to set formatted feature value string
+
+***
+
+### isPresenceData
+
+> **isPresenceData**: `boolean`
+
+Toggle flag enabling species presence marker overlays
+
+***
+
+### setIsPresenceData
+
+> **setIsPresenceData**: `Dispatch`\<`SetStateAction`\<`boolean`\>\>
+
+Dispatcher to toggle species presence data overlays
+
+***
+
+### isSequenceMetaData
+
+> **isSequenceMetaData**: `boolean`
+
+Toggle flag enabling genomic sequence metadata donut chart overlays
+
+***
+
+### setIsSequenceMetaData
+
+> **setIsSequenceMetaData**: `Dispatch`\<`SetStateAction`\<`boolean`\>\>
+
+Dispatcher to toggle sequence metadata donut overlays
+
+***
+
+### pieSize\_sequenceMetaData
+
+> **pieSize\_sequenceMetaData**: `number`
+
+Outer pixel size diameter for sequence metadata donut charts
+
+***
+
+### setPieSize\_sequenceMetaData
+
+> **setPieSize\_sequenceMetaData**: `Dispatch`\<`SetStateAction`\<`number`\>\>
+
+Dispatcher to set sequence metadata donut outer pixel size
+
+***
+
+### dateRange
+
+> **dateRange**: \{ `from`: `Date` \| `undefined`; `to?`: `Date`; \} \| `undefined`
+
+Temporal filter date range object containing starting `from` and ending `to` dates
+
+***
+
+### curMonth
+
+> **curMonth**: `number`
+
+Currently selected month index (1–12, or -1 for all months)
+
+***
+
+### setCurMonth
+
+> **setCurMonth**: `Dispatch`\<`SetStateAction`\<`number`\>\>
+
+Dispatcher to set current selected month index
+
+***
+
+### curPresenceDatasetName
+
+> **curPresenceDatasetName**: `string`
+
+Active presence dataset identifier string
+
+***
+
+### setCurPresenceDatasetName
+
+> **setCurPresenceDatasetName**: `Dispatch`\<`SetStateAction`\<`string`\>\>
+
+Dispatcher to set presence dataset name
+
+***
+
+### curPresenceDatasetURL?
+
+> `optional` **curPresenceDatasetURL?**: `string`
+
+API URL endpoint for presence marker data fetching
+
+***
+
+### setCurPresenceDatasetURL
+
+> **setCurPresenceDatasetURL**: `Dispatch`\<`SetStateAction`\<`string`\>\>
+
+Dispatcher to set presence dataset API URL
+
+***
+
+### curDonutChartDatasetName
+
+> **curDonutChartDatasetName**: `string`
+
+Active donut chart dataset identifier string (e.g. "dengue_serotype_full_dataset")
+
+***
+
+### setCurDonutChartDatasetName
+
+> **setCurDonutChartDatasetName**: `Dispatch`\<`SetStateAction`\<`string`\>\>
+
+Dispatcher to set donut chart dataset name
+
+***
+
+### curDonutChartDataURL?
+
+> `optional` **curDonutChartDataURL?**: `string`
+
+API URL endpoint for donut chart genomic metadata fetching
+
+***
+
+### setCurDonutChartDataURL
+
+> **setCurDonutChartDataURL**: `Dispatch`\<`SetStateAction`\<`string`\>\>
+
+Dispatcher to set donut chart API URL
+
+***
+
+### curSyear
+
+> **curSyear**: `string`
+
+Filter selection year string (e.g. "2020" or "ALL")
+
+***
+
+### setCurSyear
+
+> **setCurSyear**: `Dispatch`\<`SetStateAction`\<`string`\>\>
+
+Dispatcher to set filter selection year string
+
+***
+
+### curSOrgansim
+
+> **curSOrgansim**: `string`
+
+Filter target pathogen or vector organism species string
+
+***
+
+### setCurSOrgansim
+
+> **setCurSOrgansim**: `Dispatch`\<`SetStateAction`\<`string`\>\>
+
+Dispatcher to set target organism species string
+
+***
+
+### mapCoords
+
+> **mapCoords**: `object`
+
+Synchronized spatial viewport coordinates (latitude, longitude, zoom)
+
+#### latitude
+
+> **latitude**: `number`
+
+#### longitude
+
+> **longitude**: `number`
+
+#### zoom
+
+> **zoom**: `number`
+
+***
+
+### setMapCoords
+
+> **setMapCoords**: `Dispatch`\<`SetStateAction`\<\{ `latitude`: `number`; `longitude`: `number`; `zoom`: `number`; \}\>\>
+
+Dispatcher to update spatial viewport coordinates
+
+***
+
+### mouseEvent
+
+> **mouseEvent**: `MutableRefObject`\<[`MapMouseEvents`](MapMouseEvents)\>
+
+High-frequency mouse tracking ref preventing re-render thrashing during continuous drag/hover
+
+***
+
+### subscribeMouseEvent
+
+> **subscribeMouseEvent**: (`listener`) => () => `void`
+
+Subscribe to shared mouse events without starting a component-wide render loop.
+
+#### Parameters
+
+##### listener
+
+() => `void`
+
+#### Returns
+
+() => `void`
+
+***
+
+### notifyMouseEvent
+
+> **notifyMouseEvent**: () => `void`
+
+Notify subscribed linked views after updating [mouseEvent](#mouseevent).
+
+#### Returns
+
+`void`
+
+***
+
+### isCountryLevelData
+
+> **isCountryLevelData**: `boolean`
+
+Toggle flag enabling country-level polygon aggregation mode
+
+***
+
+### setIsCountryLevelData
+
+> **setIsCountryLevelData**: `Dispatch`\<`SetStateAction`\<`boolean`\>\>
+
+Dispatcher to toggle country-level data mode
+
+***
+
+### isSubregionLevelData
+
+> **isSubregionLevelData**: `boolean`
+
+Toggle flag enabling subregion/administrative level polygon aggregation mode
+
+***
+
+### setIsSubregionLevelData
+
+> **setIsSubregionLevelData**: `Dispatch`\<`SetStateAction`\<`boolean`\>\>
+
+Dispatcher to toggle subregion-level data mode
+
+***
+
+### donutChartSelectedColumnName
+
+> **donutChartSelectedColumnName**: `string`
+
+Selected genomic metadata column name for donut chart distribution rendering
+
+***
+
+### setDonutChartSelectedColumnName
+
+> **setDonutChartSelectedColumnName**: `Dispatch`\<`SetStateAction`\<`string`\>\>
+
+Dispatcher to set donut chart grouping column name
+
+***
+
+### geoAssignmentColumnNameForDonut
+
+> **geoAssignmentColumnNameForDonut**: `string`
+
+GeoJSON property column name mapping donut charts to administrative boundaries
+
+***
+
+### setGeoAssignmentColumnNameForDonut
+
+> **setGeoAssignmentColumnNameForDonut**: `Dispatch`\<`SetStateAction`\<`string`\>\>
+
+Dispatcher to set geographic assignment column name for donut overlays
+
+***
+
+### targetDate?
+
+> `optional` **targetDate?**: `string`
+
+Target filter date string in YYYY-MM-DD format
+
+***
+
+### setTargetDate
+
+> **setTargetDate**: `Dispatch`\<`SetStateAction`\<`string` \| `undefined`\>\>
+
+Dispatcher to set target filter date string
+
+## Methods
+
+### setDateRange()
+
+> **setDateRange**(`arg0`): `unknown`
+
+Setter method updating temporal date range
+
+#### Parameters
+
+##### arg0
+
+\{ `from`: `Date` \| `undefined`; `to?`: `Date`; \} \| `undefined`
+
+#### Returns
+
+`unknown`

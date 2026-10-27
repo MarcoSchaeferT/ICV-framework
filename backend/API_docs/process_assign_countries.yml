@@ -1,0 +1,46 @@
+tags:
+  - Data processing
+summary: Assign countries to a relation
+description: >-
+  Explicitly updates country assignments from geometries in the selected
+  relation. Reprocessing every row is optional.
+consumes:
+  - application/json
+produces:
+  - application/json
+parameters:
+  - in: body
+    name: command
+    required: true
+    schema:
+      type: object
+      required: [tableName]
+      properties:
+        tableName:
+          type: string
+          description: Relation whose geographic records are updated.
+        reprocessAll:
+          type: boolean
+          default: false
+          description: Also update rows that already have an assignment.
+      example:
+        tableName: mosquito_observations
+        reprocessAll: false
+responses:
+  200:
+    description: Country assignment finished.
+    schema:
+      type: object
+      properties:
+        message:
+          type: string
+        tableName:
+          type: string
+        updatedRows:
+          type: integer
+  400:
+    description: Invalid JSON command or missing tableName.
+  405:
+    description: GET is not supported for this write operation.
+  500:
+    description: Country assignment failed.

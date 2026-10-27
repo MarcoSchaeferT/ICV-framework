@@ -1,0 +1,224 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: MapGridResponseV1
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Compact column-oriented grid response returned by `responseFormat=map-grid-v1`.
+
+## Remarks
+
+Arrays are parallel: index `i` in `id`, `feature`, and each present geometry column
+describes the same cell. The backend emits four source polygon corners (`lat0..lng3`);
+consumers such as [useGridDataParser](../functions/useGridDataParser) also accept axis-aligned bounds
+(`north`, `south`, `west`, `east`) or legacy anchor arrays (`latitude`, `longitude`).
+Consumers must check optional geometry columns before indexing them and narrow
+`feature[i]` before using it as a number.
+
+## See
+
+[useGridDataParser](../functions/useGridDataParser) for conversion into [VisDataT](VisDataT) records.
+
+## Example
+
+```ts
+import type { MapGridResponseV1 } from "@/framework";
+
+const berlinHabitatGrid: MapGridResponseV1 = {
+  format: "map-grid-v1",
+  featureName: "mean",
+  id: [200509],
+  lat0: [52.5],
+  lng0: [13.25],
+  lat1: [52.5],
+  lng1: [13.5],
+  lat2: [52.25],
+  lng2: [13.5],
+  lat3: [52.25],
+  lng3: [13.25],
+  feature: [0.73],
+  cellSize: [0.25, 0.25],
+  anchorOffset: [0, 0],
+  featureRange: [0.12, 0.94],
+  rowCount: 1,
+};
+```
+
+## Properties
+
+### format
+
+> **format**: `"map-grid-v1"`
+
+Discriminator for the compact grid transport format.
+
+***
+
+### featureName?
+
+> `optional` **featureName?**: `string`
+
+Database column represented by the compact `feature` values.
+
+***
+
+### id
+
+> **id**: `number`[]
+
+Database row identifiers in column order.
+
+***
+
+### north?
+
+> `optional` **north?**: `number`[]
+
+Exact per-cell bounds retain variable dimensions after reprojection.
+
+***
+
+### south?
+
+> `optional` **south?**: `number`[]
+
+Southern latitude of each cell's exact bound.
+
+***
+
+### west?
+
+> `optional` **west?**: `number`[]
+
+Western longitude of each cell's exact bound.
+
+***
+
+### east?
+
+> `optional` **east?**: `number`[]
+
+Eastern longitude of each cell's exact bound.
+
+***
+
+### lat0?
+
+> `optional` **lat0?**: `number`[]
+
+Original polygon corners, projected independently by each map CRS.
+
+***
+
+### lng0?
+
+> `optional` **lng0?**: `number`[]
+
+Longitude of the first source polygon corner.
+
+***
+
+### lat1?
+
+> `optional` **lat1?**: `number`[]
+
+Latitude of the second source polygon corner.
+
+***
+
+### lng1?
+
+> `optional` **lng1?**: `number`[]
+
+Longitude of the second source polygon corner.
+
+***
+
+### lat2?
+
+> `optional` **lat2?**: `number`[]
+
+Latitude of the third source polygon corner.
+
+***
+
+### lng2?
+
+> `optional` **lng2?**: `number`[]
+
+Longitude of the third source polygon corner.
+
+***
+
+### lat3?
+
+> `optional` **lat3?**: `number`[]
+
+Latitude of the fourth source polygon corner.
+
+***
+
+### lng3?
+
+> `optional` **lng3?**: `number`[]
+
+Longitude of the fourth source polygon corner.
+
+***
+
+### latitude?
+
+> `optional` **latitude?**: `number`[]
+
+Compatibility fields used by the first compact response revision.
+
+***
+
+### longitude?
+
+> `optional` **longitude?**: `number`[]
+
+Legacy per-cell longitude anchor values.
+
+***
+
+### feature
+
+> **feature**: (`string` \| `number` \| `null`)[]
+
+Raw feature values; null or string values require narrowing by consumers.
+
+***
+
+### cellSize
+
+> **cellSize**: \[`number`, `number`\]
+
+`[latitude height, longitude width]` in degrees.
+
+***
+
+### anchorOffset
+
+> **anchorOffset**: \[`number`, `number`\]
+
+Offset from the stored latitude/longitude anchor to north-west.
+
+***
+
+### featureRange
+
+> **featureRange**: \[`number`, `number`\]
+
+Minimum and maximum numeric feature values reported by the backend.
+
+***
+
+### rowCount
+
+> **rowCount**: `number`
+
+Number of grid cells represented by the parallel columns.

@@ -1,0 +1,94 @@
+---
+title: Backend query flow
+description: Trace a Vis. Interface read from the browser through Flask, PostgreSQL, and both caches.
+---
+
+## Scenario: a chart reads dataset rows
+
+A client chart can request selected columns from a relation with `apiRoutes.fetchDbData`. This abbreviated snippet belongs inside a React component that imports `apiRoutes` and `useGetJSONData`. It assumes the named relation and columns exist in the current database; replace them for another deployment.
+
+```tsx
+const url = apiRoutes.fetchDbData({
+  relationName: "world_mosquitos_2014_2025_gdf_mosquito_amount",
+  features: ["id", "species", "mosquito_amount"],
+  limit: 500,
+});
+const [isLoading, data] = useGetJSONData(url);
+```
+
+`apiRoutes` encodes the query and returns a relative `/api/getDataFromDB` URL. `useGetJSONData` handles this JSON GET, shares an in-flight request between callers of the same URL, and caches successful results in the browser for five minutes. The caller must still check `data.error` and narrow `data.response` before rendering rows. See the [complete component example](./usage-examples#fetch-typed-dataset-rows).
+
+```text
+Chart → apiRoutes → useGetJSONData → Next.js /api/* rewrite
+      → Flask getDataFromDB → response cache → PostgreSQL
+      → JSON envelope → chart
+```
+
+## Follow the backend request
+
+1. `next.config.mjs` forwards `/api/*` to Flask on port `5222`. `IS_DOCKER` selects the local or Compose backend hostname.
+2. `backend/index.py` registers the `getDataFromDB` blueprint. The route parses query fields with `RequestParams` and builds a cache key that includes the parameters and accepted response encoding.
+3. On a miss, `get_relation_schema` checks relation existence, columns, and whether it contains rows. The route validates selected columns against that schema. A GET for an `_aggregated` relation only reads existing rows; preparing a missing or newer RKI snapshot requires `POST /api/processData/aggregateRKI` first.
+4. The `features` branch removes duplicate column names while keeping requested order, selects only those columns, and uses `LIMIT rowLimit + 1` to calculate `isTruncated`. Its default limit is 100, values above 10,000 are capped, and `limit=-1` explicitly requests an unbounded read. This branch currently ignores `filterBy` and `filterValue`.
+5. Query helpers in `backend/routes/setFilesToDB/db_utils.py` borrow a connection from a pool owned by the current worker. SQL values are bound as parameters; dynamic relation and column names use `psycopg.sql.Identifier`. `query_raw` fetches in batches but returns a complete Python list, so the caller's row bound still matters.
+6. Successful responses are serialized once, optionally gzip encoded, and stored in the worker's response cache under the relation scope. The route sends `X-Cache`, `Vary: Accept-Encoding`, and `X-Uncompressed-Length` headers for this path.
+
+The response is a JSON envelope with `relationName`, `header`, `response`, and `error`. The selected-column variant also sets `rowLimit` and `isTruncated`. `error` is `null` on success. Many validation and query failures also use HTTP 200 with a non-null `error`; a consumer must inspect the envelope, not only the HTTP status. A missing required `relationName` can receive HTTP 400 during Flask request parsing. The [REST API guide](./api/rest-api) links the field-level contract.
+
+<ShowCovGuard>
+
+Both COVID Vis. Interfaces submit the RKI aggregation POST before mounting views that read the derived state relation. Concurrent preparation requests share one in-flight command. After success, they clear the browser data cache; a failure leaves a retry action visible. The Germany Vis. Interface waits for success before showing its linked views. The world Vis. Interface still shows its maps after a preparation failure and falls back to the global epidemiology data for Germany. The Germany Vis. Interface's date control can submit another POST for a selected snapshot before linked views read it. This is explicit preparation work; `GET /api/getDataFromDB` remains read-only.
+
+</ShowCovGuard>
+
+The current aggregator commits a `TRUNCATE` before inserting replacement rows. If that insertion fails, the derived relation can remain empty until a later successful POST. Treat a failed preparation as a data availability error; a GET will not rebuild the relation.
+
+## Other read paths
+
+| Request | Response behavior | Consumer obligation |
+| --- | --- | --- |
+| `feature` with an optional `task` | A single field, count, grouped count, unique values, or min/max, depending on the task | Narrow the task-specific `response` shape. |
+| `feature=ALL` | Row objects with the relation's columns; date selection can apply | Do not assume the selected-column row limit applies. |
+| `feature` ending in `*` | Legacy numbered feature series | Keep the parallel feature arrays aligned with geometry. |
+| `responseFormat=map-grid-v1` | Column arrays for grid cells, plus feature and cell metadata | Match every `id`, `feature`, and `latN`/`lngN` value by the same array index. WKT source coordinates are longitude then latitude; the payload names latitude and longitude separately. |
+
+### Analytical aggregate tasks (`task` parameter)
+
+When querying a single `feature` on `/api/getDataFromDB`, the `task` parameter executes specialized server-side aggregations instead of returning raw spatial rows:
+
+| `task` value | Purpose | Required parameters | Result structure in `data.response` |
+| --- | --- | --- | --- |
+| `getUniqueEntries` | Returns unique values for a column. When querying `feature="date"`, it automatically extracts distinct calendar years. | `relationName`, `feature` | `Array<{ feature: string \| number }>` |
+| `getMinMax` | Computes minimum and maximum numerical values of a column. | `relationName`, `feature` | `{ min_val: number, max_val: number }` |
+| `getCount` | Calculates frequencies per distinct value of a column. Supports `filterBy` and `filterValue`. | `relationName`, `feature` | `Array<{ feature: string \| number, count: number }>` |
+| `getGroupedCount` | Groups frequencies by a secondary category column. | `relationName`, `feature`, `groupBy` | `Array<{ feature: string \| number, category: string, count: number }>` |
+
+```tsx
+// Example: Querying distinct species for dropdown filters
+const speciesUrl = apiRoutes.fetchDbData({
+  relationName: "world_mosquitos_2014_2025_gdf_mosquito_amount",
+  feature: "species",
+  task: "getUniqueEntries",
+});
+const [isLoading, data] = useGetJSONData(speciesUrl);
+// data.response: [{ feature: "Aedes albopictus" }, { feature: "Aedes aegypti" }, ...]
+```
+
+The compact grid uses `query_columnar`, which avoids building per-row dictionaries but still accumulates all returned cells in memory. Select data and spatial detail deliberately when adding a map consumer.
+
+`/api/getListOfRelationsDB` is the dataset discovery endpoint. It omits application and extension relations through `HIDDEN_RELATIONS`; that list only controls what the selector displays. It does not authorize access to `/api/getDataFromDB` or management routes.
+
+## Cache and freshness boundary
+
+The browser hook cache, Flask response cache, and Redis have separate jobs. The browser cache lives in one page session. Each Flask worker holds its own bounded response values and schema entries. Redis stores cache invalidation epochs, not response bodies: after a successful upload invalidates a relation, workers drop entries whose stored epoch is stale. If Redis is unavailable, invalidation is only reliable within the writing worker. Backend invalidation does not clear an already cached browser URL; a consumer that must show newly uploaded rows should evict that URL with `clearCacheForUrl` or flush browser data with `clearDataCache`.
+
+## Change and verify this flow
+
+| Contract to change | Source to inspect | Verify |
+| --- | --- | --- |
+| URL fields | `src/app/api_routes.ts`, route `RequestParams` | Caller sends encoded fields and the route accepts them. |
+| Query result or limit | `backend/routes/getDataFromDB/route_getDataFromDB.py`, `db_utils.py` | Response shape, order, boundedness, and error branch in a focused backend test. |
+| Public HTTP description | `backend/API_docs/get_data_from_db.yml` | Route behavior and YAML agree; the rendered reference alone is insufficient. |
+| Browser result handling | `src/app/hooks/useFetchAndCache.tsx` and the consuming component | Loading, error, empty, and success states remain distinct. |
+
+For commands, use [Local development](./local-development#verify-a-change). For the mutation that invalidates these responses, see [CSV upload flow](./backend-upload-flow).

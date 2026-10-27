@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image"
-import { Link } from "@/i18n/routing"
+import { Link, type Locale } from "@/i18n/routing"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -11,10 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Bug, Lightbulb, ExternalLink, InfoIcon } from 'lucide-react'
 import {GitHubIcon} from "@messages/reactIcons"
 import {useRef, useEffect, useState } from "react"
-
 import {useLocale, useTranslations} from 'next-intl';
 import { t_richConfig, layoutSizes } from '@/app/const_store';
-import {Locale } from '@/i18n/routing';
 import { apiRoutes } from "@/app/api_routes";
 import validator from "validator";
 import { Progress } from "@/components/ui/progress"
@@ -89,25 +87,30 @@ export default function Component() {
           method: "POST",
           body: formData,
         })
-          .then((response) => response.json())
-          .then((data) => {
-            console.log("Success:", data);
-            if (data.SUCCESS) {
+          .then(async (response) => {
+            const data = await response.json().catch(() => null);
+            if (response.ok && data?.SUCCESS) {
               // Handle success case
               if (nameElem) nameElem.value = "";
               if (emailElem) emailElem.value = "";
               if (textareaRef.current) textareaRef.current.value = "";
               setContactType("feature");
               setIsHighlighted(false);
+              setIsError(false);
               setIsSuccess(true);
               setResponse(data.SUCCESS.toString());
-             
+            } else {
+              setIsError(true);
+              setIsSuccess(true);
+              setResponse(data?.error || `HTTP ${response.status}`);
             }
           })
           .catch((error) => {
             console.error("Error:", error);
+            setIsError(true);
+            setIsSuccess(true);
+            setResponse(error instanceof Error ? error.message : "Submission failed");
           });
-          setIsError(false);
 
       } else {
         setIsError(true);
@@ -319,6 +322,14 @@ export default function Component() {
 
 
 
+/**
+ * Displays the localized feedback submission result and progress indicator.
+ *
+ * @param text - Submission response passed by the feedback form.
+ * @param isAlert - Selects the error presentation when true.
+ * @param progress - Optional submission progress percentage (defaults to undefined).
+ * @returns The success or alert banner shown after submitting feedback.
+ */
 function FeedbackSuccess({ text,isAlert, progress }: { text: string, isAlert: boolean, progress?: number }) {
   const t_feedback = useTranslations('page_about.FeedbackForm');
     return (
@@ -329,6 +340,7 @@ function FeedbackSuccess({ text,isAlert, progress }: { text: string, isAlert: bo
           <div>
           <div className="font-semibold">{t_feedback.rich('FeedbackDialog.alert.title',{...t_richConfig,})}</div>
           <div className="text-sm mt-1">{t_feedback.rich('FeedbackDialog.alert.description',{...t_richConfig,})}</div>
+          {text ? <div className="text-xs mt-1 text-red-700 opacity-90">{text}</div> : null}
         <Progress className="mt-1 text-xs" style={{ width: `${100-(progress ?? 0)}%` }} />
           </div>
         </>

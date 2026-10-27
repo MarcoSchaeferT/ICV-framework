@@ -1,0 +1,47 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: MapCoordinates
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Synchronized Leaflet spatial camera viewport coordinates.
+
+## See
+
+ - [useMapPosition](../functions/useMapPosition) for viewport synchronizer hook.
+ - [InterfaceContextProvider](../functions/InterfaceContextProvider) for global state storing `mapCoords`.
+
+## Example
+
+```ts
+import type { MapCoordinates } from "@/framework";
+
+const berlinViewport: MapCoordinates = { latitude: 52.52, longitude: 13.405, zoom: 6 };
+```
+
+## Properties
+
+### latitude
+
+> **latitude**: `number`
+
+Viewport center latitude coordinate in degrees (-90 to +90)
+
+***
+
+### longitude
+
+> **longitude**: `number`
+
+Viewport center longitude coordinate in degrees (-180 to +180)
+
+***
+
+### zoom
+
+> **zoom**: `number`
+
+Leaflet fractional zoom level (e.g. 0 to 18)

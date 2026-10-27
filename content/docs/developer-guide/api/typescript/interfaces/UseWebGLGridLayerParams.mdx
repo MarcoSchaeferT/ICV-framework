@@ -1,0 +1,250 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: UseWebGLGridLayerParams
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Parameters for the [useWebGLGridLayer](../functions/useWebGLGridLayer) hardware-accelerated grid and polygon hook.
+
+## Properties
+
+### map
+
+> **map**: `Map` \| `null`
+
+Target Leaflet map instance.
+
+***
+
+### L
+
+> **L**: `__module` \| `null`
+
+Loaded Leaflet module; retained as an initialization readiness signal.
+
+***
+
+### isUpdate?
+
+> `optional` **isUpdate?**: `boolean`
+
+Optional external redraw/upload trigger.
+
+***
+
+### isLoading
+
+> **isLoading**: `boolean`
+
+Suppresses grid rendering while data is loading.
+
+***
+
+### hasError
+
+> **hasError**: `boolean`
+
+Suppresses grid rendering after a data error.
+
+***
+
+### gridData
+
+> **gridData**: `Map`\<`number`, [`VisDataT`](VisDataT)\>
+
+Parsed spatial cells keyed by their source grid index.
+
+***
+
+### cellSize
+
+> **cellSize**: `object`
+
+Fallback cell height and width in degrees.
+
+#### lat
+
+> **lat**: `number`
+
+#### lng
+
+> **lng**: `number`
+
+***
+
+### dimensions
+
+> **dimensions**: [`MapDimensions`](MapDimensions)
+
+Map container dimensions used until Leaflet reports a valid size.
+
+***
+
+### colorMap
+
+> **colorMap**: (`value`) => `string`
+
+Feature-value-to-CSS-color function sampled into a GPU texture.
+
+#### Parameters
+
+##### value
+
+`number`
+
+#### Returns
+
+`string`
+
+***
+
+### layerOpacity
+
+> **layerOpacity**: `number`
+
+Grid-layer opacity in the range `[0, 1]`.
+
+***
+
+### isProjection\_equirectangular?
+
+> `optional` **isProjection\_equirectangular?**: `boolean`
+
+Uses equirectangular projection when true, otherwise Web Mercator.
+
+***
+
+### mapData?
+
+> `optional` **mapData?**: `FeatureCollection`\<`Geometry`, `GeoJsonProperties`\> \| `null`
+
+GeoJSON country boundaries used for fills, stencil masking, and picking.
+
+***
+
+### useOceanMask?
+
+> `optional` **useOceanMask?**: `boolean`
+
+Clips grid fragments to land through the stencil buffer.
+
+#### Default Value
+
+```ts
+true
+```
+
+***
+
+### polygonStyles?
+
+> `optional` **polygonStyles?**: [`PolygonStyleOptions`](PolygonStyleOptions)
+
+Polygon fill, background, border, hover, and active styles.
+
+***
+
+### selectedCountryName?
+
+> `optional` **selectedCountryName?**: `string`
+
+Selected country name or code synchronized from shared application state.
+
+***
+
+### onSelectCountry?
+
+> `optional` **onSelectCountry?**: (`countryCode`, `feature`) => `void`
+
+Fired when a country polygon is clicked.
+
+#### Parameters
+
+##### countryCode
+
+`string`
+
+##### feature
+
+`Feature`
+
+#### Returns
+
+`void`
+
+***
+
+### onClickBackground?
+
+> `optional` **onClickBackground?**: () => `void`
+
+Fired when a click does not hit any country polygon.
+
+#### Returns
+
+`void`
+
+***
+
+### onHoverCountry?
+
+> `optional` **onHoverCountry?**: (`translatedName`, `feature`, `e`) => `void`
+
+Fired once when the pointer enters a different country polygon.
+
+#### Parameters
+
+##### translatedName
+
+`string`
+
+##### feature
+
+`Feature`
+
+##### e
+
+`LeafletMouseEvent`
+
+#### Returns
+
+`void`
+
+***
+
+### onHoverLeave?
+
+> `optional` **onHoverLeave?**: () => `void`
+
+Fired when the pointer leaves the currently hovered country.
+
+#### Returns
+
+`void`
+
+***
+
+### locale?
+
+> `optional` **locale?**: `string`
+
+Locale suffix used for translated GeoJSON name properties.
+
+***
+
+### disableClick?
+
+> `optional` **disableClick?**: `boolean`
+
+Suppresses country click selection while preserving hover behavior.
+
+***
+
+### debug?
+
+> `optional` **debug?**: `boolean`
+
+Enables renderer lifecycle and upload diagnostics.

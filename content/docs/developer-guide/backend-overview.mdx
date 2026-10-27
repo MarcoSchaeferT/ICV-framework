@@ -1,0 +1,49 @@
+---
+title: Backend overview
+description: Find Flask route ownership, persistence boundaries, worker state, and backend contracts.
+---
+
+## From the browser to a backend result
+
+Vis. Interface code builds a relative `/api/*` URL with `src/app/api_routes.ts`. The rewrite in `next.config.mjs` forwards it to Flask on port `5222`. `backend/index.py` creates the app, installs `DirectUploadRequest`, registers route blueprints, and serves routes that do not have a blueprint. Importing that module also attempts to create the English and German column metadata tables. A missing or invalid `DATABASE_URL` can stop the import; a connection or table-creation failure after URL parsing is logged and the import continues.
+
+The backend stores imported dataset rows and column metadata in PostgreSQL. Redis coordinates upload status, per-filename processing locks, and response-cache invalidation epochs. Each Gunicorn worker owns its database pool, response values, and upload event loop. Uploaded CSV files live briefly under `backend/assets/uploads_tmp`; that directory is not the dataset catalog. Follow [Backend query flow](./backend-query-flow) or [CSV upload flow](./backend-upload-flow) for a request from end to end.
+
+## Find the owning route
+
+| Area | Routes and methods | Owning code and effect |
+| --- | --- | --- |
+| Dataset discovery | `GET /api/getListOfRelationsDB`, `GET /api/getColumnNamesDB` | `routes/getDataFromDB/`; lists public relations for selectors and probes a relation's columns. The hidden-name list controls discovery only. |
+| Dataset reads | `GET /api/getDataFromDB` | `routes/getDataFromDB/route_getDataFromDB.py`; reads rows, query aggregates, or compact grids without changing database relations. |
+| CSV ingestion | `POST /api/setFilesToDB`, `GET /api/uploadStatus` | `routes/setFilesToDB/` schedules ingestion; `index.py` serves progress. A successful POST only means the background work was scheduled. |
+| Column metadata | `GET`, `POST`, `PUT /api/columnMetadata`; `GET /api/get_datasets_metaData` | `routes/columnMetadata/` reads or changes localized metadata and may alter a dataset column type; its GET handler only selects rows. Metadata tables are ensured at startup or by write operations. `index.py` reads database metadata with a CSV fallback. |
+| Direct writes and administration | `POST /api/setEntryToTable`; `GET`, `DELETE /api/manageDB` | `routes/setEntryToTable/` inserts form values and creates feedback/page-visit tables on demand. `routes/manageDB/` lists or drops unprotected public tables; deletion uses `CASCADE`. Its protected-name set is separate from dataset discovery. |
+| Data processing | `POST /api/processData/assignCountries`; `POST /api/processData/aggregateRKI` | `routes/processData/`; both JSON commands can write PostgreSQL data and reject GET with HTTP 405. Country matching uses Shapely and the same `backend/assets/worldmap_midRes.geo.json.tgz` archive served by the map endpoint. |
+| Assets and derived views | `GET /api/getMapData`, `/api/get_image`, `/api/get_cell_chart_data`, `/api/get_uncertainty_svg` | `index.py` serves packaged or generated assets and supporting derived-view endpoints. Check each route's response type before treating it as a database JSON envelope. |
+| Diagnostics and cache | `GET /health`, `/api/cache/stats`, `/api/python`, `/api/test`; `POST /api/cache/clear` | `index.py` owns these routes. `/health` is a fixed liveness response, not a database or Redis readiness probe. Cache clear affects all workers through Redis when available. |
+
+`backend/routes/setFilesToDB/db_utils.py` owns pooled psycopg reads and writes. Bind data values as parameters and compose dynamic relation or column identifiers with `psycopg.sql.Identifier`. The query helpers are declared `async`, but their psycopg connection and cursor operations are synchronous; do not assume an async route makes a large database operation nonblocking.
+
+<ShowCovGuard>
+
+The Germany COVID Vis. Interface submits an RKI aggregation POST when opened, waits for it to finish, then mounts its map, table, and chart GET consumers. Selecting another report date submits a new POST before changing the linked views. The aggregation helper invalidates the derived relation's backend response cache; the frontend also clears its local JSON cache before reading updated data.
+
+</ShowCovGuard>
+
+## State and failure boundaries
+
+| State | Location | Boundary to remember |
+| --- | --- | --- |
+| Dataset and metadata tables | PostgreSQL | Uploads replace tables as snapshots. Schema replacement and row `COPY` use separate transactions. |
+| Response bodies and schema entries | Worker memory in `backend/cache.py` | A hit avoids a database read. Entries are bounded by size, count, and TTL; another worker has its own copy. |
+| Invalidation epochs and upload progress | Redis, with process-local fallback | Redis shares coordination, not response bodies or a durable job queue. During a Redis outage, another worker may not see an upload's progress or invalidation. |
+| Browser JSON results | `useGetJSONData` cache | Backend invalidation does not automatically evict a browser URL already cached in the page. |
+| Uploaded file parts | Per-upload temporary directory | The receiving worker schedules the job on its own daemon thread and removes the directory after processing or a handled error. A worker crash can leave temporary files behind; no queue retries the job. |
+
+Gunicorn uses preloaded, threaded workers configured in `backend/gunicorn.conf.py`. The pool and Redis clients open lazily after the fork; the background upload loop is created per worker on first use. For local and container startup, use [Local development](./local-development).
+
+## Keep contracts aligned
+
+Python type hints and docstrings describe in-process shapes, side effects, and failure behavior. The Flask route is the HTTP behavior source; `backend/API_docs/*.yml` or embedded Flasgger descriptions cover only routes that have a spec. `/api-docs` renders those descriptions while Flask is running. The current app declares Swagger 2, but some YAML response blocks use OpenAPI 3 `content` syntax, so inspect route code and tests before relying on a rendered schema detail. The [REST API guide](./api/rest-api) explains this boundary.
+
+When extending a route, update its docstring, its Flasgger description if present, the relevant developer flow, and a focused test. Update `src/app/api_routes.ts` and the consumer when public URL fields or response shapes change. The [documentation workflow](./maintaining-documentation) and [engineering practices](./best-practices) provide the review checklist.

@@ -1,0 +1,55 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: UseGridDataParserResult
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Parsed output structure returned by [useGridDataParser](../functions/useGridDataParser).
+
+## Example
+
+```ts
+import type { UseGridDataParserResult } from "@/framework";
+
+const result: UseGridDataParserResult = {
+  gridData: new Map([[42, { geometry: [[52, 13], [52, 13.25], [51.75, 13.25], [51.75, 13], [52, 13]], feature: 0.73 }]]),
+  parseErrors: [],
+  featureRange: [0.73, 0.73],
+  cellSize: { lat: 0.25, lng: 0.25 },
+};
+```
+
+## Properties
+
+### gridData
+
+> **gridData**: `Map`\<`number`, [`VisDataT`](VisDataT)\>
+
+Map mapping unique spatial grid cell index keys to parsed visual cell data
+
+***
+
+### parseErrors
+
+> **parseErrors**: `string`[]
+
+Parsing errors reported while converting a response.
+
+***
+
+### featureRange
+
+> **featureRange**: \[`number`, `number`\]
+
+Backend range for compact data, or range derived from parsed numeric values; `[0, 0]` if unavailable.
+
+***
+
+### cellSize
+
+> **cellSize**: [`GridCellSize`](GridCellSize)
+
+Grid dimensions from compact metadata or the first row-oriented polygon.

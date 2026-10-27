@@ -1,27 +1,40 @@
 tags:
   - Data Management Endpoints
 summary: Get datasets metadata
-description: Returns metadata for all datasets including descriptions, data types, and other information in the specified language.
+description: >-
+  Returns localized column metadata from PostgreSQL. relationName restricts
+  the database lookup; if the query fails or returns no rows, the endpoint
+  falls back to the language-specific CSV metadata file. The successful and
+  fallback responses are JSON-encoded strings returned by Flask as text/html.
+  If both sources fail, the HTTP 200 payload contains an ERROR key.
 parameters:
-  - name: LANGID
+  - name: relationName
     in: query
-    description: Language ID for metadata (e.g., 'en' for English, 'de' for German). Defaults to 'en' if not provided.
+    description: Optional relation name used to restrict the PostgreSQL metadata lookup; the CSV fallback is not relation-filtered.
     required: false
     schema:
       type: string
+      example: "MosquitoPresenceData"
+  - name: LANGID
+    in: query
+    description: Language ID, case-insensitive en or de. Defaults to en.
+    required: false
+    schema:
+      type: string
+      enum: ["en", "de"]
       example: "en"
 responses:
   200:
-    description: Successful response with metadata
+    description: JSON-encoded metadata string, or a JSON-encoded object with ERROR if both sources fail.
     content:
-      application/json:
+      text/html:
         schema:
-          type: object
-          additionalProperties:
-            type: object
-          description: Dictionary containing metadata for each dataset
+          type: string
+          description: >-
+            JSON object keyed by column name. Each value includes valuename,
+            datatype, dimension, description, and availability.
   400:
-    description: Invalid or missing metadata file
+    description: LANGID is neither en nor de.
     content:
       application/json:
         schema:
@@ -29,14 +42,4 @@ responses:
           properties:
             ERROR:
               type: string
-              example: "Invalid or missing metadata"
-  500:
-    description: Internal server error reading metadata
-    content:
-      application/json:
-        schema:
-          type: object
-          properties:
-            ERROR:
-              type: string
-              description: Error message
+              example: "Invalid lang 'fr'. Use 'en' or 'de'."

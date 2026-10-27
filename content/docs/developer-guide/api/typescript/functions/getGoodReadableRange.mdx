@@ -1,0 +1,36 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: getGoodReadableRange
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **getGoodReadableRange**(`dataMin`, `dataMax`): \[`number`, `number`\]
+
+Calculates human-readable axis range bounds `[min, max]` by rounding to powers of 10.
+
+## Parameters
+
+### dataMin
+
+`number`
+
+Raw dataset minimum value.
+
+### dataMax
+
+`number`
+
+Raw dataset maximum value.
+
+## Returns
+
+\[`number`, `number`\]
+
+Human-friendly axis scale range tuple `[adjustedMin, adjustedMax]`.
+
+## See
+
+[ColorMapLegend](../variables/ColorMapLegend) for legend scale tick generation.

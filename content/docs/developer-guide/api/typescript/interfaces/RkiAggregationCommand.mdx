@@ -1,0 +1,45 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: RkiAggregationCommand
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+JSON fields accepted by the RKI state-aggregation `POST /api/processData/aggregateRKI` command.
+
+## Example
+
+```ts
+import type { RkiAggregationCommand } from "@/framework";
+
+const command: RkiAggregationCommand = {
+  sourceTable: "aktuell_deutschland_sarscov2_infektionen",
+  targetDate: "2022-02-14",
+};
+```
+
+## Properties
+
+### sourceTable?
+
+> `optional` **sourceTable?**: `string`
+
+Raw relation; defaults to the standard RKI infection dataset (`"aktuell_deutschland_sarscov2_infektionen"`).
+
+***
+
+### targetTable?
+
+> `optional` **targetTable?**: `string`
+
+Destination relation; defaults to `sourceTable` with `_aggregated` appended.
+
+***
+
+### targetDate?
+
+> `optional` **targetDate?**: `string`
+
+Report date in YYYY-MM-DD format; defaults to the latest source date.

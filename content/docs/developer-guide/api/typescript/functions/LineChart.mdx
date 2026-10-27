@@ -1,0 +1,33 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: LineChart
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **LineChart**(`props`): `Element`
+
+Chooses the generic or spatially linked line-chart implementation.
+
+## Parameters
+
+### props
+
+Chart configuration; `dataMode` selects the implementation.
+
+#### chartProps
+
+[`LinechartProps`](../interfaces/LinechartProps)
+
+## Returns
+
+`Element`
+
+A generic row-oriented chart or a linked time-series chart.
+
+## Remarks
+
+Defaults to `dataMode = "linked"` when omitted. Generic mode uses the relation shared by `ChartDatasetProvider`;
+linked mode uses the supplied data URL and `InterfaceContext` selections.

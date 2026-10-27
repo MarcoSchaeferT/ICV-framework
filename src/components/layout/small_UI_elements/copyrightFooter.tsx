@@ -13,12 +13,19 @@ export function generateStaticParams() {
   return routing.locales.map((locale) => ({locale}));
 }
 
+/**
+ * Renders the localized copyright, funding, and optional legal links.
+ *
+ * @param textColor - Text color applied to the footer content.
+ * @returns The site footer for the current locale.
+ * @remarks Legal links are shown only when `UIContext.showLegalTexts` is true.
+ */
 const CopyrightFooter = ({ textColor = "#000000" }: { textColor?: string }) => {
   const t = useTranslations("component_copyrightFooter");
   const { showLegalTexts } = useUIContext();
 
   return (
-     <footer className="border-t mt-16 max-w-full mx-auto">
+     <footer id="app-footer" className="border-t mt-16 max-w-full mx-auto">
         <div className="container mx-auto px-4 py-8">
           <div className={`flex flex-col md:flex-row justify-around items-start gap-6 md:items-start text-sm text-gray-300`} style={{ color: textColor }}>
    

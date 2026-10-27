@@ -6,6 +6,8 @@ import type { MapDimensions } from '../types';
  *
  * @example
  * ```ts
+ * import type { UseMapResizeParams } from "@/framework";
+ *
  * const resize: UseMapResizeParams = {
  *   map: null,
  *   dimensions: { width: 960, height: 640 },
@@ -28,14 +30,20 @@ export interface UseMapResizeParams {
  * @param params - Object containing Leaflet map instance and container dimensions.
  *
  * @remarks
- * Calling `map.invalidateSize()` synchronously on every resize event causes main-thread frame drops,
- * SVG layout reflows, and canvas tile flickering. Debouncing by 100 ms ensures smooth grid card resizing
- * across multi-view dashboard layouts.
+ * The timer starts only for non-zero dimensions and is replaced on subsequent
+ * dimension changes. It does not measure the container itself.
  *
  * @example
  * ```tsx
- * const { dimensions } = useChartResizer("habitat-map");
- * useMapResize({ map, dimensions });
+ * import { useMap } from "react-leaflet";
+ * import { useMapResize, type MapDimensions } from "@/framework";
+ *
+ * // Render below a React-Leaflet MapContainer with dimensions from the card.
+ * function MapResizeSync({ dimensions }: { dimensions: MapDimensions }) {
+ *   const map = useMap();
+ *   useMapResize({ map, dimensions });
+ *   return null;
+ * }
  * ```
  */
 export function useMapResize({ map, dimensions }: UseMapResizeParams): void {

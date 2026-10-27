@@ -1,25 +1,29 @@
 tags:
   - Utility Endpoints
 summary: Get image file
-description: Retrieves an image file from the backend assets directory.
+description: >-
+  Retrieves a raster image file from the backend images directory after
+  verifying that the resolved path stays inside that directory. Missing or
+  escaped paths return HTTP 400; file-read failures inside load_image return a
+  JSON-encoded ERROR object with HTTP 200.
 parameters:
   - name: imagePath
     in: query
-    description: Relative path to the image within the images directory
+    description: Relative path to the image within the backend images directory.
     required: true
     schema:
       type: string
       example: "mosquito.jpg"
 responses:
   200:
-    description: Successful response with image data
+    description: Successful response with JPEG image bytes, or a JSON-encoded ERROR string if reading fails.
     content:
       image/jpeg:
         schema:
           type: string
           format: binary
   400:
-    description: Invalid or missing image path
+    description: Invalid, missing, or directory-traversing imagePath.
     content:
       application/json:
         schema:
@@ -28,14 +32,3 @@ responses:
             ERROR:
               type: string
               example: "Invalid or missing image path"
-  500:
-    description: Internal server error reading image file
-    content:
-      application/json:
-        schema:
-          type: object
-          properties:
-            ERROR:
-              type: string
-              description: Error message
-              example: "ERROR reading image file: load_image"

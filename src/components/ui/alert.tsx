@@ -19,6 +19,12 @@ const alertVariants = cva(
   }
 )
 
+/**
+ * Renders a semantic alert with default or destructive styling.
+ *
+ * @param variant - Visual severity of the alert (defaults to `"default"`).
+ * @returns An element with `role="alert"` for assistive technology.
+ */
 function Alert({
   className,
   variant,
@@ -34,6 +40,7 @@ function Alert({
   )
 }
 
+/** Renders the heading within an `Alert`. */
 function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -47,6 +54,7 @@ function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/** Renders supporting text within an `Alert`. */
 function AlertDescription({
   className,
   ...props

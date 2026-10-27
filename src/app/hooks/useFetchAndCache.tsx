@@ -10,9 +10,27 @@ import { dbDATA } from "@/app/const_store";
 const dataCache = new Map<string, { data: dbDATA; timestamp: number; sizeBytes: number }>();
 
 // Track in-flight requests to prevent duplicate fetches for same URL
+/**
+ * One shared HTTP request and the number of mounted consumers awaiting it.
+ *
+ * @remarks The controller aborts only after the final subscriber releases
+ * the request, so one Vis. Interface card unmounting does not cancel another card's data.
+ *
+ * @example
+ * ```ts
+ * const pendingMosquitoRequest: InflightRequest = {
+ *   promise: Promise.resolve(undefined),
+ *   controller: new AbortController(),
+ *   subscribers: 1,
+ * };
+ * ```
+ */
 interface InflightRequest {
+    /** Promise shared by consumers of the same URL. */
     promise: Promise<dbDATA | undefined>;
+    /** Abort signal for the underlying network request. */
     controller: AbortController;
+    /** Number of currently mounted request consumers. */
     subscribers: number;
 }
 
@@ -116,37 +134,45 @@ function releaseInflightRequest(url: string, request: InflightRequest) {
 
 
 /**
- * Primary HTTP data fetching hook with LRU caching, in-flight request deduplication, and an `AbortController` signal.
- *
- * Primary data pipeline hook for retrieving spatial grid datasets, vector presence markers, and genomic metadata payloads
- * from backend endpoints (`/api/db/getDataFromDB`).
+ * Fetches JSON with a bounded browser cache and shared in-flight GET requests.
  *
  * @param url - Absolute or relative API URL string to fetch.
- * @param isAllowed - Optional boolean flag controlling whether the request is authorized to execute. @default true
+ * @param isAllowed - Set to `false` to skip fetching; omitted values allow the request.
  * @returns A tuple `[isLoadingData, data]`:
- * - `isLoadingData`: True while the HTTP request is pending or initializing.
- * - `data`: Parsed JSON response payload matching {@link dbDATA}.
+ * - `isLoadingData`: True while the current URL is pending or initializing.
+ * - `data`: Parsed JSON on success, an `{ error }` object on failure, or an empty
+ *   object while disabled or before data is available.
  *
  * @remarks
- * **Performance & Memory Architecture:**
- * 1. **Zero-Latency Cached Reads:** Uses `useState` lazy initializers to synchronously return cached data on initial component mount.
- * 2. **In-Flight Request Deduplication:** If multiple dashboard cards request the same dataset simultaneously, only a single HTTP network request is dispatched. Subscribing components await the shared Promise (`inflightRequests`).
- * 3. **LRU Cache Eviction:** Bounded in-memory LRU cache holding up to 32 entries or an estimated 256 MB (`MAX_CACHE_BYTES`).
- * 4. **5-Minute TTL:** Cached items automatically expire after 300,000 ms (`CACHE_DURATION`).
- * 5. **Unmount Safety:** Reference-counted subscribers abort a request after its final consumer unmounts.
+ * Cache keys are exact URL strings. A usable cached value is available on the
+ * initial render; responses expire after five minutes. Least recently used
+ * eviction limits the cache to 32 entries and an estimated 256 MiB. Concurrent
+ * subscribers to the same URL share a request. Its controller aborts when the
+ * last subscriber releases it. Errors are returned in `data.error`, not thrown.
+ * The hook does not request images, streams, or mutation endpoints.
  *
- * @see {@link InterfaceContext} for global URL state parameters driving this hook.
- * @see {@link LeafD3Map} for Leaflet map integration consuming `useGetJSONData`.
+ * @see {@link InterfaceContextProvider} for global state shared by linked views.
+ * @see {@link LeafD3MapLayerProps} for the Leaflet layer contract consuming `useGetJSONData`.
  * @see {@link clearDataCache} to flush all cached endpoints.
  * @see {@link clearCacheForUrl} to evict a specific endpoint.
  *
  * @example
  * ```tsx
- * const url = "/api/db/getDataFromDB?dataset=world_mosquitos&feature=mosquito_amount";
- * const [isLoading, rawData] = useGetJSONData(url, true);
+ * import { apiRoutes, useGetJSONData } from "@/framework";
  *
- * if (isLoading) return <LoadingSpinner />;
- * console.log("Fetched grid records:", rawData.response?.length);
+ * // Replace the relation name with one available in your deployment.
+ * function MosquitoObservationCount() {
+ *   const url = apiRoutes.fetchDbData({
+ *     relationName: "world_mosquitos_2014_2025_gdf_mosquito_amount",
+ *     feature: "mosquito_amount",
+ *     filterBy: "species",
+ *     filterValue: "albopictus",
+ *   });
+ *   const [isLoading, rawData] = useGetJSONData(url);
+ *   if (isLoading) return <span>Loading observations</span>;
+ *   if (rawData.error) return <span>{rawData.error}</span>;
+ *   return <span>{Array.isArray(rawData.response) ? rawData.response.length : 0} observations</span>;
+ * }
  * ```
  */
 function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boolean, data: dbDATA] {
@@ -255,8 +281,9 @@ function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boole
                     let errorMSG = "ERROR while retrieving data from URL: '" + String(url) + "'";
                     try {
                         const errorJson = await res.json();
-                        if (errorJson && errorJson.error) {
-                            errorMSG = errorJson.error;
+                        const extracted = errorJson?.error ?? errorJson?.message ?? errorJson?.detail;
+                        if (extracted) {
+                            errorMSG = String(extracted);
                         }
                     } catch (e) {
                         if (abortController.signal.aborted || isAbortError(e)) {
@@ -359,10 +386,12 @@ function useGetJSONData(url: string, isAllowed?: boolean): [isLoadingData: boole
 }
 
 /**
- * Flushes all cached dataset responses from the global in-memory cache and resets byte counters.
+ * Removes all stored JSON responses from the browser cache.
  *
  * @remarks
- * Useful when the user triggers a explicit "Refresh Data" action, forcing fresh HTTP API fetches.
+ * This does not cancel in-flight requests or refetch mounted consumers. A
+ * subsequent request for an evicted URL will fetch again unless an existing
+ * in-flight request is still shared.
  *
  * @see {@link useGetJSONData}
  */
@@ -372,9 +401,11 @@ function clearDataCache() {
 }
 
 /**
- * Removes a specific API endpoint URL entry from the global in-memory cache.
+ * Removes the entry for one exact URL string from the browser cache.
  *
  * @param url - The API endpoint URL to evict.
+ * @remarks In-flight requests for the same URL continue; this only affects
+ * subsequent cache reads.
  *
  * @see {@link useGetJSONData}
  * @see {@link clearDataCache}

@@ -1,10 +1,9 @@
 
 "use client";
 
-import { useRef, useEffect, useState } from 'react'
+import React, { useRef, useEffect } from 'react'
 import {apiRoutes } from "@/app/api_routes";
-import React from 'react';
-import { InterfaceContextProvider, useInterfaceContext } from '@/components/contexts/InterfaceContext';
+import { InterfaceContextProvider } from '@/components/contexts/InterfaceContext';
 import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
 import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '@/components/plots/maps/LeafD3Map';
@@ -15,16 +14,22 @@ import { Locale, useLocale, useTranslations } from "next-intl";
 import { t_richConfig } from "@/app/const_store";
 import { useUIContext } from '@/components/contexts/UIContext';
 import { availableColorMapsNames } from '@/components/plots/maps/constants';
-import { useLoadingTask, LoadingSpinnerAnimation } from '@/components/plots/maps/utils/loadingSpinner';
-
+import { UncertaintyChart, UncertaintyDataProvider } from './UncertaintyCharts';
 
 const isSWAPY = true;
 
 /**
- * Returns the cell-linked Uncertainty Quantification visualization showcase.
+ * Renders the cell-linked uncertainty-quantification showcase.
+ *
+ * @returns A coefficient-of-variation map and two interactive chart cards.
  *
  * @remarks
- * Cell selection in the Leaflet map drives backend-generated SVG uncertainty and calibration overlays.
+ * The map initially selects the `cv` feature of an `aegypti` prediction
+ * relation. Selecting a grid cell updates its database row ID in
+ * `InterfaceContext`, which drives the shared seasonal uncertainty and calibration
+ * JSON request. Each chart registers its own loading task within a Swapy card.
+ *
+ * @see {@link UncertaintyChart} for the cell-linked Recharts views.
  */
 export default function Home() {
 
@@ -95,9 +100,6 @@ let MDX = MDXContentProvider[locale];
 
   let mainInfoHeading = getTranslation('mainInfo.heading', 'Uncertainty Visualization');
 
-  // intitialize data table context
-  useInterfaceContext();
-
   // set up swapy (client side only)
   const swapyRef = useRef<Swapy | null>(null)
   const swapContainerRef = useRef<HTMLDivElement>(null)
@@ -141,6 +143,7 @@ let MDX = MDXContentProvider[locale];
       <main className="flex max-h-fit flex-col items-center justify-between " style={{paddingTop: layoutSizes.gapSize}}>
       <InterfaceContextProvider>
          <ViewMainInfoComponent heading={mainInfoHeading} mdxContent={MDX.pages.ShowCases.Uncertainty_Vis} />
+         <UncertaintyDataProvider>
         {/*** START: grid layout ***/}
         <div ref={swapContainerRef} className={`grid grid-cols-6 w-full`} style={{
               gridTemplateRows: `repeat(auto-fill, minmax(${layoutSizes.rowSpanSize}vh, ${layoutSizes.rowSpanSize}vh))`,
@@ -155,103 +158,16 @@ let MDX = MDXContentProvider[locale];
             
             
              <SGridPlotCard rowColSpan={[4,3]}  cardProps={generalCardPorps}>
-               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <UncertaintySvgComponent fileName="seasonal_uncertainty_cell.svg"/>
+               <UncertaintyChart kind="temporal" />
              </SGridPlotCard>
              <SGridPlotCard rowColSpan={[4,3]}  cardProps={generalCardPorps2}>
-               {/* eslint-disable-next-line @next/next/no-img-element */}
-               <UncertaintySvgComponent fileName="seasonal_calibration_cell.svg"/>
+                <UncertaintyChart kind="calibration" />
              </SGridPlotCard>
             <SGridPlotCard rowColSpan={[5,6]}  cardProps={d3MapCardProps_overview}><LeafD3MapLayerComponent props={worldMapProsp}/></SGridPlotCard>
         </div>
+         </UncertaintyDataProvider>
       </InterfaceContextProvider>
       </main>
     </>
-  );
-}
-
-
-
-function UncertaintySvgComponent({fileName}: {fileName: string}) {
-
-  const contexT = useInterfaceContext();
-  const rowID = contexT.dbRowID_of_selectedGridcellID;
-
-  const [isLoading, setIsLoading] = useState(false);
-
-  const L_svgLoader = useLoadingTask('Uncertainty SVG');
-
-  useEffect(() => {
-    if (isLoading) {
-      L_svgLoader.start();
-    } else {
-      L_svgLoader.stop();
-    }
-  }, [isLoading, L_svgLoader]);
-  const initialSrc = rowID !== -1 ? apiRoutes.getUncertaintySvg({ filename: fileName, cellID: rowID }) : "";
-  const [displayedSrc, setDisplayedSrc] = useState(initialSrc);
-  const pendingRowID = useRef(rowID);
-  const prevRowID = useRef(rowID);
-  const loadKey = useRef(0);
-
-  // Detect when a new cell is selected
-  useEffect(() => {
-    if (rowID !== prevRowID.current && rowID !== -1) {
-      prevRowID.current = rowID;
-      pendingRowID.current = rowID;
-      loadKey.current += 1;  // invalidate any in-flight loads
-      setIsLoading(true);
-      console.log("rowID", rowID, "fileName", fileName);
-    }
-  }, [rowID]);
-
-  const pendingSrc = (isLoading && rowID !== -1)
-    ? apiRoutes.getUncertaintySvg({ filename: fileName, cellID: rowID })
-    : "";
-
-  // Capture the current key for the onLoad closure
-  const currentKey = loadKey.current;
-
-  return (
-    <div className="relative w-full h-full">
-      {/* Show current (or previous) image */}
-      {displayedSrc && (
-        <img
-          src={displayedSrc}
-          alt={fileName}
-          style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '8px' }}
-          className={isLoading ? "opacity-40 transition-opacity duration-300" : "transition-opacity duration-300"}
-        />
-      )}
-
-      {/* Preload new image (hidden) — swap in only if still the latest request */}
-      {isLoading && pendingSrc && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          key={currentKey}
-          src={pendingSrc}
-          alt=""
-          className="hidden"
-          onLoad={() => {
-            if (loadKey.current === currentKey) {
-              setDisplayedSrc(pendingSrc);
-              setIsLoading(false);
-            }
-          }}
-          onError={() => {
-            if (loadKey.current === currentKey) {
-              setIsLoading(false);
-            }
-          }}
-        />
-      )}
-
-      {/* Loading spinner overlay */}
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/30 backdrop-blur-[1px] z-10">
-          <LoadingSpinnerAnimation />
-        </div>
-      )}
-    </div>
   );
 }

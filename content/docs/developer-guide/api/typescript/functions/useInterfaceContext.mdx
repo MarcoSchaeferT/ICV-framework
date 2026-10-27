@@ -1,0 +1,29 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: useInterfaceContext
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **useInterfaceContext**(): [`InterfaceContextValue`](../interfaces/InterfaceContextValue)
+
+Custom React hook accessing the ICV global interface context.
+
+## Returns
+
+[`InterfaceContextValue`](../interfaces/InterfaceContextValue)
+
+The global state contract object matching [interfaceContextI](../interfaces/InterfaceContextValue).
+
+## Example
+
+```tsx
+import { useInterfaceContext } from "@/framework";
+
+function MosquitoMapWidget() {
+  const { curFeature, mapCoords } = useInterfaceContext();
+  return <div>Inspecting {curFeature} at zoom {mapCoords.zoom}</div>;
+}
+```

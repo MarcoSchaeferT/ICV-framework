@@ -1,0 +1,26 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: clearDataCache
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **clearDataCache**(): `void`
+
+Removes all stored JSON responses from the browser cache.
+
+## Returns
+
+`void`
+
+## Remarks
+
+This does not cancel in-flight requests or refetch mounted consumers. A
+subsequent request for an evicted URL will fetch again unless an existing
+in-flight request is still shared.
+
+## See
+
+[useGetJSONData](useGetJSONData)

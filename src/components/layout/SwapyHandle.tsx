@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 
 
 /**
- * Toggles visibility and activation of Swapy drag handles across dashboard cards.
+ * Toggles visibility and activation of Swapy drag handles across Vis. Interface cards.
  *
  * @returns A fixed localized card-rearrangement control.
  */

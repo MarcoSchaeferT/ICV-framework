@@ -1,9 +1,8 @@
 
 "use client";
 
-import { useRef, useEffect } from 'react'
+import React, { useRef, useEffect } from 'react'
 import { apiRoutes } from "@/app/api_routes";
-import React from 'react';
 import { InterfaceContextProvider, useInterfaceContext } from '@/components/contexts/InterfaceContext';
 import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
@@ -16,11 +15,10 @@ import { Locale, useLocale, useTranslations } from "next-intl";
 import { t_richConfig } from "@/app/const_store";
 import { useUIContext } from '@/components/contexts/UIContext';
 
-
 const isSWAPY = true;
 
 /**
- * Renders the supported world prediction dashboard with linked Leaflet/D3 views.
+ * Renders the supported world prediction Vis. Interface with linked Leaflet/D3 views.
  *
  * @returns Localized cards wrapped by the shared linked-view context and Swapy grid.
  */

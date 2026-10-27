@@ -6,6 +6,11 @@ import { CheckIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Renders a keyboard-accessible checkbox with a visible checked indicator.
+ *
+ * @returns A styled Radix checkbox forwarding root props to its control.
+ */
 function Checkbox({
   className,
   ...props

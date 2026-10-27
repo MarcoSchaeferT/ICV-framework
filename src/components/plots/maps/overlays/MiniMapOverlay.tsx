@@ -4,6 +4,27 @@ import LeafD3MapLayerComponent, { LeafD3MapLayerProps } from '../LeafD3Map';
 import { apiRoutes } from "@/app/api_routes";
 import { availableColorMapsNames } from '../constants';
 
+/**
+ * Configuration for a non-interactive Leaflet overview inset.
+ *
+ * @remarks
+ * Dataset, feature, palette, center, and boundary source can be inherited from
+ * `mapProps`; explicit dataset/feature/palette props override the inherited values.
+ * The inset needs the same interface and card loading providers as the parent map.
+ *
+ * @example
+ * ```tsx
+ * import type { MiniMapOverlayProps } from "@/components/plots/maps/overlays/MiniMapOverlay";
+ *
+ * const ensoOverview: MiniMapOverlayProps = {
+ *   datasetName: "seas5_forecast_albopictus_habitat_probability",
+ *   featureName: "forecast_aug_2026",
+ *   height: 115,
+ *   zoom: -0.9,
+ *   label: "Overview",
+ * };
+ * ```
+ */
 export interface MiniMapOverlayProps {
   /** Parent mapProps object to inherit dataset, feature, colorMap, center from */
   mapProps?: ReturnType<typeof LeafD3MapLayerProps>;
@@ -13,28 +34,63 @@ export interface MiniMapOverlayProps {
   featureName?: string;
   /** Optional explicit color map name override */
   colorMapName?: string;
-  /** Container height in pixels or CSS string. Default: 115 */
+  /** Container height in pixels or CSS string. @default 115 */
   height?: number | string;
-  /** Width-to-height aspect ratio. Default: 2.0 (equirectangular 360° x 180°) */
+  /** Width-to-height aspect ratio when `width` is omitted. @default 2.0 */
   aspectRatio?: number;
-  /** Optional explicit zoom level override. Default: -0.99 */
+  /** Explicit zoom level; otherwise inherits `mapProps.zoom`, falling back to -0.99. */
   zoom?: number;
   /** Optional explicit width override */
   width?: number | string;
-  /** Distance from bottom edge. Default: 50 */
+  /** Distance from bottom edge. @default 50 */
   bottom?: number | string;
-  /** Distance from left edge. Default: 4 */
+  /** Distance from left edge. @default 4 */
   left?: number | string;
-  /** Label pill text. Default: "Overview" */
+  /** Label pill text. @default "Overview" */
   label?: string;
-  /** Z-index for overlay box. Default: 800 */
+  /** Z-index for overlay box. @default 800 */
   zIndex?: number;
-  /** Extra CSS classes */
+  /** Extra CSS classes applied to the outer overlay. @default "" */
   className?: string;
 }
 
 /**
- * Clean floating overview minimap overlay component.
+ * Renders a floating overview inset using the supported Leaflet map component.
+ *
+ * @param props - Parent map configuration plus optional inset overrides and layout values.
+ * @returns A non-interactive inset with a label and inherited analytical grid.
+ *
+ * @remarks
+ * Default layout values: `height = 115`, `aspectRatio = 2`, `bottom = 50`, `left = 4`,
+ * `label = "Overview"`, and `zIndex = 800`.
+ *
+ * Creates separate map props with controls and pointer interaction disabled.
+ * The `.gridPlotCardContent` wrapper lets the standard map resize pipeline
+ * measure the inset. The generated map ID derives from the parent chart name,
+ * preventing collisions when a full map and its overview share a page.
+ *
+ * @example
+ * ```tsx
+ * import MiniMapOverlay from "@/components/plots/maps/overlays/MiniMapOverlay";
+ * import { InterfaceContextProvider } from "@/components/contexts/InterfaceContext";
+ * import { LoadingSpinnerProvider } from "@/components/plots/maps/utils/loadingSpinner";
+ *
+ * function ForecastOverview() {
+ *   return (
+ *     <InterfaceContextProvider>
+ *       <LoadingSpinnerProvider>
+ *         <div className="relative h-[600px]">
+ *           <MiniMapOverlay
+ *             datasetName="seas5_forecast_albopictus_habitat_probability"
+ *             featureName="forecast_aug_2026"
+ *             label="Overview"
+ *           />
+ *         </div>
+ *       </LoadingSpinnerProvider>
+ *     </InterfaceContextProvider>
+ *   );
+ * }
+ * ```
  */
 export function MiniMapOverlay({
   mapProps,
@@ -60,7 +116,7 @@ export function MiniMapOverlay({
   const effectiveMapProps = useMemo(() => {
     const p = LeafD3MapLayerProps();
     p.chartName = mapProps?.chartName ? `${mapProps.chartName}_Mini` : 'map_Overview_Mini';
-    p.mapDataURL = mapProps?.mapDataURL || apiRoutes.FETCH_MAP_DATA.WORLD_MAP;
+    p.mapDataURL = mapProps?.mapDataURL || mapProps?.dataURL || apiRoutes.FETCH_MAP_DATA.WORLD_MAP;
     p.center = mapProps?.center || [8.7, 10.3];
     p.zoom = zoom ?? mapProps?.zoom ?? -0.99;
 
@@ -92,7 +148,7 @@ export function MiniMapOverlay({
     p.mapUIsettings.defaultFeatureName = featureName || mapProps?.mapUIsettings.defaultFeatureName || "prob_1";
     p.mapUIsettings.defaultFeatureColorMap = colorMapName || mapProps?.mapUIsettings.defaultFeatureColorMap || availableColorMapsNames.interpolateInferno;
 
-    p.mapInteractions = { disableMouse: true, disableScroll: true };
+    p.mapInteractions = { disableMouse: true, disableScroll: true, disableClick: false };
     p.mapDataSets = { isGridData: true, isPresenceData: false, isSequenceMetaData: false, isCityNames: false };
     p.mapStyles.backgroundColor = mapProps?.mapStyles.backgroundColor || "rgb(215, 234, 245)";
     p.mapStyles.isTooltopVisible = false;
@@ -128,7 +184,7 @@ export function MiniMapOverlay({
       )}
 
       <div
-        className="gridPlotCardContent relative pointer-events-none [&_.leaflet-control-attribution]:!hidden [&_.leaflet-control-container]:!hidden"
+        className="gridPlotCardContent relative cursor-pointer [&_.leaflet-control-attribution]:!hidden [&_.leaflet-control-container]:!hidden"
         style={{ width: formattedWidth, height: formattedHeight }}
       >
         <LeafD3MapLayerComponent props={effectiveMapProps} />

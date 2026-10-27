@@ -1,0 +1,50 @@
+tags:
+  - Utility Endpoints
+summary: Get process-local response cache statistics
+description: >-
+  Returns hit/miss counters, current entry count, memory usage, and Redis epoch
+  eviction counts for the Gunicorn worker handling the request.
+responses:
+  200:
+    description: Worker-local cache metrics.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            hits:
+              type: integer
+              example: 48
+            misses:
+              type: integer
+              example: 6
+            hit_rate:
+              type: number
+              example: 0.889
+            entries:
+              type: integer
+              example: 6
+            max_entries:
+              type: integer
+              example: 256
+            size_bytes:
+              type: integer
+              example: 4194304
+            size_mb:
+              type: number
+              example: 4.0
+            max_size_gb:
+              type: number
+              example: 0.12
+            max_size_mb:
+              type: number
+              example: 128.0
+            configured_total_mb:
+              type: number
+              example: 512.0
+            ttl_seconds:
+              type: number
+              example: 86400
+            epoch_evictions:
+              type: integer
+              example: 1

@@ -15,7 +15,7 @@ import { useLocale, useTranslations } from "next-intl";
 
 
 /**
- * Renders localized MDX explaining the data and purpose of a dashboard component.
+ * Renders localized MDX explaining the data and purpose of a Vis. Interface component.
  *
  * @param props - Optional MDX body/footer and icon color.
  * @returns An information icon with a full documentation hover card.
@@ -38,7 +38,7 @@ export const HoverCardComponentInfo: React.FC<{ MDXContent?: React.FC; Footer?: 
       <HoverCardTrigger asChild defaultChecked={true}>
         <InfoIcon className={`h-5 w-5 cursor-pointer text-${color} transition-colors duration-200 hover:text-blue-500 hover:scale-110`} />
       </HoverCardTrigger>
-      <HoverCardContent className="max-w-[30vw] min-w-[400px] max-h-[80vh] overflow-y-auto z-1000 rounded-lg shadow-lg bg-white border-4 border-gray-200 p-4">
+      <HoverCardContent className="legacy-mdx-info-card max-w-[30vw] min-w-[400px] max-h-[80vh] overflow-y-auto z-1000 rounded-lg shadow-lg bg-white border-4 border-gray-200 p-4">
        
        <div className="flex items-start gap-3 pb-5">
         <div className="flex items-center gap-3 w-full">
@@ -78,7 +78,7 @@ export const HoverCardComponentInfo: React.FC<{ MDXContent?: React.FC; Footer?: 
 };
 
 /**
- * Renders localized MDX explaining the interactions supported by a dashboard component.
+ * Renders localized MDX explaining the interactions supported by a Vis. Interface component.
  *
  * @param props - Optional MDX body and footer components.
  * @returns An interaction icon with a documentation hover card.
@@ -100,7 +100,7 @@ export const HoverCardInteractionInfo: React.FC<{ MDXContent?: React.FC; Footer?
       <HoverCardTrigger asChild>
         <OpenInBrowser className="h-5 w-5 cursor-pointer text-white transition-colors duration-200 hover:text-amber-500 hover:scale-110" />
       </HoverCardTrigger>
-      <HoverCardContent className=" max-w-[30vw] min-w-[400px] max-h-[80vh] overflow-y-auto z-1000 rounded-lg shadow-lg bg-white border-4 border-gray-200 p-4">
+      <HoverCardContent className="legacy-mdx-info-card max-w-[30vw] min-w-[400px] max-h-[80vh] overflow-y-auto z-1000 rounded-lg shadow-lg bg-white border-4 border-gray-200 p-4">
          
         <div className="flex items-start gap-3">
           <div className="shrink-0 mt-[12px] bg-amber-200 rounded-full p-3 shadow">

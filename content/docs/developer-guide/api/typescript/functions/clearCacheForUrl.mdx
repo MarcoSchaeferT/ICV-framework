@@ -1,0 +1,34 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: clearCacheForUrl
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **clearCacheForUrl**(`url`): `void`
+
+Removes the entry for one exact URL string from the browser cache.
+
+## Parameters
+
+### url
+
+`string`
+
+The API endpoint URL to evict.
+
+## Returns
+
+`void`
+
+## Remarks
+
+In-flight requests for the same URL continue; this only affects
+subsequent cache reads.
+
+## See
+
+ - [useGetJSONData](useGetJSONData)
+ - [clearDataCache](clearDataCache)

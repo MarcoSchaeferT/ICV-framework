@@ -1,0 +1,31 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: CardWrapper
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **CardWrapper**(`props`): `Element`
+
+Renders the standard Vis. Interface card shell and required chart-resizing boundary.
+
+## Parameters
+
+### props
+
+[`CardWrapperProps`](../interfaces/CardWrapperProps)
+
+Card content and presentation configuration.
+
+## Returns
+
+`Element`
+
+A hydrated card, or a loading indicator during server/client handoff.
+
+## Remarks
+
+The `.gridPlotCardContent` class is an architectural contract consumed by `useChartResizer`. Removing or moving it
+prevents maps and charts from detecting Swapy grid-card size changes.

@@ -4,7 +4,7 @@ import React from 'react';
 import { useUIContext } from './contexts/UIContext';
 
 /**
- * Conditionally renders its children based on the `NEXT_PUBLIC_SHOW_COV` deployment flag.
+ * Conditionally renders its children based on the server-provided COVID-content flag.
  *
  * @param props - React children to render when COVID content is enabled.
  * @returns The children when `showCov` is `true`, otherwise `null`.
@@ -20,6 +20,8 @@ import { useUIContext } from './contexts/UIContext';
  */
 export default function ShowCovGuard({ children }: { children: React.ReactNode }) {
   const { showCov } = useUIContext();
+
   if (!showCov) return null;
   return <>{children}</>;
 }
+

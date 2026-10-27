@@ -1,0 +1,98 @@
+---
+title: Maintaining documentation
+description: Keep user workflows, developer guidance, and generated reference accurate.
+---
+
+## Choose the correct audience
+
+Write in the **User Guide** when the reader needs to complete a task in the UI. Avoid file paths, React internals, database implementation, and TypeScript signatures there.
+
+Write in the **Developer Guide** when the reader needs to run, extend, test, or maintain ICV. Technical terminology is appropriate, but define project-specific concepts before relying on them.
+
+## Source of truth by subject
+
+| Subject | Maintain here | Verify against |
+| --- | --- | --- |
+| User task | `content/docs/user-guide/*.mdx` | Current UI and labels |
+| Localized quick help, datasets, or preprocessing | `messages/markdown/pages/FullDocu/fullDocu_en.mdx` and `fullDocu_de.mdx`, plus their imported MDX files | Current UI, datasets, and preprocessing code |
+| Architecture or procedure | Hand-written `content/docs/developer-guide/*.mdx` | Runtime code, scripts, Compose, and tests |
+| Public TypeScript symbol | TSDoc on the declaration exported through `src/framework/index.ts` | Generated `api/typescript` page and actual call sites |
+| Python contract or lifecycle | Google-style docstring next to the backend declaration | Generated `api/python` page, types, side effects, error paths, and focused tests |
+| Flask endpoint | Route code and its Flasgger spec (`backend/API_docs/*.yml`) | Method, validation, response construction, and tests |
+
+Do not copy an older guide or rule when it conflicts with current behavior. Record a discrepancy explicitly and fix the authoritative source with the behavior change.
+
+`npm run docs:api` generates both the TypeScript reference (`content/docs/developer-guide/api/typescript`) and the Python backend reference (`content/docs/developer-guide/api/python`). Hand-written architecture and flow pages under `content/docs/developer-guide/` complement the generated API references.
+
+## Language policy
+
+- User Guide: English only.
+- Developer Guide: English only.
+- Generated TypeScript & Python API: English only.
+
+The documentation portal is available at `/en/docs/overview`. The main application and its legacy help page retain their own locale settings.
+
+## MDX patterns and components
+
+`src/mdx-components.tsx` registers the MDX renderers used by both documentation surfaces. Check it and an existing MDX page before adding presentation markup.
+
+| Pattern or component | Use |
+| --- | --- |
+| `<Callout type="info">` / `<Callout type="warn">` | Notes and warnings in the Fumadocs portal (`content/docs`). Add `title` when useful. |
+| GitHub-style `> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, `> [!CAUTION]` | Notes and warnings in the localized quick help (`messages/markdown`), with translated labels. |
+| Markdown links `[label](destination)` | Internal links use the existing MDX link renderer. Check the resulting URL when a link intentionally changes locale. |
+| `<Cards>` / `<Card>` and `<Steps>` / `<Step>` | Navigation cards and ordered procedures in the portal. |
+| `<Tabs>` / `<Tab>` and `<Accordions>` / `<Accordion>` | Content variants and collapsible details. |
+| `<Files>` / `<FileTree>` / `<Folder>` / `<File>` and `<TypeTable>` | File trees and structured type reference. |
+
+Use Markdown for ordinary prose, headings, lists, and links. In `content/docs`, use Fumadocs callouts for a consistent portal appearance:
+
+```mdx
+<Callout type="info">
+  Available datasets depend on the deployment.
+</Callout>
+
+<Callout type="warn" title="Before uploading">
+  Check the filename: uploading to an existing dataset name replaces that dataset.
+</Callout>
+```
+
+The shared MDX renderer also recognizes GitHub-style alerts in the portal, but use them in the localized quick help. Put the marker on the first quoted line and prefix each following line with `>`:
+
+```mdx
+> [!NOTE]
+> **Quick documentation**
+>
+> This page explains the datasets and preprocessing steps.
+```
+
+See `messages/markdown/cheatSheet.mdx` and the paired `fullDocu_en.mdx` and `fullDocu_de.mdx`. Keep their content in sync. Use the registered callout renderer for each documentation surface instead of building an HTML box. Styled navigation lists, legends, and layout containers serve different purposes and should not be turned into alerts.
+
+## Update the TypeScript reference
+
+1. Add or update TSDoc next to the declaration.
+2. Re-export supported symbols through `src/framework/index.ts`.
+3. Run `npm run docs:api`.
+4. Review generated navigation, signatures, links, and examples.
+5. Run `npm run docs:check` before committing. It regenerates the reference, runs `tsc --noEmit`, lints TSDoc on the modules exported by `src/framework/index.ts`, and runs `docs:lint` for hand-written portal pages.
+6. Review the generated diff for unexpected exports, broken links, or misleading examples.
+
+`npm run docs:lint` can be run separately while editing prose. It checks frontmatter, relative page and anchor targets in Markdown links and `href` attributes, and `meta.json` navigation for hand-written pages. It does not compile MDX; use `npx next build` when a change needs a full portal compilation check.
+
+## Add a hand-written page
+
+1. Add the MDX file below the appropriate audience folder with a concise `title` and `description` in frontmatter.
+2. Add its slug to that folder's `meta.json` in the reading order.
+3. Link from the nearest entry page when the new page serves a common task. Prefer relative links between portal pages; use a locale-aware absolute path only for an application route.
+4. Build or preview the portal and inspect navigation, headings, code blocks, and links.
+
+## Review checklist
+
+- The title describes the reader's goal.
+- Procedures use numbered steps and state the expected result or next check.
+- Links are relative when they point to another documentation page.
+- Commands are executable from the repository root.
+- Code examples include required imports and surrounding setup when presented as copyable; shortened snippets are labeled as such.
+- Examples contain no secrets, live credentials, or unsupported production guarantees.
+- Claims about defaults, limits, caches, and error status come from the implementation.
+- Generated API files were not edited manually.

@@ -1,0 +1,51 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: ChartDatasetProvider
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **ChartDatasetProvider**(`props`): `Element`
+
+Owns the dataset shared by all generic charts in one layout-template page.
+
+## Parameters
+
+### props
+
+React children that need the shared dataset selection.
+
+#### children
+
+`ReactNode`
+
+## Returns
+
+`Element`
+
+A context provider wrapping the chart layout.
+
+## Remarks
+
+Initial defaults: `rowLimit = 100`, `selectedDataset = ""`.
+
+Loads available dataset relations through `useGetJSONData` and sorts the result.
+Axis selections intentionally remain local to individual chart cards. An unavailable requested relation
+resolves to an empty selection rather than persisting a stale dataset name.
+
+## Example
+
+```tsx
+import { ChartDatasetProvider, useChartDataset } from "@/framework";
+
+function DatasetLabel() {
+  const { selectedDataset } = useChartDataset();
+  return <span>{selectedDataset || "Choose a dataset"}</span>;
+}
+
+function DatasetPage() {
+  return <ChartDatasetProvider><DatasetLabel /></ChartDatasetProvider>;
+}
+```

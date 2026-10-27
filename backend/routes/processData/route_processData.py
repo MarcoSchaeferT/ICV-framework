@@ -1,95 +1,113 @@
+"""Expose explicit POST commands for spatial data processing."""
+
+from datetime import date
+from typing import Optional
+
 from flask import Blueprint, request, jsonify
 from flasgger import swag_from
+from pydantic import Field, ValidationError, field_validator
+from backend.schemas import BaseSchema, RelationName
 from .assignGeoPosToCountry import assign_geo_pos_to_country
 from .aggregateRKIdata import aggregate_rki_data
 
 route_processData = Blueprint('route_processData', __name__)
 
-@route_processData.route('/assignCountries', methods=['GET', 'POST'])
-def assign_countries():
-    """
-    Assign ISO codes to a table based on its geometry column.
-    ---
-    parameters:
-      - name: tableName
-        in: query
-        type: string
-        required: true
-        description: The name of the table to process.
-      - name: reprocessAll
-        in: query
-        type: boolean
-        description: Whether to reprocess all rows.
-    responses:
-      200:
-        description: Processing complete
-    """
-    if request.method == 'POST':
-        data = request.get_json() or {}
-        table_name = data.get('tableName') or request.args.get('tableName')
-        reprocess_all = data.get('reprocessAll', False) or request.args.get('reprocessAll', 'false').lower() == 'true'
-    else:
-        table_name = request.args.get('tableName')
-        reprocess_all = request.args.get('reprocessAll', 'false').lower() == 'true'
 
-    if not table_name:
-        return jsonify({"error": "Missing tableName parameter"}), 400
-    
+class AssignCountriesParams(BaseSchema):
+    """Parameters for assigning countries to spatial points in a relation.
+
+    Example:
+        ```python
+        params = AssignCountriesParams(tableName="observations", reprocessAll=False)
+        ```
+    """
+    tableName: RelationName
+    reprocessAll: bool = Field(
+        default=False,
+        strict=True,
+        description="Whether to reprocess already assigned rows.",
+    )
+
+
+class AggregateRkiParams(BaseSchema):
+    """Parameters for aggregating RKI COVID-19 data by German federal state.
+
+    Example:
+        ```python
+        params = AggregateRkiParams(
+            sourceTable="aktuell_deutschland_sarscov2_infektionen",
+            targetTable="rki_states",
+            targetDate="2022-06-01",
+        )
+        ```
+    """
+    sourceTable: RelationName = "aktuell_deutschland_sarscov2_infektionen"
+    targetTable: Optional[RelationName] = None
+    targetDate: Optional[str] = None
+
+    @field_validator("targetDate")
+    @classmethod
+    def _validate_target_date(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        if not isinstance(v, str):
+            raise ValueError("targetDate must be an ISO date string when supplied.")
+        try:
+            if date.fromisoformat(v).isoformat() != v:
+                raise ValueError
+        except (ValueError, TypeError):
+            raise ValueError("targetDate must use YYYY-MM-DD format.")
+        return v
+
+
+@swag_from('../../API_docs/process_assign_countries.yml')
+@route_processData.route('/assignCountries', methods=['POST'])
+def assign_countries():
+    """Update a relation's country assignments from a JSON POST command."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "A JSON object is required."}), 400
+
     try:
-        updated_count = assign_geo_pos_to_country(table_name, skip_existing=not reprocess_all)
+        params = AssignCountriesParams.model_validate(data)
+    except ValidationError as err:
+        return jsonify({"error": str(err.errors()[0]["msg"] if err.errors() else err)}), 400
+
+    try:
+        updated_count = assign_geo_pos_to_country(
+            params.tableName, skip_existing=not params.reprocessAll
+        )
         return jsonify({
             "message": "Processing complete",
-            "tableName": table_name,
-            "updatedRows": updated_count
+            "tableName": params.tableName,
+            "updatedRows": updated_count,
         }), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
 
-@route_processData.route('/aggregateRKI', methods=['GET', 'POST'])
+@swag_from('../../API_docs/process_aggregate_rki.yml')
+@route_processData.route('/aggregateRKI', methods=['POST'])
 def aggregate_rki():
-    """
-    Aggregate RKI COVID-19 / SARS-CoV-2 metrics by Bundesland.
-    ---
-    parameters:
-      - name: sourceTable
-        in: query
-        type: string
-        required: false
-        default: "aktuell_deutschland_sarscov2_infektionen"
-        description: The name of the raw RKI table to aggregate.
-      - name: targetTable
-        in: query
-        type: string
-        required: false
-        description: The target aggregated table name.
-      - name: targetDate
-        in: query
-        type: string
-        required: false
-        description: Target date for aggregation (YYYY-MM-DD). Defaults to latest date in dataset.
-    responses:
-      200:
-        description: Aggregation completed successfully
-    """
-    if request.method == 'POST':
-        data = request.get_json() or {}
-        source_table = data.get('sourceTable') or request.args.get('sourceTable') or "aktuell_deutschland_sarscov2_infektionen"
-        target_table = data.get('targetTable') or request.args.get('targetTable')
-        target_date = data.get('targetDate') or data.get('date') or request.args.get('targetDate') or request.args.get('date')
-    else:
-        source_table = request.args.get('sourceTable', 'aktuell_deutschland_sarscov2_infektionen')
-        target_table = request.args.get('targetTable')
-        target_date = request.args.get('targetDate') or request.args.get('date')
+    """Create or refresh state-level RKI data from a JSON POST command."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "A JSON object is required."}), 400
+
+    try:
+        params = AggregateRkiParams.model_validate(data)
+    except ValidationError as err:
+        return jsonify({"error": str(err.errors()[0]["msg"] if err.errors() else err)}), 400
 
     try:
         result = aggregate_rki_data(
-            source_table=source_table,
-            target_table=target_table,
-            targetDate=target_date
+            source_table=params.sourceTable,
+            target_table=params.targetTable,
+            targetDate=params.targetDate,
         )
         return jsonify(result), 200
-    except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
-    except Exception as e:
-        return jsonify({"error": f"Error aggregating RKI data: {str(e)}"}), 500
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"error": f"Error aggregating RKI data: {exc}"}), 500
+

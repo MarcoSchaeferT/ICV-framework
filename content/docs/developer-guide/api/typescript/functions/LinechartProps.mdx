@@ -1,0 +1,68 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: LinechartProps
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **LinechartProps**(`chartName`, `dataURL?`, `locale?`, `translations?`, `isDummyMode?`, `yDomain?`, `dataMode?`, `rowLimit?`): [`LinechartProps`](../interfaces/LinechartProps)
+
+Creates a complete temporal line-chart configuration.
+
+## Parameters
+
+### chartName
+
+`string`
+
+Stable chart/container identifier.
+
+### dataURL?
+
+`string` = `""`
+
+Encoded database API URL.
+
+### locale?
+
+`string` = `"en"`
+
+Locale for labels and number formatting.
+
+### translations?
+
+`any` = `{}`
+
+`next-intl` translator for the chart namespace.
+
+### isDummyMode?
+
+`boolean` = `false`
+
+Uses bundled demonstration data.
+
+### yDomain?
+
+\[`number`, `number`\]
+
+Optional fixed Y-axis extent.
+
+### dataMode?
+
+`"linked"` \| `"generic"` = `"linked"`
+
+`linked` uses the Vis. Interface selection; `generic` uses the shared dataset chart.
+
+### rowLimit?
+
+`number` \| `null`
+
+Optional maximum rows for generic mode.
+
+## Returns
+
+[`LinechartProps`](../interfaces/LinechartProps)
+
+Configuration accepted by `LinechartComponent`.

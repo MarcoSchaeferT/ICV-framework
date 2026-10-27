@@ -1,4 +1,4 @@
-import React, { JSX, useEffect } from 'react';
+import React, { JSX } from 'react';
 import {
     CardGrid,
     CardContent,
@@ -12,10 +12,12 @@ import {
 import {HoverCardComponentInfo, HoverCardInteractionInfo} from './InfoCards';
 
 /**
- * Presentation and contextual-help contract for one dashboard card.
+ * Presentation and contextual-help contract for one Vis. Interface card.
  *
  * @example
  * ```tsx
+ * import type { CardPropsClass } from "@/framework";
+ *
  * const habitatCard: CardPropsClass = {
  *   id: "albopictus-habitat-map",
  *   headline: "Aedes albopictus habitat suitability",
@@ -53,7 +55,7 @@ export interface CardPropsClass {
 }
 
 /**
- * Creates a complete dashboard-card configuration with empty optional information panels.
+ * Creates a complete Vis. Interface card configuration with empty optional information panels.
  *
  * @param id - Stable DOM and Swapy slot identifier.
  * @param headline - Visible card title.
@@ -61,7 +63,6 @@ export interface CardPropsClass {
  * @param footer - Attribution or footer text.
  * @param bgColor - Tailwind background utility.
  * @returns A card configuration accepted by {@link CardWrapper} and `SGridPlotCard`.
- * @default bgColor "bg-surface-light"
  */
 export function CardPropsClass(id: string, headline: string, description: string, footer: string, bgColor: string = "bg-surface-light"): CardPropsClass {
     return {
@@ -80,18 +81,20 @@ export function CardPropsClass(id: string, headline: string, description: string
  *
  * @example
  * ```tsx
+ * import { CardPropsClass, type CardWrapperProps } from "@/framework";
+ *
  * const props: CardWrapperProps = {
- *   children: <div id="berlin-incidence-chart" />,
+ *   children: <div id="serotype-distribution-chart" />,
  *   cardProps: CardPropsClass(
- *     "berlin-incidence",
- *     "Berlin incidence",
- *     "Seven-day incidence by reporting date",
- *     "Source: RKI",
+ *     "serotype-distribution",
+ *     "Serotype distribution",
+ *     "Sample counts across regions",
+ *     "Source: Surveillance",
  *   ),
  * };
  * ```
  */
-interface CardWrapperProps {
+export interface CardWrapperProps {
     /** Visualization or table rendered in the card body. */
     children: React.ReactNode;
     /** Card heading, help, footer, styling, and identity. */
@@ -99,7 +102,7 @@ interface CardWrapperProps {
 }
 
 /**
- * Renders the standard dashboard card shell and required chart-resizing boundary.
+ * Renders the standard Vis. Interface card shell and required chart-resizing boundary.
  *
  * @param props - Card content and presentation configuration.
  * @returns A hydrated card, or a loading indicator during server/client handoff.
@@ -112,10 +115,11 @@ const CardWrapper = ({ children, cardProps }: CardWrapperProps) => {
     // fallback to empty cardProps
     if (cardProps === undefined) cardProps = CardPropsClass('', '', '', '');
 
-    const [isClient, setIsClient] = React.useState(false);
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
+    const isClient = React.useSyncExternalStore(
+        () => () => {},
+        () => true,
+        () => false,
+    );
     // return the card
     if(isClient){
     return (
@@ -161,5 +165,5 @@ function LoadingSpinner() {
     );
 }
 
-/** Default export for the standard dashboard-card shell. */
+/** Default export for the standard Vis. Interface card shell. */
 export default CardWrapper;

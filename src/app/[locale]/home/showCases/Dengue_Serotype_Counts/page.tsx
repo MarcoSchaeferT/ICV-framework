@@ -1,9 +1,8 @@
 
 "use client";
 
-import { useRef, useEffect, useState } from 'react'
+import React, { useRef, useEffect, useState } from 'react'
 import {apiRoutes } from "@/app/api_routes";
-import React from 'react';
 import { InterfaceContextProvider, useInterfaceContext, interfaceContextI } from '@/components/contexts/InterfaceContext';
 import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
@@ -16,10 +15,20 @@ import { useLocale, useTranslations } from "next-intl";
 import { t_richConfig } from "@/app/const_store";
 import { useUIContext } from '@/components/contexts/UIContext';
 
-
 const isSWAPY = true;
 
-/** Returns the geographic dengue-serotype distribution showcase dashboard. */
+/**
+ * Renders the Central American dengue-serotype distribution showcase.
+ *
+ * @returns A localized introduction and a Leaflet map with spatial overlays.
+ *
+ * @remarks The map combines an `albopictus` probability grid with enabled
+ * sequence-metadata donut charts. The Vis. Interface begins over Central America
+ * and uses `InterfaceContextProvider` for linked selections. A Swapy card owns
+ * loading feedback independently of other views.
+ *
+ * @see {@link LeafD3MapLayerProps} for grid and sequence-layer settings.
+ */
 export default function Home() {
 
 const t = useTranslations("page_home.ShowCases.page_Dengue_Serotype_Counts");

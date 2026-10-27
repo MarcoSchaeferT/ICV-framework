@@ -1,0 +1,667 @@
+---
+title: Database Query Routes
+description: Read-only endpoints for tabular queries, aggregations, compact map grids, column names, and relation discovery.
+---
+
+Read-only endpoints for tabular queries, aggregations, compact map grids, column names, and relation discovery.
+
+## `backend/routes/getDataFromDB/route_getDataFromDB.py`
+
+Serve cached PostgreSQL queries and compact grids for Vis. Interface views.
+
+The `/api/getDataFromDB` blueprint returns a common response envelope for
+single fields, counts, multi-column charts, and `map-grid-v1` spatial data.
+Successful JSON responses may be gzip encoded and cached by relation scope.
+
+### `RequestParams`
+
+```python
+class RequestParams(BaseSchema)
+```
+
+Validated query parameters accepted by the database endpoint.
+
+The `features` path returns selected row objects and applies its own
+limit; it currently does not apply `filterBy` or `filterValue`. A single
+`feature` request and `map-grid-v1` take different query paths.
+
+
+**Example**
+
+RequestParams(
+relationName="seas5_forecast_albopictus_habitat_probability",
+feature="forecast_aug_2026",
+responseFormat="map-grid-v1",
+)
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"relationName": {"type": "RelationName", "required": true}, "feature": {"type": "str", "required": false, "default": "''"}, "features": {"type": "Optional[str]", "required": false, "default": "None"}, "limit": {"type": "Optional[int]", "required": false, "default": "None"}, "filterBy": {"type": "Optional[str]", "required": false, "default": "None"}, "filterValue": {"type": "Optional[str]", "required": false, "default": "None"}, "startDate": {"type": "Optional[str]", "required": false, "default": "None"}, "endDate": {"type": "Optional[str]", "required": false, "default": "None"}, "targetDate": {"type": "Optional[str]", "required": false, "default": "None"}, "task": {"type": "Optional[str]", "required": false, "default": "None"}, "aggregation_level": {"type": "Optional[str]", "required": false, "default": "None"}, "responseFormat": {"type": "Optional[str]", "required": false, "default": "None"}, "groupBy": {"type": "Optional[str]", "required": false, "default": "None"}}} />
+
+### `ResponseJson`
+
+```python
+class ResponseJson(BaseModel)
+```
+
+Common JSON envelope for database rows, aggregates, and grid payloads.
+
+`response` varies with the requested task. Errors are also represented
+in this envelope, including cases that currently return HTTP 200. Clients
+must check `error` as well as the status code. `rowLimit` and
+`isTruncated` describe the bounded `features` variant.
+
+
+**Example**
+
+```python
+payload = ResponseJson(
+relationName="world_mosquitos_2014_2025_gdf_mosquito_amount",
+header=["id", "geometry", "mosquito_amount"],
+response=[{"id": 1, "geometry": "POINT (13.405 52.52)", "feature": 42}],
+error=None,
+)
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"relationName": {"type": "str", "required": true}, "header": {"type": "list[str]", "required": true}, "response": {"type": "object", "required": true}, "error": {"type": "str | None", "required": false, "default": "None"}, "isTruncated": {"type": "bool", "required": false, "default": "False"}, "rowLimit": {"type": "int | None", "required": false, "default": "None"}}} />
+
+### `CachedJSONResponse`
+
+```python
+@dataclass(frozen=True, slots=True)
+class CachedJSONResponse
+```
+
+Serialized response bytes plus encoding (`'identity'` or `'gzip'`) and uncompressed byte length.
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"body": {"type": "bytes", "required": true}, "encoding": {"type": "str", "required": true}, "uncompressed_length": {"type": "int", "required": true}}} />
+
+### `_response_payload`
+
+```python
+def _response_payload(response_json: ResponseJson) -> dict
+```
+
+Build the response envelope without recursively copying large payloads.
+
+**Parameters**
+
+<TypeTable type={{"response_json": {"type": "ResponseJson", "required": true}}} />
+
+### `_requested_encoding`
+
+```python
+def _requested_encoding() -> str
+```
+
+Choose gzip when accepted by the client, otherwise identity encoding.
+
+### `_encode_json_response`
+
+```python
+def _encode_json_response(payload: object, encoding: str) -> CachedJSONResponse
+```
+
+Serialize JSON once and optionally gzip it before caching.
+
+PostgreSQL scalar values fall back to `str` during serialization.
+`orjson` is preferred when installed; the standard JSON encoder is the
+local-development fallback.
+
+**Parameters**
+
+<TypeTable type={{"payload": {"type": "object", "required": true}, "encoding": {"type": "str", "required": true}}} />
+
+### `_make_cached_response`
+
+```python
+def _make_cached_response(cached: CachedJSONResponse, cache_status: str) -> Response
+```
+
+Build an HTTP response with encoding, size, and cache-status headers.
+
+**Parameters**
+
+<TypeTable type={{"cached": {"type": "CachedJSONResponse", "required": true}, "cache_status": {"type": "str", "required": true}}} />
+
+### `_cache_json_response`
+
+```python
+def _cache_json_response(cache_key: str, payload: object, relation_name: str) -> Response
+```
+
+Cache a successful JSON payload under its relation and return a miss.
+
+**Parameters**
+
+<TypeTable type={{"cache_key": {"type": "str", "required": true}, "payload": {"type": "object", "required": true}, "relation_name": {"type": "str", "required": true}}} />
+
+### `getDataFromDB`
+
+**HTTP Endpoint:** `GET` `/api/getDataFromDB` — Get data from database (REST Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/get_data_from_db.yml`
+
+**OpenAPI Request Parameters**
+
+<TypeTable type={{"relationName (query)": {"type": "string", "required": true, "description": "Name of the database relation (table) to fetch data from. (Example: `MosquitoPresenceData`)"}, "feature (query)": {"type": "string", "required": false, "description": "Column to fetch. A trailing * scans a numbered feature series; ALL selects all columns. When omitted, the middle column is selected, except a compact grid selects a numeric feature. (Example: `latitude`)"}, "features (query)": {"type": "string", "required": false, "description": "Comma-separated column names for a bounded, row-oriented multi-column response. Takes precedence over `feature` when supplied. (Example: `date,temperature`)"}, "limit (query)": {"type": "integer", "required": false, "description": "Row limit for a features request. Defaults to 100, values above 10000 are capped at 10000, and -1 explicitly disables the limit. (Example: `100`)"}, "filterBy (query)": {"type": "string", "required": false, "description": "Filter column names in the legacy quoted-list format, for example 'country','year'. Pair with filterValue in the same order. Ignored when features contains at least one column. (Example: `species`)"}, "filterValue (query)": {"type": "string", "required": false, "description": "Filter values in the legacy quoted-list format, paired with filterBy. ALL or an empty value skips that filter. Ignored when features contains at least one column. (Example: `Aedes aegypti`)"}, "startDate (query)": {"type": "string", "required": false, "description": "Start date for date range filtering (optional). (Example: `2020-01-01`)"}, "endDate (query)": {"type": "string", "required": false, "description": "End date for date range filtering (optional). (Example: `2020-12-31`)"}, "targetDate (query)": {"type": "string", "required": false, "description": "Snapshot date for relations with a date or datenstand column. Single feature and compact-grid reads choose the latest datenstand at or before this date; ALL-column reads require an exact date match. (Example: `2020-12-31`)"}, "task (query)": {"type": "string ('getUniqueEntries' | 'getMinMax' | 'getCount' | 'getGroupedCount')", "required": false, "description": "Optional aggregate or set operation executed on a single feature. Supported values: - `getUniqueEntries`: Distinct feature values as an array of {feature}. When querying a date column, extracts distinct years. - `getMinMax`: Minimum and maximum values as {min_val, max_val}. - `getCount`: Frequency count per feature value as an array of {feature, count}. Respects filterBy/filterValue. - `getGroupedCount`: Frequency count per feature grouped by category as an array of {feature, category, count}. Requires groupBy. An omitted or unrecognized task follows the standard single-feature row query path. (Example: `getUniqueEntries`)"}, "groupBy (query)": {"type": "string", "required": false, "description": "Existing column used as the secondary category for getGroupedCount (required when task=getGroupedCount). (Example: `species`)"}, "responseFormat (query)": {"type": "string ('map-grid-v1')", "required": false, "description": "Set to map-grid-v1 for a compact map response. Its response object contains aligned id, lat0..lat3, lng0..lng3, and feature arrays; featureName, cellSize, anchorOffset, featureRange, and rowCount provide metadata. Each latitude/longitude pair describes the same cell corner. This format requires a geometry column."}, "aggregation_level (query)": {"type": "string", "required": false, "description": "Optional aggregation level used as an equality filter when supported by the selected query path. (Example: `0`)"}}} />
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200", "HTTP 400"]}>
+<Tab value="HTTP 200">
+
+Query result or an error in the common envelope. The response value varies by feature, task, and responseFormat. Multi-column features requests set isTruncated and rowLimit; compact maps use the map-grid-v1 object described above.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "relationName": "MosquitoPresenceData",
+  "header": [
+    "id",
+    "latitude",
+    "longitude",
+    "species",
+    "date"
+  ],
+  "response": "<value>",
+  "error": "<string>",
+  "isTruncated": "<boolean>",
+  "rowLimit": "<integer>"
+}
+```
+
+</Tab>
+<Tab value="HTTP 400">
+
+Missing required relationName query parameter (Flask request parsing).
+
+</Tab>
+</Tabs>
+
+```python
+@swag_from('../../API_docs/get_data_from_db.yml')
+@route_getDataFromDB.route('', methods=['GET'])
+async def getDataFromDB()
+```
+
+Handle GET queries for one relation through the shared response envelope.
+
+Request parsing uses `RequestParams`. A `features` request is bounded
+unless `limit=-1` is explicitly supplied; `responseFormat=map-grid-v1`
+emits aligned column arrays for map cells. Successful results are cached
+by relation and requested encoding. Reads never run aggregation; clients
+must submit a separate processing request before querying derived data.
+Validation and query errors often return the envelope with HTTP 200;
+only successful results are stored in the response cache. The `features`
+path does not apply its optional filter fields.
+
+See `API_docs/get_data_from_db.yml` for query fields and HTTP examples.
+
+### `_grid_geometry_points`
+
+```python
+def _grid_geometry_points(geometry: str) -> tuple[tuple[float, float], ...]
+```
+
+Return the first four unique WKT polygon corners as `(lat, lng)`.
+
+**Parameters**
+
+<TypeTable type={{"geometry": {"type": "str", "required": true}}} />
+
+### `_grid_geometry_bounds`
+
+```python
+def _grid_geometry_bounds(geometry: str) -> tuple[float, float, float, float]
+```
+
+Return north, south, west and east bounds for a WKT grid polygon.
+
+**Parameters**
+
+<TypeTable type={{"geometry": {"type": "str", "required": true}}} />
+
+### `_default_grid_feature`
+
+```python
+def _default_grid_feature(column_names: list[str], column_types: dict[str, str]) -> str
+```
+
+Choose a stable numeric value column for a compact-grid bootstrap.
+
+**Parameters**
+
+<TypeTable type={{"column_names": {"type": "list[str]", "required": true}, "column_types": {"type": "dict[str, str]", "required": true}}} />
+
+### `_grid_geometry_metadata`
+
+```python
+def _grid_geometry_metadata(geometry: str, latitude: object, longitude: object) -> tuple[list[float], list[float]]
+```
+
+Return per-dataset cell size `[lat_height, lng_width]` and north-west anchor offset.
+
+Retained for legacy anchor-based grid geometries where cell bounds are
+reconstructed from a single `(latitude, longitude)` anchor plus a uniform
+`cellSize` and `anchorOffset`. Current `map-grid-v1` payloads emit
+four explicit corner arrays (`lat0..lng3`) via `_grid_geometry_corners`.
+
+**Parameters**
+
+<TypeTable type={{"geometry": {"type": "str", "required": true}, "latitude": {"type": "object", "required": true}, "longitude": {"type": "object", "required": true}}} />
+
+### `getDBdata_mapGrid`
+
+```python
+async def getDBdata_mapGrid(relationName: str, feature: str, filterBy: Optional[List[str]], filterValue: Optional[List[str]], startDate: Optional[str], endDate: Optional[str], aggregation_level: Optional[str]=None, targetDate: Optional[str]=None) -> tuple[object, str | None]
+```
+
+Return aligned cell columns for the `map-grid-v1` response.
+
+WKT polygon coordinates are converted to four `latN`/`lngN` corner
+pairs per row. `id` is synthesized when the relation has no ID column.
+The payload includes `featureName`, `featureRange`, `cellSize`, and
+`rowCount`; every per-cell array has the same length. A missing geometry
+or feature column returns an error string alongside an empty result.
+
+**Parameters**
+
+<TypeTable type={{"relationName": {"type": "str", "required": true}, "feature": {"type": "str", "required": true}, "filterBy": {"type": "Optional[List[str]]", "required": true}, "filterValue": {"type": "Optional[List[str]]", "required": true}, "startDate": {"type": "Optional[str]", "required": true}, "endDate": {"type": "Optional[str]", "required": true}, "aggregation_level": {"type": "Optional[str]", "required": false, "default": "None"}, "targetDate": {"type": "Optional[str]", "required": false, "default": "None"}}} />
+
+### `getDBdata_singleCol`
+
+```python
+async def getDBdata_singleCol(relationName: str, feature: str, filterBy: Optional[List[str]], filterValue: Optional[List[str]], startDate: Optional[str], endDate: Optional[str], aggregation_level: Optional[str]=None, targetDate: Optional[str]=None) -> tuple[object, str | None]
+```
+
+Query one feature with optional geography, date, and aggregation filters.
+
+Returns a list of row-oriented map records and an optional error string.
+The legacy empty-result path supplies one zero-valued placeholder polygon.
+
+**Parameters**
+
+<TypeTable type={{"relationName": {"type": "str", "required": true}, "feature": {"type": "str", "required": true}, "filterBy": {"type": "Optional[List[str]]", "required": true}, "filterValue": {"type": "Optional[List[str]]", "required": true}, "startDate": {"type": "Optional[str]", "required": true}, "endDate": {"type": "Optional[str]", "required": true}, "aggregation_level": {"type": "Optional[str]", "required": false, "default": "None"}, "targetDate": {"type": "Optional[str]", "required": false, "default": "None"}}} />
+
+### `getDBdata_singleColCount`
+
+```python
+async def getDBdata_singleColCount(relationName, feature, filterBy, filterValue) -> tuple[object, str | None]
+```
+
+Count rows per feature value after applying optional equality filters.
+
+**Parameters**
+
+<TypeTable type={{"relationName": {"type": "Any", "required": true}, "feature": {"type": "Any", "required": true}, "filterBy": {"type": "Any", "required": true}, "filterValue": {"type": "Any", "required": true}}} />
+
+### `getDBdata_groupedCount`
+
+```python
+async def getDBdata_groupedCount(relationName: str, feature: str, groupBy: str, filterBy: Optional[List[str]], filterValue: Optional[List[str]]) -> tuple[object, str | None]
+```
+
+Return counts grouped by a geographic feature and one category.
+
+**Parameters**
+
+<TypeTable type={{"relationName": {"type": "str", "required": true}, "feature": {"type": "str", "required": true}, "groupBy": {"type": "str", "required": true}, "filterBy": {"type": "Optional[List[str]]", "required": true}, "filterValue": {"type": "Optional[List[str]]", "required": true}}} />
+
+### `getDBdata_singleColUnique`
+
+```python
+async def getDBdata_singleColUnique(relationName, feature) -> tuple[object, str | None]
+```
+
+Return distinct feature values; `date` yields calendar years instead.
+
+**Parameters**
+
+<TypeTable type={{"relationName": {"type": "Any", "required": true}, "feature": {"type": "Any", "required": true}}} />
+
+### `getDBdata_singleColMinMax`
+
+```python
+async def getDBdata_singleColMinMax(relationName, feature) -> tuple[object, str | None]
+```
+
+Return `min_val` and `max_val` for a feature, or an error tuple.
+
+**Parameters**
+
+<TypeTable type={{"relationName": {"type": "Any", "required": true}, "feature": {"type": "Any", "required": true}}} />
+
+### `getDBdata_HEADER`
+
+```python
+async def getDBdata_HEADER(relationName)
+```
+
+Fetch at most one row to expose a relation's available columns.
+
+**Parameters**
+
+<TypeTable type={{"relationName": {"type": "Any", "required": true}}} />
+
+### `getDBdata_multiCol`
+
+```python
+async def getDBdata_multiCol(relationName: str, feature: str, filterBy: Optional[List[str]], filterValue: Optional[List[str]], startDate: Optional[str], endDate: Optional[str], aggregation_level: Optional[str]=None) -> tuple[object, str | None]
+```
+
+Query a numbered feature series for legacy multi-month chart views.
+
+The result contains one geometry array and parallel feature arrays.
+Monthly suitability relations are queried separately; an empty result
+retains the legacy placeholder geometry with no feature values.
+
+**Parameters**
+
+<TypeTable type={{"relationName": {"type": "str", "required": true}, "feature": {"type": "str", "required": true}, "filterBy": {"type": "Optional[List[str]]", "required": true}, "filterValue": {"type": "Optional[List[str]]", "required": true}, "startDate": {"type": "Optional[str]", "required": true}, "endDate": {"type": "Optional[str]", "required": true}, "aggregation_level": {"type": "Optional[str]", "required": false, "default": "None"}}} />
+
+### `getDBdata_allCols`
+
+```python
+async def getDBdata_allCols(relationName: str, targetDate: Optional[str]=None, startDate: Optional[str]=None, endDate: Optional[str]=None) -> tuple[object, str | None]
+```
+
+Return all relation columns, selecting report dates when present.
+
+With no date filter, only the latest `datenstand` or `date` snapshot
+is selected. Date objects are serialized to `YYYY-MM-DD` strings.
+
+**Parameters**
+
+<TypeTable type={{"relationName": {"type": "str", "required": true}, "targetDate": {"type": "Optional[str]", "required": false, "default": "None"}, "startDate": {"type": "Optional[str]", "required": false, "default": "None"}, "endDate": {"type": "Optional[str]", "required": false, "default": "None"}}} />
+
+### `getDBdata_selectedCols`
+
+```python
+async def getDBdata_selectedCols(relationName: str, features: list[str], row_limit: int | None) -> tuple[list[dict], str | None, bool]
+```
+
+Return only the requested columns for generic charts.
+
+For bounded requests, one extra row is requested so callers can warn about
+truncation without an additional `COUNT(*)` query. A `None` limit is the
+explicitly requested unbounded debug mode. Tables with an `id` column
+retain their stable database order; other tables use the returned row order.
+
+**Parameters**
+
+<TypeTable type={{"relationName": {"type": "str", "required": true}, "features": {"type": "list[str]", "required": true}, "row_limit": {"type": "int | None", "required": true}}} />
+
+### `consumeARGSvalues`
+
+```python
+def consumeARGSvalues(argsValues) -> list[str]
+```
+
+Decode the legacy quoted query-list format into string values.
+
+Missing input yields `[""]` so callers can treat absent filters uniformly.
+
+**Parameters**
+
+<TypeTable type={{"argsValues": {"type": "Any", "required": true}}} />
+
+### `conditionBuilderEquals`
+
+```python
+def conditionBuilderEquals(filterBy: List[str], filterValue: List[str]) -> tuple[Optional[sql.Composed], Optional[list]]
+```
+
+Build an AND-combined equality filter and its bound parameters.
+
+Returns `(None, None)` for mismatched, empty, or inactive filters.
+A four-digit value for `date` becomes a calendar-year range.
+
+**Parameters**
+
+<TypeTable type={{"filterBy": {"type": "List[str]", "required": true}, "filterValue": {"type": "List[str]", "required": true}}} />
+
+### `_append_filter_condition`
+
+```python
+def _append_filter_condition(conditions: list[sql.Composed], params: list, column_name: str, value: str) -> None
+```
+
+Append an index-friendly equality or calendar-year condition.
+
+**Parameters**
+
+<TypeTable type={{"conditions": {"type": "list[sql.Composed]", "required": true}, "params": {"type": "list", "required": true}, "column_name": {"type": "str", "required": true}, "value": {"type": "str", "required": true}}} />
+
+### `conditionBuilderFeatureNotEmpty`
+
+```python
+def conditionBuilderFeatureNotEmpty(feature: str, feature_type: str, params: list) -> sql.Composed
+```
+
+Exclude NULL and type-specific sentinel values from a feature query.
+
+Appends sentinel values to `params` for the composed SQL placeholders.
+
+**Parameters**
+
+<TypeTable type={{"feature": {"type": "str", "required": true}, "feature_type": {"type": "str", "required": true}, "params": {"type": "list", "required": true}}} />
+
+### `get_not_in_values`
+
+```python
+def get_not_in_values(feature_type: str) -> list
+```
+
+Return missing-value sentinels appropriate for a PostgreSQL type.
+
+**Parameters**
+
+<TypeTable type={{"feature_type": {"type": "str", "required": true}}} />
+
+### `conditionBuilderRange`
+
+```python
+def conditionBuilderRange(start: str, end: str, attribute: str, params: list) -> sql.Composed
+```
+
+Build an inclusive SQL range and append both bound endpoints.
+
+**Parameters**
+
+<TypeTable type={{"start": {"type": "str", "required": true}, "end": {"type": "str", "required": true}, "attribute": {"type": "str", "required": true}, "params": {"type": "list", "required": true}}} />
+
+### `get_relation_schema`
+
+```python
+async def get_relation_schema(relationName: str) -> dict
+```
+
+Cache a relation's columns, types, existence, and nonempty status.
+
+Returns `{"exists": bool, "has_data": bool, "columns": dict}`.
+A schema lookup error is reported with an `error` key and `is_connection_error` flag;
+a failed row probe is reported as `has_data=False`. Errors are never cached.
+
+**Parameters**
+
+<TypeTable type={{"relationName": {"type": "str", "required": true}}} />
+
+### `get_feature_column_type`
+
+```python
+async def get_feature_column_type(relationName: str, feature: str) -> str
+```
+
+Read a feature's PostgreSQL type from the cached relation schema.
+
+**Parameters**
+
+<TypeTable type={{"relationName": {"type": "str", "required": true}, "feature": {"type": "str", "required": true}}} />
+
+## `backend/routes/getDataFromDB/route_getColumnNamesDB.py`
+
+Serve cached column names for a PostgreSQL relation.
+
+### `GetColumnNamesParams`
+
+```python
+class GetColumnNamesParams(BaseSchema)
+```
+
+Query parameters for retrieving column names of a relation.
+
+
+**Example**
+
+```python
+params = GetColumnNamesParams(relationName="observations")
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"relationName": {"type": "RelationName", "required": true}}} />
+
+### `getColumnNamesDB`
+
+**HTTP Endpoint:** `GET` `/api/getColumnNamesDB` — Get column names from a database table (REST Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/get_column_names_db.yml`
+
+**OpenAPI Request Parameters**
+
+<TypeTable type={{"relationName (query)": {"type": "string", "required": true, "description": "Name of the database relation (table) to get column names from. (Example: `MosquitoPresenceData`)"}}} />
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200", "HTTP 400", "HTTP 500", "HTTP 404"]}>
+<Tab value="HTTP 200">
+
+Successful response with list of column names
+
+- **Content-Type:** `application/json`
+
+```json
+[
+  "id",
+  "latitude",
+  "longitude",
+  "species",
+  "date"
+]
+```
+
+</Tab>
+<Tab value="HTTP 400">
+
+Missing relationName parameter.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "error": "<string>"
+}
+```
+
+</Tab>
+<Tab value="HTTP 500">
+
+Internal server error
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "error": "<string>"
+}
+```
+
+</Tab>
+<Tab value="HTTP 404">
+
+The named relation does not exist.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "error": "Table 'missing_table' does not exist in the database."
+}
+```
+
+</Tab>
+</Tabs>
+
+```python
+@swag_from('../../API_docs/get_column_names_db.yml')
+@route_getColumnNamesDB.route('', methods=['GET'])
+async def getColumnNamesDB()
+```
+
+Return a relation's column names with an `X-Cache` hit/miss header.
+
+`relationName` is required. A missing table returns 404 and other
+database failures return 500. Because names are taken from a one-row
+`SELECT *`, an empty relation currently returns an empty list. Results
+are cached under the relation scope.
+
+## `backend/routes/getDataFromDB/route_getListOfRelationsDB.py`
+
+Expose names of public PostgreSQL relations for dataset selectors.
+
+### `getListOfRelationsDB`
+
+**HTTP Endpoint:** `GET` `/api/getListOfRelationsDB` — Get list of database tables (REST Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/get_list_of_relations_db.yml`
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200", "HTTP 500"]}>
+<Tab value="HTTP 200">
+
+Successful response with dictionary of table names
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "MosquitoPresenceData": "MosquitoPresenceData",
+  "DengueSerotypeCounts": "DengueSerotypeCounts",
+  "MosquitoHabitatSuitability": "MosquitoHabitatSuitability"
+}
+```
+
+</Tab>
+<Tab value="HTTP 500">
+
+Internal server error
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "error": "<string>"
+}
+```
+
+</Tab>
+</Tabs>
+
+```python
+@swag_from('../../API_docs/get_list_of_relations_db.yml')
+@route_getListOfRelationsDB.route('', methods=['GET'])
+async def getListOfRelationsDB() -> Response
+```
+
+Return a name-to-name JSON map of public relations.
+
+Application and extension relations in `HIDDEN_RELATIONS` are omitted.
+This is a dataset-discovery filter, not an authorization check for other
+endpoints that accept a relation name.

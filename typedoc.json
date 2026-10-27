@@ -1,0 +1,40 @@
+{
+  "$schema": "./node_modules/typedoc-plugin-markdown/typedoc-plugin-markdown.schema.json",
+  "entryPoints": ["./src/framework/index.ts"],
+  "tsconfig": "./tsconfig.typedoc.json",
+  "name": "ICV TypeScript API",
+  "readme": "none",
+  "out": "./content/docs/developer-guide/api/typescript",
+  "plugin": [
+    "typedoc-plugin-markdown",
+    "typedoc-plugin-frontmatter",
+    "./scripts/typedoc-frontmatter.mjs",
+    "./scripts/typedoc-example-checker.mjs"
+  ],
+  "entryFileName": "index",
+  "fileExtension": ".mdx",
+  "router": "member",
+  "cleanOutputDir": true,
+  "disableSources": true,
+  "hidePageTitle": true,
+  "hideBreadcrumbs": true,
+  "sanitizeComments": true,
+  "excludeInternal": true,
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeExternals": true,
+  "sort": ["source-order"],
+  "validation": {
+    "invalidLink": true,
+    "invalidPath": true,
+    "notDocumented": false,
+    "notExported": true
+  },
+  "treatWarningsAsErrors": true,
+  "frontmatterGlobals": {
+    "description": "Generated reference for the public ICV TypeScript API."
+  },
+  "indexFrontmatter": {
+    "title": "TypeScript API"
+  }
+}

@@ -1,0 +1,21 @@
+tags:
+  - Utility Endpoints
+summary: Clear the response cache across all workers
+description: >-
+  Flushes the current worker's local response cache and increments the global
+  Redis invalidation epoch so all other Gunicorn workers drop cached entries on
+  next access.
+responses:
+  200:
+    description: Cache flush confirmation.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            success:
+              type: boolean
+              example: true
+            message:
+              type: string
+              example: "Cache cleared"

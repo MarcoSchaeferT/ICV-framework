@@ -1,21 +1,36 @@
+"""Create the Flask API, register routes, and serve map and metadata assets.
+
+Importing this module configures Flasgger, resolves packaged asset paths,
+registers blueprints, and attempts to ensure both column metadata tables.
+Gunicorn preloads it before forking, so database pools and Redis clients are
+opened lazily in workers. Upload progress and response-cache invalidation
+use Redis when available, with process-local fallbacks.
+"""
+
 from flask import Flask, Response
 from flask import request
 from flask import jsonify
 from backend.upload_request import DirectUploadRequest
 import time
 import json
-from backend.routes.setFilesToDB.db_utils import query_raw, execute_raw, get_db_connection_params
-import psycopg
+from backend.routes.setFilesToDB.db_utils import get_db_connection
 from psycopg import sql as psycopg_sql
-import requests
-import lzma
 import os
 import tarfile
 import csv
 csv.field_size_limit(100000000)
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Literal
 from flasgger import Swagger, swag_from
+from pydantic import Field, ValidationError
+from backend.schemas import (
+    BaseSchema,
+    CellId,
+    ImagePath,
+    LangCode,
+    MapName,
+    UploadId,
+)
 
 
 
@@ -30,8 +45,12 @@ from backend.routes.columnMetadata.route_columnMetadata import route_columnMetad
 from backend.routes.manageDB.route_manageDB import route_manageDB
 from backend import metadata_utils
 from backend.metadata_utils import getMetaDataPath, loadMetadataCSV
-from backend.routes.processData.uncertaintyVis import render_uncertainty_svgs
+from backend.routes.processData.uncertaintyVis import (
+    build_uncertainty_chart_data,
+    render_uncertainty_svgs,
+)
 from backend.routes.processData.ensoSuitability import (
+    build_ENSO_suitability_data,
     normalize_enso_locale,
     render_ENSO_suitability_svg,
 )
@@ -63,34 +82,31 @@ Swagger(app, template=template)
 
 testData = ["test", "test2", "test3"]
 
-# global variables
-global metadata
-# used by uploadFileToDB.py -> createTable() -> loadMetadata() stores part of the metadata (valuename, datatype)
-metadata = {}
 # Upload progress/error state lives in Redis (shared across Gunicorn workers),
 # see backend/upload_state.py
 from backend.upload_state import upload_state
 class DataPaths:
+    """Resolve packaged assets and temporary upload storage from this module.
+
+    ``data_sets_save_location`` holds per-upload work directories; it is not
+    a durable dataset catalog. PostgreSQL holds the imported relation data.
+    """
     germany_map_states: Path
     germany_map_districts: Path
     world_map: Path
     capitals: Path
-    mos_data: Path
-    data_sets: Path
     data_sets_save_location: Path
     images: Path
     meta_data: Path
     usa_map: Path
-    usa_map: Path
 
     def __init__(self):
+        """Resolve backend asset paths relative to this module."""
         self.germany_map_states = Path(__file__).parent / "assets" / "germany_states_midRes.geo.json.tgz"
         self.germany_map_districts = Path(__file__).parent / "assets" / "germany_districts.geo.json.tgz"
-        self.world_map = Path(__file__).parent / "assets" / "worldmap_lowRes.geo.json.tgz"
+        self.world_map = Path(__file__).parent / "assets" / "worldmap_midRes.geo.json.tgz"
         self.capitals = Path(__file__).parent / "assets" / "capitals.geo.json.tgz"
-        self.mos_data = Path(__file__).parent / "assets" / "aedes_aegypti_svm_output_2015.csv"
         self.data_sets_save_location = Path(__file__).parent / "assets" / "uploads_tmp"
-        self.data_sets = self.data_sets_save_location
         self.images = Path(__file__).parent / "assets" / "images"
         self.meta_data: Path = Path(__file__).parent.parent / "messages" / "metaData.csv"
         self.usa_map = Path(__file__).parent / "assets" / "USA_map.geo.json.tgz"
@@ -98,37 +114,6 @@ class DataPaths:
 dataPaths: DataPaths = DataPaths()
 metadata_utils.init(dataPaths.meta_data)
 
-
-dummyDBdata = [
-    {
-        "email": "alice@prisdma.io",
-        "name": "Alice",
-        "password": "password",
-    },
-    {
-        "email": "tom@john.web.de",
-        "name": "Tom",
-        "password": "Jon4756",
-    },
-    {
-        "email": "john@example.com",
-        "name": "John",
-        "password": "pass123",
-    },
-    {
-        "email": "jane@example.com",
-        "name": "Jane",
-        "password": "secret",
-    },
-    {
-        "email": "alex@example.com",
-        "name": "Alex",
-        "password": "qwerty",
-    },
-]
-
-database_url = os.getenv("DATABASE_URL")
-db_pw = os.getenv("DB_PASSWORD_SECRET")
 
 # register the blueprint
 app.register_blueprint(route_setFilesToDB, url_prefix='/api/setFilesToDB')
@@ -140,111 +125,138 @@ app.register_blueprint(route_columnMetadata, url_prefix='/api/columnMetadata')
 app.register_blueprint(route_manageDB, url_prefix='/api/manageDB')
 app.register_blueprint(route_processData, url_prefix='/api/processData')
 
-# Create column_metadata_en/de tables if they don't exist (no Prisma needed)
+# Create column_metadata_en/de tables if they don't exist.
 ensure_metadata_tables()
 
 
 
 @app.route("/api/python")
 def hello_world():
+    """Return the small HTML development landing response at ``/api/python``."""
     return "<p>Hello, World!</p><br> <p>back to homepage: <a  class='text-blue-600' href='http://localhost:3000/'>http://localhost:3000/</a></p>"
 
 @app.route("/api/test", methods=["GET"])
 def test():
+    """Return the static JSON diagnostic payload at ``/api/test``."""
     if request.method == "GET":
         print("hello")
         #time.sleep(2)
         print(str(json.dumps(testData)))
         return json.dumps(testData)
     
+# ────────────────────────────────────────────────
+#  Pydantic Schemas for Asset & Diagnostic Routes
+# ────────────────────────────────────────────────
+class UploadStatusParams(BaseSchema):
+    """Query parameters for polling upload progress and status.
+
+    Example:
+        ```python
+        params = UploadStatusParams(id="550e8400-e29b-41d4-a716-446655440000")
+        ```
+    """
+    id: UploadId
+
+
+class GetMapDataParams(BaseSchema):
+    """Query parameters for retrieving packaged GeoJSON maps.
+
+    Example:
+        ```python
+        params = GetMapDataParams(mapName="germany_map_states")
+        ```
+    """
+    mapName: MapName
+
+
+class DatasetsMetadataParams(BaseSchema):
+    """Query parameters for retrieving localized datasets metadata.
+
+    Example:
+        ```python
+        params = DatasetsMetadataParams(LANGID="en", relationName="observations")
+        ```
+    """
+    LANGID: LangCode = "en"
+    relationName: Optional[str] = ""
+
+
+class GetImageParams(BaseSchema):
+    """Query parameters for reading a packaged JPEG image.
+
+    Example:
+        ```python
+        params = GetImageParams(imagePath="sample.jpg")
+        ```
+    """
+    imagePath: ImagePath
+
+
+class CellChartDataParams(BaseSchema):
+    """Query parameters for fetching cell-level chart data.
+
+    Example:
+        ```python
+        params = CellChartDataParams(chart="enso", cellID=42)
+        ```
+    """
+    chart: Literal["enso", "uncertainty"]
+    cellID: CellId
+    dataset: Optional[str] = "seas5_forecast_albopictus_habitat_probability"
+    locale: Optional[str] = None
+
+
+class UncertaintySvgParams(BaseSchema):
+    """Query parameters for rendering cell-level SVG plots.
+
+    Example:
+        ```python
+        params = UncertaintySvgParams(
+            filename="climate_forecast_cell.svg",
+            cellID=42,
+            dataset="seas5_forecast_albopictus_habitat_probability",
+        )
+        ```
+    """
+    filename: str = Field(min_length=1)
+    cellID: CellId
+    dataset: Optional[str] = "seas5_forecast_albopictus_habitat_probability"
+    month: Optional[str] = None
+    locale: Optional[str] = None
+
+
 @swag_from('API_docs/get_upload_status.yml')
 @app.route("/api/uploadStatus", methods=["GET"])
 def getUploadStatus():
+    """Return shared progress and errors for one upload ID.
+
+    The ``id`` query parameter is required; an absent ID receives HTTP 400.
+    Status falls back to process-local state when Redis is unavailable;
+    missing or expired IDs receive default values. See
+    ``API_docs/get_upload_status.yml`` for the public response fields.
+    """
     # Combined progress + error state for one upload, polled by the frontend.
     # Read-only: state is initialized by the setFilesToDB route and written
     # only by the backend during processing.
-    upload_id = request.args.get("id", "")
-    if not upload_id:
-        return jsonify({"ERROR": "Missing 'id' query parameter"}), 400
-    return jsonify(upload_state.get_status(upload_id))
-
-
-# test route to database 
-@app.route("/api/db", methods=["GET", "POST"])
-async def db():
-    async def main() -> None:
-        print("Testing DB connection:")
-        print("DATABASE_URL:", database_url)
-        
-        # Check if User table exists
-        try:
-            users_query = await query_raw("SELECT * FROM \"User\"")
-        except Exception as e:
-            # Table might not exist, create it
-            await execute_raw("""
-                CREATE TABLE IF NOT EXISTS "User" (
-                    id SERIAL PRIMARY KEY,
-                    email VARCHAR UNIQUE,
-                    name VARCHAR,
-                    password VARCHAR
-                )
-            """)
-            users_query = []
-        
-        print("db" + str(users_query))
-        for element in dummyDBdata:
-            # Check if user exists
-            found = await query_raw("SELECT * FROM \"User\" WHERE email = %s", (element['email'],))
-            if found and len(found) > 0:
-                print("Email already exists: {}".format(element["email"]))
-                continue
-            else:
-                await execute_raw("""
-                    INSERT INTO "User" (email, name, password) 
-                    VALUES (%s, %s, %s)
-                """, (element["email"], element["name"], element["password"]))
-        
-        # Get updated users list
-        users_query = await query_raw("SELECT * FROM \"User\"")
-        return jsonify(users_query)
-
-    return await main()
-
-
-@swag_from('API_docs/get_compressed_json.yml')
-@app.route("/api/get_compressed_json", methods=["GET"])
-async def get_compressed_json():
-    url = ""
-    data = []
-    if request.method == "GET":
-        url = request.args.get("url", "")
-        print("url", url)
-    if url == "":
-        return jsonify({"error": "ERROR: No URL provided!"}), 400
     try:
-        response = requests.get(str(url))
-        # Decompress the response content
-        decompressed_data = lzma.decompress(response.content)
-
-        # Decode the decompressed data as JSON
-        json_data = decompressed_data.decode("utf-8")
-
-        # Parse the JSON data
-        data = json.loads(json_data)
-
-    except Exception as e:
-        print("ERROR reading data: get_compressed_json", e)
-        return jsonify({"error": "ERROR reading JSON file: get_compressed_json " + str(e)}), 500
-
-    return jsonify(data)
+        params = UploadStatusParams.model_validate({"id": request.args.get("id")})
+    except ValidationError:
+        return jsonify({"error": "Missing 'id' query parameter"}), 400
+    return jsonify(upload_state.get_status(params.id))
 
 
 @swag_from('API_docs/get_map_data.yml')
 @app.route("/api/getMapData", methods=["GET"])
 def getMap():
-    mapName = request.args.get("mapName")
-    if not mapName:
-        return jsonify({"error": "ERROR: No mapName provided!"}), 400
+    """Serve one packaged GeoJSON map selected by the ``mapName`` query field.
+
+    Unknown names return HTTP 404; missing names return HTTP 400. Map names
+    are resolved through a fixed local asset registry.
+    """
+    try:
+        params = GetMapDataParams.model_validate({"mapName": request.args.get("mapName")})
+    except ValidationError:
+        return jsonify({"error": "No mapName provided!"}), 400
 
     # Mapping of map names to their respective paths
     map_paths = {
@@ -255,64 +267,73 @@ def getMap():
         "capitals": dataPaths.capitals
     }
 
-    if mapName not in map_paths:
-        return jsonify({"error": f"ERROR: Map '{mapName}' not found!"}), 404
+    if params.mapName not in map_paths:
+        return jsonify({"error": f"Map '{params.mapName}' not found!"}), 404
 
     try:
-        data = load_TAR_GZ_JSON(map_paths[mapName])
+        data = load_TAR_GZ_JSON(map_paths[params.mapName])
         return jsonify(data)
     except Exception as e:
-        print(f"ERROR reading map data for {mapName}:", e)
-        return jsonify({"error": f"ERROR reading map data for {mapName}: " + str(e)}), 500
+        print(f"Error reading map data for {params.mapName}:", e)
+        return jsonify({"error": f"Error reading map data for {params.mapName}: {e}"}), 500
 
 
 def load_TAR_GZ_JSON(path):
-    try:
-        # Open the tar.gz file
-        with tarfile.open(path, "r:gz") as tar:
-            # Get the 2. member (since the first one is binary meta dadta from mac os causing decoding errors...)
-            member = tar.getmembers()[1]
-            file = tar.extractfile(member)
-            content = file.read()
-            json_data = content.decode("utf-8")
-    except Exception as e:
-        raise e
-    # Parse the JSON data
-    data = json.loads(json_data)
+    """Decode the GeoJSON payload from a packaged ``.tgz`` map.
+
+    Args:
+        path: Archive path selected by the map asset registry.
+
+    Returns:
+        Parsed JSON content of the selected archive member.
+
+    macOS metadata entries and directories are ignored. Both conventional
+    ``.json`` and ``.geojson`` member names are supported.
+    """
+    with tarfile.open(path, "r:gz") as tar:
+        members = [
+            member
+            for member in tar.getmembers()
+            if member.isfile()
+            and not Path(member.name).name.startswith("._")
+            and member.name.lower().endswith((".json", ".geojson"))
+        ]
+        if not members:
+            raise ValueError(f"No GeoJSON file found in {path}")
+
+        file = tar.extractfile(members[0])
+        if file is None:
+            raise ValueError(f"Could not extract GeoJSON from {path}")
+        data = json.loads(file.read().decode("utf-8"))
+
     return data
 
-@swag_from('API_docs/get_list_of_datasets.yml')
-@app.route("/api/get_list_of_datasets", methods=["GET"])
-def getListOfDatasets():
-    data = {}
-    try:
-        for filename in os.listdir(dataPaths.data_sets):
-            if filename.endswith(".csv"):
-                key = os.path.splitext(filename)[0]
-                data[key] = os.path.join(dataPaths.data_sets, filename)
-    except Exception as e:
-        print("ERROR reading directory: get_list_of_datasets", e)
-        data = {"ERROR": "ERROR reading directory: get_list_of_datasets" + str(e)}
-    json_data = json.dumps(data)
-    return json_data
-
 def _load_metadata_from_db(lang: str, relation_name: str = "") -> dict:
-    """Query column_metadata_{lang} and return a dict keyed by column_name.
-        {
-          "<column_name>": {
-              "valuename": "...",
-              "datatype":  "...",
-              "dimension": "...",
-              "description": "...",
-              "availability": "..."
-          },
-          ...
+    """Query ``column_metadata_<lang>`` and return a dict keyed by ``column_name``.
+
+    Args:
+        lang: Two-letter metadata language code (``'en'`` or ``'de'``).
+        relation_name: Optional relation filter; empty string loads all rows.
+
+    Returns:
+        Dictionary mapping each ``column_name`` to its metadata record.
+
+    Example:
+        ```python
+        record = {
+            "mean": {
+                "valuename": "mean",
+                "datatype": "float",
+                "dimension": "probability",
+                "description": "Habitat suitability",
+                "availability": "1",
+            }
         }
+        ```
     """
     table = f"column_metadata_{lang}"
-    conn_params = get_db_connection_params()
     data: dict[str, dict] = {}
-    with psycopg.connect(**conn_params) as conn:
+    with get_db_connection() as conn:
         with conn.cursor() as cur:
             if relation_name:
                 query = psycopg_sql.SQL(
@@ -346,79 +367,174 @@ def _load_metadata_from_db(lang: str, relation_name: str = "") -> dict:
 @swag_from('API_docs/get_datasets_metadata.yml')
 @app.route("/api/get_datasets_metaData", methods=["GET"])
 def getDatasetsMetadata():
-    LANGID: str = request.args.get("LANGID", "en").lower()
-    relation_name: str = request.args.get("relationName", "")
-    if LANGID not in ("en", "de"):
-        return jsonify({"ERROR": f"Invalid lang '{LANGID}'. Use 'en' or 'de'."}), 400
+    """Return localized column metadata, falling back from PostgreSQL to CSV.
+
+    ``LANGID`` accepts ``en`` or ``de`` and defaults to ``en``. An optional
+    ``relationName`` limits the database lookup. Invalid locales return 400;
+    database errors trigger the maintained CSV fallback.
+    """
+    raw_lang: str = (request.args.get("LANGID") or "en").lower()
+    raw_relation: str = request.args.get("relationName", "")
+
     try:
-        data = _load_metadata_from_db(LANGID, relation_name)
+        params = DatasetsMetadataParams.model_validate({
+            "LANGID": raw_lang,
+            "relationName": raw_relation,
+        })
+    except ValidationError:
+        return jsonify({"error": f"Invalid lang '{raw_lang}'. Use 'en' or 'de'."}), 400
+
+    try:
+        data = _load_metadata_from_db(params.LANGID, params.relationName)
         if not data:
             # Fallback to CSV if no DB rows found (graceful transition)
-            data = loadMetadataCSV(LANGID)
+            data = loadMetadataCSV(params.LANGID)
     except Exception as e:
-        print("ERROR reading metadata: get_datasets_metaData", e)
+        print("Error reading metadata: get_datasets_metaData", e)
         # Fallback to CSV on DB error
         try:
-            data = loadMetadataCSV(LANGID)
+            data = loadMetadataCSV(params.LANGID)
         except Exception as csv_err:
-            data = {"ERROR": "ERROR reading metadata: " + str(e) + " | CSV fallback also failed: " + str(csv_err)}
+            data = {"error": f"Error reading metadata: {e} | CSV fallback also failed: {csv_err}"}
     return json.dumps(data)
 
 
 @swag_from('API_docs/get_image.yml')
 @app.route("/api/get_image", methods=["GET"])
 def get_image():
-    image_os_path = ""
-    if request.method == "GET":
-        image_path = request.args["imagePath"]
-        image_os_path = os.path.join(dataPaths.images, image_path)
-        print("image_path", image_os_path)
-    if not image_os_path or not os.path.exists(image_os_path):
-        return jsonify({"ERROR": "Invalid or missing image path"}), 400
+    """Read an image from the configured image directory as JPEG bytes.
+
+    The ``imagePath`` query field names the requested file. Missing files
+    return HTTP 400 and read failures return HTTP 500.
+    """
+    try:
+        params = GetImageParams.model_validate({"imagePath": request.args.get("imagePath")})
+    except ValidationError:
+        return jsonify({"error": "Invalid or missing image path"}), 400
+
+    image_os_path = os.path.join(dataPaths.images, params.imagePath)
+    print("image_path", image_os_path)
+    if not os.path.exists(image_os_path):
+        return jsonify({"error": "Invalid or missing image path"}), 400
 
     try:
         with open(image_os_path, "rb") as image_file:
             image_data = image_file.read()
         return image_data, 200, {"Content-Type": "image/jpeg"}
     except Exception as e:
-        print("ERROR reading image file: load_image", e)
-        return jsonify({"ERROR": "ERROR reading image file: load_image" + str(e)}), 500
+        print("Error reading image file: load_image", e)
+        return jsonify({"error": f"Error reading image file load_image: {e}"}), 500
+
+
+@app.route("/api/get_cell_chart_data", methods=["GET"])
+@swag_from('API_docs/get_cell_chart_data.yml')
+def get_cell_chart_data():
+    """Validate, cache, and return one cell's chart data as strict JSON."""
+    try:
+        params = CellChartDataParams.model_validate({
+            "chart": request.args.get("chart"),
+            "cellID": request.args.get("cellID"),
+            "dataset": request.args.get(
+                "dataset", "seas5_forecast_albopictus_habitat_probability"
+            ),
+            "locale": request.args.get("locale"),
+        })
+    except ValidationError as err:
+        loc = err.errors()[0]["loc"][0] if err.errors() else "chart"
+        return jsonify({"error": f"Invalid or missing {loc}"}), 400
+
+    if params.chart == "enso":
+        if params.dataset not in {
+            "seas5_forecast_albopictus_habitat_probability",
+            "seas5_forecast_aegypti_habitat_probability",
+        }:
+            return jsonify({"error": "Invalid dataset"}), 400
+        locale = normalize_enso_locale(params.locale)
+        cache_key = f"json:enso:v1:{locale}:{params.dataset}:{params.cellID}"
+        scopes = (params.dataset,)
+    else:
+        dataset_template = "t_2024_monthly_mean_{month}_ocsvm_aegypti_predictions_2023_mod_sim"
+        cache_key = f"json:uq:v1:{params.cellID}"
+        scopes = tuple(dataset_template.format(month=m) for m in range(1, 13))
+    try:
+        data = response_cache.get(cache_key)
+        if data is None:
+            if params.chart == "enso":
+                data = build_ENSO_suitability_data(
+                    cell_id=params.cellID, dataset_template=params.dataset, locale=locale
+                )
+            else:
+                data = build_uncertainty_chart_data(
+                    row_id=params.cellID, dataset_template=dataset_template,
+                    months_range=range(1, 13),
+                )
+            if data is not None:
+                response_cache.set(
+                    cache_key, data, scopes=scopes,
+                    size_bytes=len(json.dumps(data, allow_nan=False)),
+                )
+    except Exception:
+        app.logger.exception("Cell chart data generation failed")
+        return jsonify({"error": "Cell chart data generation failed"}), 500
+    if data is None:
+        return jsonify({"error": f"No data found for cellID {params.cellID}"}), 404
+    response = jsonify(data)
+    response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 @app.route("/api/get_uncertainty_svg", methods=["GET"])
+@swag_from('API_docs/get_uncertainty_svg.yml')
 def get_uncertainty_svg():
-    """Render and serve an ENSO or UQ SVG without shared temporary files."""
-    filename = request.args.get("filename", "")
-    raw_cell_id = request.args.get("cellID")
-    try:
-        cell_id = int(raw_cell_id) if raw_cell_id and raw_cell_id != "NaN" else -1
-    except (ValueError, TypeError):
-        cell_id = -1
-    if cell_id < 0:
-        return jsonify({"ERROR": "Invalid or missing cellID"}), 400
+    """Render an ENSO suitability or uncertainty SVG for one grid cell.
 
+    ``cellID`` must be a nonnegative integer. ``filename`` selects the ENSO
+    forecast plot (``climate_forecast_cell.svg``) or one of the seasonal
+    uncertainty and calibration plots. ENSO requests also accept ``dataset``,
+    ``month``, and ``locale``. Rendered bytes are cached by plot inputs and
+    served as ``image/svg+xml`` without shared temporary files.
+
+    Invalid cell IDs or filenames return HTTP 400, missing UQ data returns
+    404, and rendering failures return 500. Successful responses use
+    ``Cache-Control: no-cache``; the process cache may still serve the SVG.
+    """
     uq_plot_types = {
         "seasonal_uncertainty_cell.svg": "uncertainty",
         "seasonal_calibration_cell.svg": "calibration",
     }
+    raw_filename = request.args.get("filename", "")
+    if raw_filename != "climate_forecast_cell.svg" and raw_filename not in uq_plot_types:
+        return jsonify({"error": "Invalid or missing filename"}), 400
 
     try:
-        if filename == "climate_forecast_cell.svg":
-            dataset = request.args.get(
+        params = UncertaintySvgParams.model_validate({
+            "filename": raw_filename,
+            "cellID": request.args.get("cellID"),
+            "dataset": request.args.get(
                 "dataset",
                 "seas5_forecast_albopictus_habitat_probability",
-            )
-            month = request.args.get("month")
-            locale = normalize_enso_locale(request.args.get("locale"))
+            ),
+            "month": request.args.get("month"),
+            "locale": request.args.get("locale"),
+        })
+    except ValidationError as err:
+        loc = err.errors()[0]["loc"][0] if err.errors() else "parameter"
+        return jsonify({"error": f"Invalid or missing {loc}"}), 400
+
+    try:
+        if params.filename == "climate_forecast_cell.svg":
+            dataset = params.dataset or "seas5_forecast_albopictus_habitat_probability"
+            month = params.month
+            locale = normalize_enso_locale(params.locale)
             normalized_month = month.lower() if month else "all"
-            cache_key = f"svg:enso:v6:{locale}:{dataset}:{cell_id}:{normalized_month}"
+            cache_key = f"svg:enso:v6:{locale}:{dataset}:{params.cellID}:{normalized_month}"
             svg_data = response_cache.get(cache_key)
             if svg_data is None:
                 with SVG_RENDER_LOCK:
                     svg_data = response_cache.get(cache_key)
                     if svg_data is None:
                         svg_data = render_ENSO_suitability_svg(
-                            cell_id=cell_id,
+                            cell_id=params.cellID,
                             dataset_template=dataset,
                             active_month=month,
                             locale=locale,
@@ -429,23 +545,23 @@ def get_uncertainty_svg():
                             scopes=(dataset,),
                             size_bytes=len(svg_data),
                         )
-        elif filename in uq_plot_types:
-            plot_type = uq_plot_types[filename]
+        elif params.filename in uq_plot_types:
+            plot_type = uq_plot_types[params.filename]
             dataset_template = "t_2024_monthly_mean_{month}_ocsvm_aegypti_predictions_2023_mod_sim"
-            cache_key = f"svg:uq:v1:{cell_id}:{plot_type}"
+            cache_key = f"svg:uq:v1:{params.cellID}:{plot_type}"
             svg_data = response_cache.get(cache_key)
             if svg_data is None:
                 with SVG_RENDER_LOCK:
                     svg_data = response_cache.get(cache_key)
                     if svg_data is None:
                         rendered = render_uncertainty_svgs(
-                            row_id=cell_id,
+                            row_id=params.cellID,
                             dataset_template=dataset_template,
                             months_range=range(1, 13),
                         )
                         scopes = tuple(dataset_template.format(month=m) for m in range(1, 13))
                         for rendered_type, rendered_svg in rendered.items():
-                            rendered_key = f"svg:uq:v1:{cell_id}:{rendered_type}"
+                            rendered_key = f"svg:uq:v1:{params.cellID}:{rendered_type}"
                             response_cache.set(
                                 rendered_key,
                                 rendered_svg,
@@ -454,18 +570,19 @@ def get_uncertainty_svg():
                             )
                         svg_data = rendered.get(plot_type)
             if svg_data is None:
-                return jsonify({"ERROR": f"No data found for cellID {cell_id}"}), 404
+                return jsonify({"error": f"No data found for cellID {params.cellID}"}), 404
         else:
-            return jsonify({"ERROR": "Invalid or missing filename"}), 400
+            return jsonify({"error": "Invalid or missing filename"}), 400
     except Exception:
         app.logger.exception("SVG generation failed")
-        return jsonify({"ERROR": "SVG generation failed"}), 500
+        return jsonify({"error": "SVG generation failed"}), 500
 
     response = Response(svg_data, mimetype="image/svg+xml")
     response.headers["Cache-Control"] = "no-cache"
     return response
 
 @app.route('/health')
+@swag_from('API_docs/health.yml')
 def health():
     """Simple health check endpoint."""
     return {"status": "healthy"}, 200
@@ -473,11 +590,13 @@ def health():
 
 # --- Cache management endpoints ---
 @app.route("/api/cache/stats", methods=["GET"])
+@swag_from('API_docs/cache_stats.yml')
 def cache_stats():
     """Return current cache statistics (hits, misses, size, etc.)."""
     return jsonify(response_cache.stats())
 
 @app.route("/api/cache/clear", methods=["POST"])
+@swag_from('API_docs/cache_clear.yml')
 def cache_clear():
     """Manually flush the entire response cache."""
     response_cache.clear()

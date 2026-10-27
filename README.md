@@ -1,3 +1,5 @@
+# ICV
+
 <div align="center">
 
 <img src="public/iconHighDetail.svg" alt="ICV Logo" width="200" />
@@ -67,6 +69,26 @@ npm install
 npm run dev
 ```
 
+## Documentation
+
+The documentation portal is available at `/en/docs` and `/de/docs` and is separated by audience:
+
+- **User Guide:** task-oriented product guidance in English and German.
+- **Developer Guide:** architecture, engineering practices, REST reference, and generated TypeScript API in English.
+
+```bash
+# regenerate the public TypeScript API reference
+npm run docs:api
+
+# regenerate the API reference and start the documentation locally
+npm run docs:dev
+
+# regenerate documentation and run the TypeScript check
+npm run docs:check
+```
+
+Do not edit files under `content/docs/developer-guide/api/typescript` manually. Update TSDoc or `src/framework/index.ts` and regenerate them instead.
+
 page available at: [http://localhost:3000](http://localhost:3000) (see terminal log)
 
 > [!NOTE]
@@ -75,22 +97,21 @@ page available at: [http://localhost:3000](http://localhost:3000) (see terminal 
 >* DATABASE_URL_SECRET="postgresql://icv_user:<DB_PASSWORD>@icv-database:5333/icv-database?schema=public"
 >* DB_PASSWORD_SECRET="<DB_PASSWORD>"
 
-To debug or develop the backend, use two terminals (one for the backend and one for the frontend and database):
+To run the frontend and backend in separate terminals while debugging:
 ```bash
 # 1. terminal:
 npm run flask-dev
 
 # 2. terminal
-npm run dev
+npm run next-dev
 ```
 
-## Production Build
+## Local Start from a Production Build
+
+Build the Next.js frontend, then start it together with the local Flask backend. The backend startup also starts the database container, as in `npm run dev`:
 
 ```bash
-#Build your app: 
 npm run build
-
-#Run your app: 
 npm run start
 ```
 
@@ -131,9 +152,11 @@ npm run start
 ## Inspect the Database
 
 ```bash
-# starts db & opens prisma studio 
+# starts the database and the read-only pgweb browser
 npm run db-view
 ```
+
+The database browser opens at [http://127.0.0.1:8081](http://127.0.0.1:8081). It is bound to the local machine and is not started by the regular `docker compose up` command.
 
 ## General Info
 
@@ -162,5 +185,5 @@ This project uses many open-source libraries and components. For a comprehensive
 - **Backend:** Flask, NumPy, PostgreSQL drivers (BSD-3-Clause)
 - **UI Components:** Radix UI, Recharts, D3, Leaflet
 - **Icons:** Font Awesome (CC BY 4.0), Game Icons (CC BY 3.0)
-- **Utilities:** Swapy (GPL-3.0), Prisma (Apache-2.0)
+- **Utilities:** Swapy (GPL-3.0), pgweb (MIT, development only)
 

@@ -1,7 +1,7 @@
 tags:
   - REST Endpoints
 summary: Get list of database tables
-description: Retrieves a list of all available database relations (tables) in the public schema, excluding system tables like 'Test' and 'User'.
+description: Retrieves available dataset relations in the public schema, excluding application and extension relations such as 'Test', 'User', 'column_metadata_en', and 'pg_stat_statements'.
 responses:
   200:
     description: Successful response with dictionary of table names

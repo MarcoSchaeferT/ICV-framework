@@ -2,14 +2,40 @@ import { useState } from "react";
 import Image from 'next/image'
 import { BlogPostProps } from "./BlogPosts"
 
-/** Article collection and selected image index for `ImageBlogPostHandler`. */
+/**
+ * Article collection and selected image index for `ImageBlogPostHandler`.
+ *
+ * @example
+ * ```ts
+ * const imageProps: ImageBlogPostHandlerProps = {
+ *   postsData: [{
+ *     title: "Dengue virus",
+ *     content: "Dengue is transmitted by infected Aedes mosquitoes.",
+ *     imageUrl: "/viruses/Dengue_Virus.png",
+ *   }],
+ *   index: 0,
+ * };
+ * ```
+ */
 interface ImageBlogPostHandlerProps {
+    /** Localized article records containing image and provenance fields. */
     postsData: BlogPostProps[];
+    /** Zero-based index of the article image to render. */
     index: number;
 }
 
-/** Optional provenance URL displayed while hovering an article image. */
+/**
+ * Optional provenance URL displayed while hovering an article image.
+ *
+ * @example
+ * ```ts
+ * const tooltip: ImageTooltipProps = {
+ *   sourceURL: "https://www.rcsb.org/3d-view/1K4R/1",
+ * };
+ * ```
+ */
 interface ImageTooltipProps {
+    /** Optional link to the image's source or structure record. */
     sourceURL?: string;
 }
 
@@ -55,8 +81,8 @@ export function ImageBlogPostHandler({ postsData: postData, index}: ImageBlogPos
 /**
  * A component that displays a tooltip with the given image source URL.
  *
- * @param {string} props.sourceURL - The URL of the image to be displayed in the tooltip.
- * @returns {JSX.Element} The rendered tooltip component.
+ * @param props - Contains the optional image source URL displayed in the tooltip.
+ * @returns The rendered tooltip component.
  */
 function ImageTooltip({ sourceURL }: ImageTooltipProps) {
     return (

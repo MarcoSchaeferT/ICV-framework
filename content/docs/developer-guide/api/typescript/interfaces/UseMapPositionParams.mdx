@@ -1,0 +1,55 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: UseMapPositionParams
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Parameters for the [useMapPosition](../functions/useMapPosition) hook.
+
+## Example
+
+```ts
+import type { UseMapPositionParams } from "@/framework";
+
+const berlinViewport: UseMapPositionParams = {
+  map: null,
+  latitude: 52.52,
+  longitude: 13.405,
+  zoom: 6,
+};
+```
+
+## Properties
+
+### map
+
+> **map**: `Map` \| `null`
+
+Target Leaflet map instance
+
+***
+
+### latitude
+
+> **latitude**: `number`
+
+Target viewport latitude coordinate in degrees
+
+***
+
+### longitude
+
+> **longitude**: `number`
+
+Target viewport longitude coordinate in degrees
+
+***
+
+### zoom
+
+> **zoom**: `number`
+
+Target map zoom level

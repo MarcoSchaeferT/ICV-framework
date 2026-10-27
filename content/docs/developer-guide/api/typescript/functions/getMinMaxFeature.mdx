@@ -1,0 +1,40 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: getMinMaxFeature
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **getMinMaxFeature**(`data`): \[`number`, `number`\]
+
+Computes the minimum and maximum feature numerical values across a dataset array.
+
+## Parameters
+
+### data
+
+`object`[]
+
+Array of dataset objects containing numerical `feature` properties.
+
+## Returns
+
+\[`number`, `number`\]
+
+`[min, max]`; empty input returns `[0, 0]`, and a constant
+dataset uses zero as its lower bound.
+
+## See
+
+[ColorMapLegend](../variables/ColorMapLegend) for color scale domain calculation.
+
+## Example
+
+```ts
+import { getMinMaxFeature } from "@/framework";
+
+const [min, max] = getMinMaxFeature([{ feature: 0.12 }, { feature: 0.89 }]);
+// Returns [0.12, 0.89]
+```

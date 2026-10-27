@@ -18,12 +18,30 @@ import { Textarea } from "@/components/ui/textarea";
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
-/** Editable localized scientific metadata for one database column. */
+/**
+ * Editable localized scientific metadata for one database column.
+ *
+ * @example
+ * ```ts
+ * const metadata: ColumnMeta = {
+ *   columnName: "mosquito_amount",
+ *   datatype: "int",
+ *   dimension: "observations",
+ *   description: "Aedes albopictus observations",
+ *   availability: 1,
+ * };
+ * ```
+ */
 interface ColumnMeta {
+  /** Database column identifier. */
   columnName: string;
+  /** Backend datatype name. */
   datatype: string;
+  /** Physical or count unit displayed with the field. */
   dimension: string;
+  /** Localized explanation of the field. */
   description: string;
+  /** Backend availability marker for the column. */
   availability: number;
 }
 
@@ -43,7 +61,7 @@ const DATATYPE_OPTIONS = ["string", "float", "int", "date"];
 export default function MetadataEditorPage() {
   const t = useTranslations("page_metadata");
   const locale = useLocale();
-  const { setIsDemoModeDialogOpen, demoMode } = useUIContext();
+  const { setIsDemoModeDialogOpen, demoMode, configReady } = useUIContext();
 
   // ── state ──────────────────────────────────────────────────────────
   const [relations, setRelations] = useState<string[]>([]);
@@ -58,14 +76,25 @@ export default function MetadataEditorPage() {
   // ── load relations list ────────────────────────────────────────────
   useEffect(() => {
     fetch(apiRoutes.GET_LIST_OF_DATASETS)
-      .then((r) => r.json())
-      .then((data) => {
-        const names = Object.keys(data).filter(
-          (n) => n !== "User" && n !== "Test" && !n.startsWith("column_metadata_")
-        );
-        setRelations(names.sort());
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) {
+          throw new Error(data?.error || `HTTP ${r.status}`);
+        }
+        return data;
       })
-      .catch(console.error);
+      .then((data) => {
+        if (data && typeof data === "object") {
+          const names = Object.keys(data).filter(
+            (n) => n !== "User" && n !== "Test" && !n.startsWith("column_metadata_")
+          );
+          setRelations(names.sort());
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+        setFeedback({ type: "error", msg: err instanceof Error ? err.message : "Failed to load datasets" });
+      });
   }, []);
 
   // ── build rows from DB columns + saved metadata ───────────────────
@@ -95,23 +124,33 @@ export default function MetadataEditorPage() {
   // ── load metadata + columns when relation or lang changes ─────────
   useEffect(() => {
     if (!selectedRelation) return;
-    setLoading(true);
-    setFeedback(null);
+    const controller = new AbortController();
 
     const fetchAll = async () => {
       try {
+        setFeedback(null);
         // Fetch column names for the relation
         const colsRes = await fetch(
-          apiRoutes.fetchDbColumnNames({ relationName: selectedRelation })
+          apiRoutes.fetchDbColumnNames({ relationName: selectedRelation }),
+          { signal: controller.signal }
         );
-        const allCols: string[] = await colsRes.json();
-        const dbCols = allCols.filter((c) => c !== "id");
+        const allCols: any = await colsRes.json();
+        if (!colsRes.ok || !Array.isArray(allCols)) {
+          const errDetail = allCols?.error || `Failed to fetch columns (HTTP ${colsRes.status})`;
+          throw new Error(errDetail);
+        }
+        const dbCols = allCols.filter((c: string) => c !== "id");
 
         // Fetch existing saved metadata
         const metaRes = await fetch(
-          apiRoutes.columnMetadata({ relationName: selectedRelation, lang: lang as "en" | "de" })
+          apiRoutes.columnMetadata({ relationName: selectedRelation, lang: lang as "en" | "de" }),
+          { signal: controller.signal }
         );
-        const metaData: any[] = await metaRes.json();
+        const metaData: any = await metaRes.json();
+        if (!metaRes.ok || !Array.isArray(metaData)) {
+          const errDetail = metaData?.error || `Failed to fetch column metadata (HTTP ${metaRes.status})`;
+          throw new Error(errDetail);
+        }
         const savedMeta: ColumnMeta[] = Array.isArray(metaData)
           ? metaData.map((d) => ({
               columnName: d.column_name,
@@ -122,15 +161,19 @@ export default function MetadataEditorPage() {
             }))
           : [];
 
-        buildRows(dbCols, savedMeta);
-      } catch (e) {
-        console.error(e);
+        if (!controller.signal.aborted) buildRows(dbCols, savedMeta);
+      } catch (e: any) {
+        if (!controller.signal.aborted) {
+          console.error(e);
+          setFeedback({ type: "error", msg: e instanceof Error ? e.message : String(e) });
+        }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 
-    fetchAll();
+    void fetchAll();
+    return () => controller.abort();
   }, [selectedRelation, lang, buildRows]);
 
   // ── update a single field ──────────────────────────────────────────
@@ -140,6 +183,7 @@ export default function MetadataEditorPage() {
 
   // ── save all ───────────────────────────────────────────────────────
   const handleSave = async () => {
+    if (!configReady) return;
     if (demoMode) {
       setIsDemoModeDialogOpen(true);
       return;
@@ -158,7 +202,7 @@ export default function MetadataEditorPage() {
         }),
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setFeedback({ type: "success", msg: t("saveSuccess") });
       } else {
         setFeedback({ type: "error", msg: data.error || t("saveError") });
@@ -183,7 +227,11 @@ export default function MetadataEditorPage() {
           {/* Relation */}
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-gray-600">{t("relation")}</label>
-            <Select value={selectedRelation} onValueChange={setSelectedRelation}>
+            <Select value={selectedRelation} onValueChange={(value) => {
+              setSelectedRelation(value);
+              setLoading(true);
+              setFeedback(null);
+            }}>
               <SelectTrigger className="w-72">
                 <SelectValue placeholder={t("selectRelation")} />
               </SelectTrigger>
@@ -200,7 +248,13 @@ export default function MetadataEditorPage() {
           {/* Language */}
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-gray-600">{t("language")}</label>
-            <Select value={lang} onValueChange={(v) => setLang(v as "en" | "de")}>
+            <Select value={lang} onValueChange={(value) => {
+              setLang(value as "en" | "de");
+              if (selectedRelation) {
+                setLoading(true);
+                setFeedback(null);
+              }
+            }}>
               <SelectTrigger className="w-36">
                 <SelectValue />
               </SelectTrigger>
@@ -215,7 +269,7 @@ export default function MetadataEditorPage() {
           <div className="flex-1" />
 
           {/* Save */}
-          <Button onClick={handleSave} disabled={!selectedRelation || saving}>
+          <Button onClick={handleSave} disabled={!configReady || !selectedRelation || saving}>
             {saving ? t("saving") : t("save")}
           </Button>
         </div>

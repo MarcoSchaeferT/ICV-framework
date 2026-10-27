@@ -1,3 +1,5 @@
+"""Accept streamed CSV uploads and schedule their database ingestion."""
+
 from flask import request, jsonify, Blueprint
 from pathlib import Path
 import os
@@ -27,6 +29,11 @@ _bg_loop_pid = None
 _bg_loop_lock = Lock()
 
 def _get_bg_loop() -> asyncio.AbstractEventLoop:
+  """Return a running background event loop owned by the current worker.
+
+  Gunicorn preloads modules before forking, so a PID change discards an
+  inherited loop and starts a new daemon thread in the child process.
+  """
   global _bg_loop, _bg_loop_pid
   with _bg_loop_lock:
     if _bg_loop is None or _bg_loop_pid != os.getpid():
@@ -41,6 +48,17 @@ def _get_bg_loop() -> asyncio.AbstractEventLoop:
 @swag_from('../../API_docs/set_files_to_db.yml')
 @route_setFilesToDB.route("", methods=[ "POST"])
 async def setFilesToDB():
+  """Stream multipart files into an upload-specific work directory.
+
+  ``DirectUploadRequest`` writes file parts to disk while Flask parses the
+  request. The route initializes Redis-backed status (or local fallback)
+  before returning ``upload_id`` and schedules sequential ingestion in a
+  worker-local event loop. The HTTP response means processing started, not
+  that the database write succeeded.
+  Invalid or unsaved files return an error and remove the work directory.
+  The client polls ``/api/uploadStatus?id=<upload_id>`` for completion or a
+  background error. The work directory is removed after either outcome.
+  """
   from backend.index import dataPaths 
   if request.method == "POST":
     # Configure the final work directory before request.files triggers
@@ -54,11 +72,11 @@ async def setFilesToDB():
     print(request.files)
     if "files" not in request.files:
       shutil.rmtree(upload_dir, ignore_errors=True)
-      return jsonify({"ERROR": "No files part in the request"}), 400
+      return jsonify({"error": "No files part in the request"}), 400
     files = request.files.getlist("files")
     if not files:
       shutil.rmtree(upload_dir, ignore_errors=True)
-      return jsonify({"ERROR": "No selected files"}), 400
+      return jsonify({"error": "No selected files"}), 400
     
     # Multipart parsing has already streamed every file into upload_dir.
     saved_files = []
@@ -80,11 +98,11 @@ async def setFilesToDB():
         except Exception as e:
           # Clean up on error
           shutil.rmtree(upload_dir, ignore_errors=True)
-          return jsonify({"ERROR": "Error finalizing file: " + str(e)}), 500
+          return jsonify({"error": f"Error finalizing file: {str(e)}"}), 500
     
     if not saved_files:
       shutil.rmtree(upload_dir, ignore_errors=True)
-      return jsonify({"ERROR": "No files were saved"}), 400
+      return jsonify({"error": "No files were saved"}), 400
     
     # Initialize the shared progress/error state for this upload BEFORE
     # returning the upload_id, so the client can poll it immediately.
@@ -93,13 +111,18 @@ async def setFilesToDB():
     # Start background processing and return immediately
     # Frontend will poll /api/uploadStatus?id=<upload_id> for status
     async def process_files():
+      """Ingest the saved files sequentially and always remove the work area.
+
+      The batch reaches 100 percent only after all files succeed. Errors are
+      recorded in shared upload state and stop further files in the batch.
+      """
       try:
         for file_path in saved_files:
           try:
             print(f"Processing file: {file_path}")
             error = await uploadFileToDB(file_path, upload_id)
             if error:
-              detail = error.get("ERROR") if isinstance(error, dict) else str(error)
+              detail = error.get("error") if isinstance(error, dict) else str(error)
               upload_state.set_error(upload_id, f"Error processing {file_path}: {detail}")
               print(f"Error processing file: {file_path}: {detail}")
               return

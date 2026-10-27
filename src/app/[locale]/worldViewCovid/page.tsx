@@ -1,40 +1,38 @@
 
 "use client";
 
-import { useRef, createRef, useEffect, useState } from 'react'
+import { useRef, useEffect } from 'react'
 import {apiRoutes } from "@/app/api_routes";
-import React from 'react';
-import { InterfaceContextProvider, useInterfaceContext, interfaceContextI } from '@/components/contexts/InterfaceContext';
+import { InterfaceContextProvider } from '@/components/contexts/InterfaceContext';
+import { useRkiPreparation } from '@/app/hooks/useRkiPreparation';
 import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
 import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '@/components/plots/maps/LeafD3Map';
 import { availableColorMapsNames } from '@/components/plots/maps/constants';
 import { createSwapy, Swapy } from 'swapy';
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { t_richConfig } from "@/app/const_store";
-import * as d3 from 'd3';
 import { useUIContext } from '@/components/contexts/UIContext';
 import { ViewMainInfoComponent } from '@/components/ViewPageMainInfo';
 import { MDXContentProvider } from '@messages/markdown/MDXContentProvider';
 import { Locale } from '@/i18n/routing';
-import { useLocale } from 'next-intl';
-
-
-const isSWAPY = true;
 
 /**
- * Renders the world COVID-19 linked-view dashboard.
+ * Renders the world COVID-19 linked-view Vis. Interface.
  *
  * @returns Localized world map and companion analytical cards.
+ * @remarks Requests the RKI state aggregate before mounting the maps.
+ * If preparation fails, the maps remain available with a warning and their
+ * existing fallback for Germany values.
  */
 export default function Home() {
+  const UI_contextT = useUIContext();
+  const t = useTranslations("page_covidWorldView");
+  const locale = useLocale() as Locale;
+  let md = MDXContentProvider[locale];
+  const { status: aggregationStatus, error: aggregationError, retry: retryAggregation } = useRkiPreparation(true);
 
-const t = useTranslations("page_covidWorldView");
-const locale = useLocale() as Locale;
-let md = MDXContentProvider[locale];
-
- const UI_contextT = useUIContext();
- const layoutSizes = UI_contextT.layoutDims;
+  const layoutSizes = UI_contextT.layoutDims;
 
   // set up the map props
   let worldMapProsp = LeafD3MapLayerProps();
@@ -114,16 +112,13 @@ let md = MDXContentProvider[locale];
 
 
 
-  // intitialize data table context
-  useInterfaceContext();
-
    // set up swapy (client side only)
      const swapyRef = useRef<Swapy | null>(null)
      const swapContainerRef = useRef<HTMLDivElement>(null)
      useEffect(() => {
        const container =swapContainerRef.current;
        console.log("container", container)
-       if(isSWAPY && container) {
+       if (container) {
          swapyRef.current = createSwapy(container,{
            animation: 'dynamic', // dynamic or spring or none
            manualSwap: false,
@@ -132,14 +127,14 @@ let md = MDXContentProvider[locale];
            // dragAxis: 'x',
            // dragOnHold: true
          })
-         swapyRef.current?.enable(isSWAPY)
+         swapyRef.current.enable(true)
    
          return () => {
            // Destroy the swapy instance on component destroy
            swapyRef.current?.destroy()
          }
        };
-     }, []);
+     }, [aggregationStatus]);
   
 
   // build the page
@@ -156,6 +151,14 @@ let md = MDXContentProvider[locale];
       <main className="flex max-h-fit flex-col items-center justify-between " style={{paddingTop: layoutSizes.gapSize}}>
       <InterfaceContextProvider>
       <ViewMainInfoComponent heading={t('mainInfo.heading')} mdxContent={md.pages.CovidWorldView.mainInfo} />
+        {aggregationStatus === 'loading' && <p role="status" className="p-6">{t('preparing')}</p>}
+        {aggregationStatus === 'error' && (
+          <div role="alert" className="p-6">
+            <p>{t('preparationError')}: {aggregationError}</p>
+            <button type="button" className="mt-2 underline" onClick={retryAggregation}>{t('retry')}</button>
+          </div>
+        )}
+        {aggregationStatus !== 'loading' && <>
         {/*** START: grid layout ***/}
         <div ref={swapContainerRef} className={`w-full grid grid-cols-6 `} style={{
               gridTemplateRows: `repeat(auto-fill, minmax(${layoutSizes.rowSpanSize}vh, ${layoutSizes.rowSpanSize}vh))`,
@@ -171,6 +174,7 @@ let md = MDXContentProvider[locale];
               <SGridPlotCard rowColSpan={[9,2]}  cardProps={d3MapCardProps2_overveiwDetail}><LeafD3MapLayerComponent props={mapPropsWorld2}/></SGridPlotCard>
 
             </div>
+        </>}
       </InterfaceContextProvider>
       </main>
     </>

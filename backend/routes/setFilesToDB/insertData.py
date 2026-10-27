@@ -1,3 +1,5 @@
+"""Stream CSV rows into PostgreSQL COPY while reporting upload progress."""
+
 from os import listdir
 import os
 import time
@@ -9,7 +11,14 @@ from psycopg import sql
 
 
 async def insertData(data: ParsedData, upload_id: str) -> int | None:
-    """Insert CSV data using PostgreSQL COPY and return the inserted row count."""
+    """Stream CSV rows through PostgreSQL COPY and report database progress.
+
+    The CSV header order and resolved SQL types determine each COPY row.
+    Progress uses bytes consumed and stops at 99 percent; the upload route
+    sets 100 only after the whole file batch succeeds. On success, return the
+    inserted row count and remove this file. On failure, record the error in
+    upload state and return ``None``.
+    """
     from backend.upload_state import NO_ERROR, upload_state
 
     print(f"Starting COPY insert into {data.db_name}")

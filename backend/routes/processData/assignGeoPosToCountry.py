@@ -1,3 +1,9 @@
+"""Assign country ISO codes to uploaded geometries in bounded SQL batches.
+
+The worker caches a world-map spatial index per process, streams source rows
+from PostgreSQL, and applies country matches through a temporary update table.
+"""
+
 import json
 import os
 import sys
@@ -36,6 +42,11 @@ _MAX_GEOM_STR_LEN = 1_000
 
 
 def get_db_connection_params() -> dict:
+    """Parse ``DATABASE_URL`` for this standalone country-assignment worker.
+
+    Local runs translate the Docker hostname ``icv-database`` to ``localhost``.
+    A missing URL raises ``ValueError``.
+    """
     database_url = os.getenv("DATABASE_URL", "")
     if not database_url:
         raise ValueError("DATABASE_URL not set.")
@@ -50,7 +61,7 @@ def get_db_connection_params() -> dict:
         host = host_port
         port = "5432"
 
-    if os.getenv("IS_DOCKER", "false").lower() != "true" and host == "davis-db":
+    if os.getenv("IS_DOCKER", "false").lower() != "true" and host == "icv-database":
         host = "localhost"
 
     return {
@@ -63,6 +74,10 @@ def get_db_connection_params() -> dict:
 
 
 def load_world_map(path: Path):
+    """Read the first GeoJSON member from a compressed world-map archive.
+
+    Raises ``ValueError`` when no readable GeoJSON member is present.
+    """
     with tarfile.open(path, "r:gz") as tar:
         members = [
             member
@@ -80,9 +95,9 @@ def load_world_map(path: Path):
 
 @lru_cache(maxsize=1)
 def _load_country_index():
-    """Load the immutable country map and spatial index once per worker."""
+    """Index the world map used by the map endpoint once per worker."""
     backend_dir = Path(__file__).parent.parent.parent
-    world_map_path = backend_dir / "assets" / "worldmap_lowRes.geo.json.tgz"
+    world_map_path = backend_dir / "assets" / "worldmap_midRes.geo.json.tgz"
     world_data = load_world_map(world_map_path)
 
     polygons = []
@@ -90,8 +105,18 @@ def _load_country_index():
     admin_names = []
     for feature in world_data["features"]:
         polygons.append(shape(feature["geometry"]))
-        iso_codes.append(feature["properties"].get("iso_a3"))
-        admin_names.append(feature["properties"].get("admin"))
+        properties = feature["properties"]
+        iso_codes.append(
+            properties.get("iso_a3")
+            or properties.get("ISO_A3")
+            or properties.get("ISO3166-1-Alpha-3")
+        )
+        admin_names.append(
+            properties.get("admin")
+            or properties.get("ADMIN")
+            or properties.get("name")
+            or properties.get("NAME")
+        )
 
     tree = STRtree(polygons)
     geometry_indices = {id(geometry): index for index, geometry in enumerate(polygons)}
@@ -200,6 +225,11 @@ def _scalar_updates(
 
 
 def _country_updates(rows, country_index):
+    """Match one database batch to countries with a scalar compatibility path.
+
+    Vectorized Shapely matching is attempted first. A failure is logged and
+    retried with per-geometry matching rather than aborting the upload.
+    """
     tree, polygons, iso_codes, admin_names, geometry_indices = country_index
     if hasattr(shapely, "from_wkt") and hasattr(tree, "query"):
         try:
@@ -252,6 +282,21 @@ def assign_geo_pos_to_country(
     progress_callback: Optional[Callable[[int, int], None]] = None,
     total_rows: Optional[int] = None,
 ):
+    """Write ``iso_a3`` and ``admin`` for geometries in a PostgreSQL table.
+
+    Args:
+        table_name: Relation containing ``id`` and ``geometry`` columns.
+        skip_existing: Update only rows with no country code when true.
+        progress_callback: Optional callback receiving processed and total rows.
+        total_rows: Known row count; otherwise queried from PostgreSQL.
+
+    Returns:
+        Number of rows matched and updated with a country.
+
+    The function adds missing country columns, streams rows in batches, and
+    commits each update batch. Very complex polygons are skipped to bound
+    memory use; metadata update failures are logged but do not stop matching.
+    """
     print("Loading cached world map index...")
     country_index = _load_country_index()
     params = get_db_connection_params()

@@ -13,10 +13,10 @@ import { t_richConfig } from '@/app/const_store';
  *   title: "Dengue virus serotypes",
  *   column_2: "Aedes mosquitoes",
  *   content: "DENV-1 through DENV-4 are represented in the sequence dataset.",
- *   imageUrl: "/images/dengue-serotypes.jpg",
- *   imageCaption: "Dengue serotype overview",
- *   sourceURL: "https://example.org/dengue-image-source",
- *   textSourceURL: "https://example.org/dengue-reference",
+ *   imageUrl: "/viruses/Dengue_Virus.png",
+ *   imageCaption: "Dengue virus structure",
+ *   sourceURL: "https://www.rcsb.org/3d-view/1K4R/1",
+ *   textSourceURL: "https://www.who.int/news-room/fact-sheets/detail/dengue-and-severe-dengue",
  * };
  * ```
  */

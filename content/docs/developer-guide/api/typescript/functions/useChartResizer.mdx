@@ -1,0 +1,83 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: useChartResizer
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **useChartResizer**(`chartName`): `object`
+
+Dynamic container resizing hook for ICV Vis. Interface plot cards.
+
+Traverses up the DOM tree starting from an element with ID `chartName` until it locates the outer Vis. Interface card container
+(`.gridPlotCardContent`). Tracks element pixel width and height changes.
+
+## Parameters
+
+### chartName
+
+`string`
+
+DOM element ID string identifying the chart container.
+
+## Returns
+
+`object`
+
+Object containing `dimensions` (`{ width, height }`), `setSizes` state dispatcher, parent `element` node, and mutable `sizeRef`.
+
+### dimensions
+
+> **dimensions**: `object`
+
+#### dimensions.width
+
+> **width**: `number` = `0`
+
+#### dimensions.height
+
+> **height**: `number` = `0`
+
+### setSizes
+
+> **setSizes**: `Dispatch`\<`SetStateAction`\<\{ `width`: `number`; `height`: `number`; \}\>\>
+
+### element
+
+> **element**: `HTMLElement` \| `null`
+
+### sizeRef
+
+> **sizeRef**: `RefObject`\<\{ `width`: `number`; `height`: `number`; \} \| `undefined`\>
+
+## Remarks
+
+**Card Resizer Pipeline:**
+Combined with `<SizeHook />` (`src/app/hooks/useResizeObserver.tsx`), this hook allows visualization widgets (maps, bar charts, line plots)
+to automatically resize when Vis. Interface layout grid cards are resized or swapped by `swapy`.
+
+## See
+
+ - [SizeHook](SizeHook) for the accompanying ResizeObserver component helper.
+ - [useMapResize](useMapResize) for debounced Leaflet size invalidation consuming these dimensions.
+ - [LeafD3MapLayerProps](LeafD3MapLayerProps) for the Leaflet layer contract consuming container resizes.
+
+## Example
+
+```tsx
+import { useChartResizer, SizeHook } from "@/framework";
+
+function HabitatMapCard() {
+  const { dimensions, setSizes, element, sizeRef } = useChartResizer("habitat-map");
+  return (
+    <div className="gridPlotCardContent">
+      <div id="habitat-map">
+        <SizeHook element={element} sizeRef={sizeRef} setSize={setSizes} />
+        <span>{dimensions.width} × {dimensions.height} px</span>
+      </div>
+    </div>
+  );
+}
+```

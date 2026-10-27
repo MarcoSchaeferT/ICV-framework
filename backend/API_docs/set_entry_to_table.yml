@@ -1,9 +1,14 @@
 tags:
   - REST Endpoints
 summary: Insert a new entry into a database table
-description: Inserts a new row into the specified database table with the provided column values. Automatically creates the feedback_csv table if it doesn't exist when inserting feedback data.
+description: >-
+  Inserts one row using the submitted form field names as column names and
+  their values as bound SQL parameters. At least one field besides relationName
+  is required. The feedback_csv and page_visits relations are created on demand;
+  other relations must already exist.
 consumes:
   - multipart/form-data
+  - application/x-www-form-urlencoded
 parameters:
   - name: relationName
     in: formData
@@ -11,11 +16,6 @@ parameters:
     required: true
     type: string
     example: "feedback_csv"
-  - name: additionalFields
-    in: formData
-    description: Additional form fields representing column names and their values. Field names should match column names in the target table.
-    required: false
-    type: string
 responses:
   200:
     description: Data successfully inserted into the table
@@ -24,12 +24,9 @@ responses:
         schema:
           type: object
           properties:
-            success:
-              type: boolean
-              example: true
-            message:
+            SUCCESS:
               type: string
-              example: "Data inserted successfully"
+              example: "Form data submitted successfully"
   400:
     description: Bad request - missing or invalid parameters
     content:
@@ -50,4 +47,14 @@ responses:
             ERROR:
               type: string
               description: Detailed error message including the SQL error.
-              example: "ERROR inserting data into table: syntax error at or near 'INSERT'"
+              example: "Error inserting data into table: invalid input syntax"
+  404:
+    description: The named relation does not exist.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            ERROR:
+              type: string
+              example: "Table 'missing_table' does not exist. Please create the table first."

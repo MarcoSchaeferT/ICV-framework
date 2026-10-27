@@ -1,0 +1,29 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: DataTableRow
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **DataTableRow**\<`TData`\> = `Row`\<[`DataTableFeatures`](DataTableFeatures), `TData`\>
+
+TanStack row carrying the project's feature set and a relation-specific record.
+
+## Type Parameters
+
+### TData
+
+`TData` *extends* `RowData` = [`DataTableData`](DataTableData)
+
+Original record shape; defaults to [DataTableData](DataTableData).
+
+## Example
+
+```ts
+import type { DataTableRow } from "@/framework";
+function selectedSpecies(row: DataTableRow<{ species: string }>): string {
+  return row.original.species;
+}
+```

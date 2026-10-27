@@ -1,7 +1,13 @@
 tags:
   - REST Endpoints
 summary: Get data from database
-description: Retrieves data from a specified database relation (table) with support for filtering, feature scanning, aggregation, and various data retrieval tasks.
+description: >-
+  Retrieves rows or aggregate results from a database relation. Successful
+  results and many validation/query errors use the same HTTP 200 envelope;
+  check its error field. Successful responses may be gzip-compressed and
+  include X-Cache, Vary, and X-Uncompressed-Length headers. Reads never
+  refresh derived relations; call POST /api/processData/aggregateRKI first
+  when a new RKI aggregate is needed.
 parameters:
   - name: relationName
     in: query
@@ -12,7 +18,10 @@ parameters:
       example: "MosquitoPresenceData"
   - name: feature
     in: query
-    description: Name of the feature (column) to fetch. Use `*` at the end for feature scan (e.g., 'species*'). Use 'ALL' to fetch all columns.
+    description: >-
+      Column to fetch. A trailing * scans a numbered feature series; ALL
+      selects all columns. When omitted, the middle column is selected, except
+      a compact grid selects a numeric feature.
     required: false
     schema:
       type: string
@@ -26,23 +35,29 @@ parameters:
       example: "date,temperature"
   - name: limit
     in: query
-    description: Maximum rows returned for a `features` request. Defaults to 100, is capped at 10000, and accepts -1 for explicit unbounded debug mode.
+    description: >-
+      Row limit for a features request. Defaults to 100, values above 10000
+      are capped at 10000, and -1 explicitly disables the limit.
     required: false
     schema:
       type: integer
-      minimum: -1
-      maximum: 10000
       example: 100
   - name: filterBy
     in: query
-    description: Column name(s) to filter the data by. Multiple values can be provided.
+    description: >-
+      Filter column names in the legacy quoted-list format, for example
+      'country','year'. Pair with filterValue in the same order. Ignored when
+      features contains at least one column.
     required: false
     schema:
       type: string
       example: "species"
   - name: filterValue
     in: query
-    description: Value(s) to filter by. Can be a string, integer, or number. Must correspond to filterBy parameter.
+    description: >-
+      Filter values in the legacy quoted-list format, paired with filterBy.
+      ALL or an empty value skips that filter. Ignored when features contains
+      at least one column.
     required: false
     schema:
       type: string
@@ -63,24 +78,68 @@ parameters:
       type: string
       format: date
       example: "2020-12-31"
-  - name: task
+  - name: targetDate
     in: query
-    description: Special task to perform on the data. Options include 'getUniqueEntries', 'getCount', or leave blank for standard retrieval.
+    description: >-
+      Snapshot date for relations with a date or datenstand column. Single
+      feature and compact-grid reads choose the latest datenstand at or before
+      this date; ALL-column reads require an exact date match.
     required: false
     schema:
       type: string
-      enum: ["getUniqueEntries", "getCount"]
-      example: "getCount"
+      format: date
+      example: "2020-12-31"
+  - name: task
+    in: query
+    description: >-
+      Optional aggregate or set operation executed on a single feature. Supported values:
+      - `getUniqueEntries`: Distinct feature values as an array of {feature}. When querying a date column, extracts distinct years.
+      - `getMinMax`: Minimum and maximum values as {min_val, max_val}.
+      - `getCount`: Frequency count per feature value as an array of {feature, count}. Respects filterBy/filterValue.
+      - `getGroupedCount`: Frequency count per feature grouped by category as an array of {feature, category, count}. Requires groupBy.
+      An omitted or unrecognized task follows the standard single-feature row query path.
+    required: false
+    schema:
+      type: string
+      enum:
+        - getUniqueEntries
+        - getMinMax
+        - getCount
+        - getGroupedCount
+      example: "getUniqueEntries"
+  - name: groupBy
+    in: query
+    description: Existing column used as the secondary category for getGroupedCount (required when task=getGroupedCount).
+    required: false
+    schema:
+      type: string
+      example: "species"
+  - name: responseFormat
+    in: query
+    description: >-
+      Set to map-grid-v1 for a compact map response. Its response object
+      contains aligned id, lat0..lat3, lng0..lng3, and feature arrays;
+      featureName, cellSize, anchorOffset, featureRange, and rowCount provide
+      metadata. Each latitude/longitude pair describes the same cell corner.
+      This format requires a geometry column.
+    required: false
+    schema:
+      type: string
+      enum: ["map-grid-v1"]
   - name: aggregation_level
     in: query
-    description: Level of data aggregation (optional, used for filtering by aggregation level).
+    description: Optional aggregation level used as an equality filter when supported by the selected query path.
     required: false
     schema:
       type: string
       example: "0"
 responses:
   200:
-    description: Successful response with queried data
+    description: >-
+      Query result or an error in the common envelope. The response value
+      varies by feature, task, and responseFormat. Multi-column features
+      requests set isTruncated and rowLimit; compact maps use the
+      map-grid-v1 object described above.
     content:
       application/json:
         schema:
@@ -97,12 +156,11 @@ responses:
               description: Column names in the relation
               example: ["id", "latitude", "longitude", "species", "date"]
             response:
-              type: object
-              description: The actual data retrieved from the database
+              description: Rows, aggregate values, or compact map-grid data; null on some errors.
             error:
               type: string
               nullable: true
-              description: Error message if any occurred during query
+              description: Null on success, otherwise a validation or query error message.
             isTruncated:
               type: boolean
               description: Whether a multi-column response contains only the first `rowLimit` rows.
@@ -111,34 +169,4 @@ responses:
               nullable: true
               description: Applied row limit for a multi-column request.
   400:
-    description: Validation error in the request parameters.
-    content:
-      application/json:
-        schema:
-          type: object
-          properties:
-            relationName:
-              type: string
-            header:
-              type: array
-            response:
-              type: object
-            error:
-              type: string
-              description: Error message with validation details
-  500:
-    description: Internal server error during database query
-    content:
-      application/json:
-        schema:
-          type: object
-          properties:
-            relationName:
-              type: string
-            header:
-              type: array
-            response:
-              type: object
-            error:
-              type: string
-              description: Detailed error message about the database query failure
+    description: Missing required relationName query parameter (Flask request parsing).

@@ -1,0 +1,163 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: ColorMapLegendProps
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Properties for the [ColorMapLegend](../variables/ColorMapLegend) component.
+
+## Example
+
+```ts
+import type { ColorMapLegendProps } from "@/framework";
+
+const legend: ColorMapLegendProps = {
+  chartId: "albopictus-habitat-map",
+  colorMapType: "interpolateInferno",
+  minVal: 0,
+  maxVal: 1,
+  selectedFeature: "mean",
+  metaData: {
+    mean: { valuename: "mean", dimension: "probability", description: "Habitat suitability", availability: "2024" },
+  },
+  layerOpacity: 0.85,
+  locale: "en",
+};
+```
+
+## Properties
+
+### chartId
+
+> **chartId**: `string`
+
+Unique DOM ID suffix for the SVG linearGradient definition preventing collisions across multi-map layouts
+
+***
+
+### colorMapType
+
+> **colorMapType**: `string`
+
+Sequential D3 color map key (e.g. "interpolateInferno", "interpolateViridis", "interpolateRdBu")
+
+***
+
+### minVal
+
+> **minVal**: `number`
+
+Raw minimum feature data value before metadata unit scaling
+
+***
+
+### maxVal
+
+> **maxVal**: `number`
+
+Raw maximum feature data value before metadata unit scaling
+
+***
+
+### selectedFeature
+
+> **selectedFeature**: `string`
+
+Name of the active dataset column feature
+
+***
+
+### metaData
+
+> **metaData**: [`MetadataRecord`](../type-aliases/MetadataRecord)
+
+Metadata dictionary specifying units, scaling factors, and dimension labels
+
+***
+
+### layerOpacity
+
+> **layerOpacity**: `number`
+
+Map layer opacity (0 to 1) applied to SVG gradient stop stops
+
+***
+
+### locale
+
+> **locale**: `string`
+
+BCP-47 locale identifier for localized number formatting (e.g. "en", "de")
+
+***
+
+### width?
+
+> `optional` **width?**: `number`
+
+Outer SVG width in pixels.
+
+#### Default Value
+
+```ts
+5
+```
+
+***
+
+### height?
+
+> `optional` **height?**: `number`
+
+Outer SVG height in pixels.
+
+#### Default Value
+
+```ts
+160
+```
+
+***
+
+### barWidth?
+
+> `optional` **barWidth?**: `number`
+
+Width of the vertical color gradient bar in pixels.
+
+#### Default Value
+
+```ts
+10
+```
+
+***
+
+### isVisible?
+
+> `optional` **isVisible?**: `boolean`
+
+Visibility toggle flag.
+
+#### Default Value
+
+```ts
+true
+```
+
+***
+
+### tickCount?
+
+> `optional` **tickCount?**: `number`
+
+Target number of axis ticks along the color scale.
+
+#### Default Value
+
+```ts
+5
+```

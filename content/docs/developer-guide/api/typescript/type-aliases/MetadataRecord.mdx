@@ -1,0 +1,36 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: MetadataRecord
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **MetadataRecord** = `object`
+
+Metadata dictionary mapping feature column names to physical dimension units, descriptions, and dataset availability metadata.
+
+## Index Signature
+
+\[`valuename`: `string`\]: `object`
+
+## See
+
+ - [alignFeature\_to\_Metadata](../functions/alignFeature_to_Metadata) for feature unit transformation.
+ - [ColorMapLegend](../variables/ColorMapLegend) for legend scale rendering consuming metadata.
+
+## Example
+
+```ts
+import type { MetadataRecord } from "@/framework";
+
+const habitatMetadata: MetadataRecord = {
+  mean: {
+    valuename: "mean",
+    dimension: "probability",
+    description: "Aedes albopictus habitat suitability",
+    availability: "2024-01 to 2024-12",
+  },
+};
+```

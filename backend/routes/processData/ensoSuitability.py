@@ -1,12 +1,15 @@
 """
-Backend route handler for ENSO Suitability static visualization generator.
-Generates static SVG/PNG plots containing 5 panels (4 climatic factors + habitat
-suitability) with ERA5 2000-2025 reference (mean ±1 std) and SEAS5 forecast for a
-selected grid cell from the seas5_forecast_* database tables.
+Generate ENSO suitability visualizations for a selected grid cell.
+
+The five-panel SVG/PNG plots show four climatic factors and habitat
+suitability, comparing the ERA5 2000-2025 reference with SEAS5 forecasts
+from the ``seas5_forecast_*`` relations. The HTTP route lives in
+``backend.index``.
 """
 
 from functools import lru_cache
 import json
+import math
 
 import numpy as np
 import matplotlib
@@ -175,6 +178,119 @@ except ImportError:
 # Main visualization generator
 # ==============================================================================
 
+def _build_enso_panels(row: dict, text: dict) -> list[tuple[str, str, np.ndarray, np.ndarray, np.ndarray, list[tuple[int, int, str]]]]:
+    """Build the five plot series; forecast tuples retain year and month across New Year."""
+    fc_items = _forecast_prob_items(row)
+    fc_labels = [f"{year}_{month:02d}" for year, month, _ in fc_items]
+    panels = []
+    for variable in CLIMATE_VARS:
+        ref_mean, ref_std = _build_ref_series(row, variable)
+        fc_vals = _build_fc_series(row, variable, fc_labels)
+        if variable == "tp":
+            # Precipitation is stored in m/day and displayed in mm/day.
+            ref_mean, ref_std, fc_vals = (
+                ref_mean * 1000.0, ref_std * 1000.0, fc_vals * 1000.0
+            )
+        panels.append((variable, text["climateVariables"][variable], ref_mean, ref_std, fc_vals, fc_items))
+
+    suit_ref_mean, suit_ref_std = _build_ref_suitability_series(row)
+    suit_fc_vals = np.array([
+        float(row[column]) if row.get(column) is not None else np.nan
+        for _, _, column in fc_items
+    ])
+    panels.append((
+        "suitability", text["suitability"], suit_ref_mean * 100.0,
+        suit_ref_std * 100.0, suit_fc_vals * 100.0, fc_items,
+    ))
+    return panels
+
+
+def _json_number(value: float) -> float | None:
+    """Return null for missing/nonfinite database values, which JSON cannot encode."""
+    number = float(value)
+    return number if math.isfinite(number) else None
+
+
+def build_ENSO_suitability_data(
+    cell_id: int,
+    dataset_template: str = "seas5_forecast_albopictus_habitat_probability",
+    locale: str = "en",
+) -> dict | None:
+    """Read one cell and return localized, JSON-safe monthly ENSO chart data.
+
+    Reference values have twelve calendar-month positions. Forecast values retain
+    their chronological year/month, so a December-to-January window is unambiguous.
+    Temperature, dewpoint, and wind retain their stored units; precipitation is
+    mm/day and suitability is percent. Missing data is represented by null.
+
+    Example:
+        ```python
+        payload = {
+            "version": "enso-suitability-v1",
+            "cellID": 200509,
+            "dataset": "seas5_forecast_albopictus_habitat_probability",
+            "coordinates": {"latitude": 52.5, "longitude": 13.25},
+            "months": [{"month": 1, "label": "Jan"}],
+            "title": "Climate Suitability & Drivers",
+            "referenceLegend": "ERA5 2000-2025 (±1 SD)",
+            "forecastLegend": "SEAS5 Forecast",
+            "panels": [
+                {
+                    "key": "suitability",
+                    "label": "Habitat Suitability [%]",
+                    "reference": [{"month": 1, "mean": 12.4, "std": 3.1, "lower": 9.3, "upper": 15.5}],
+                    "forecast": [{"year": 2026, "month": 8, "value": 64.2}],
+                }
+            ],
+        }
+        ```
+    """
+    row = _fetch_forecast_cell_row(cell_id, dataset_template)
+    if row is None:
+        return None
+    text = _load_plot_text(locale)
+    latitude, longitude = extract_centroid(row)
+    panels = []
+    for key, label, ref_mean, ref_std, fc_vals, fc_items in _build_enso_panels(row, text):
+        reference = []
+        for month, (mean, std) in enumerate(zip(ref_mean, ref_std), start=1):
+            low = mean - std
+            high = mean + std
+            reference.append({
+                "month": month,
+                "mean": _json_number(mean),
+                "std": _json_number(std),
+                "lower": _json_number(low),
+                "upper": _json_number(high),
+            })
+        panels.append({
+            "key": key,
+            "label": label,
+            "reference": reference,
+            "forecast": [
+                {"year": year, "month": month, "value": _json_number(value)}
+                for (year, month, _), value in zip(fc_items, fc_vals)
+            ],
+        })
+
+    return {
+        "version": "enso-suitability-v1",
+        "cellID": cell_id,
+        "dataset": dataset_template,
+        "coordinates": {
+            "latitude": _json_number(latitude),
+            "longitude": _json_number(longitude),
+        },
+        "months": [
+            {"month": index, "label": text["months"][key]}
+            for index, key in enumerate(MONTH_KEYS, start=1)
+        ],
+        "title": text["title"],
+        "referenceLegend": text["reference_legend"],
+        "forecastLegend": text["forecast_legend"],
+        "panels": panels,
+    }
+
 def _build_enso_figure(
     cell_id: int,
     row: dict | None,
@@ -196,36 +312,19 @@ def _build_enso_figure(
                 transform=ax.transAxes, ha='center', va='center', fontsize=14)
         return fig
 
-    # forecast_{mon}_{year} columns, chronological — fc_labels feed the
-    # climate series ({var}_fc_YYYY_MM), fc_months the X-axis positions
-    fc_items = _forecast_prob_items(row)
-    fc_labels = [f"{y}_{m:02d}" for y, m, _ in fc_items]
-    fc_months = [m for _, m, _ in fc_items]  # 1-based calendar months
+    panels = _build_enso_panels(row, text)
+    fc_months = [month for _, month, _ in panels[0][-1]]
 
-    # Build data series for each of the 5 panels
-    panels: list[tuple[str, np.ndarray, np.ndarray, np.ndarray, list[int]]] = []
-
-    # 4 climate variables
-    for var in CLIMATE_VARS:
-        label = text["climateVariables"][var]
-        ref_mean, ref_std = _build_ref_series(row, var)
-        fc_vals = _build_fc_series(row, var, fc_labels)
-        if var == "tp":
-            # Convert precipitation from m/day to mm/day (1 m = 1000 mm)
-            ref_mean = ref_mean * 1000.0
-            ref_std = ref_std * 1000.0
-            fc_vals = fc_vals * 1000.0
-        panels.append((label, ref_mean, ref_std, fc_vals, fc_months))
-
-    # Suitability columns from the shared rolling ENSO schema.
-    suit_ref_mean, suit_ref_std = _build_ref_suitability_series(row)
-    suit_fc_vals = np.array([
-        float(row[c]) if row.get(c) is not None else np.nan
-        for c in (c for _, _, c in fc_items)
-    ])
-    # Convert habitat suitability probability (0.0 - 1.0) to percentage (0% - 100%)
-    panels.append((text["suitability"], suit_ref_mean * 100.0, suit_ref_std * 100.0,
-                   suit_fc_vals * 100.0, fc_months))
+    print(f"panels (total: {len(panels)}):", flush=True)
+    for idx, (_, label, ref_mean, ref_std, fc_vals, panel_fc_items) in enumerate(panels):
+        print(
+            f"Panel {idx} [{label}]:\n"
+            f"  ref_mean:        {ref_mean}\n"
+            f"  ref_std:         {ref_std}\n"
+            f"  fc_vals:         {fc_vals}\n"
+            f"  panel_fc_months: {[month for _, month, _ in panel_fc_items]}",
+            flush=True,
+        )
 
     # Highlight the forecast month selected in the UI (optional "month" query
     # param, e.g. "aug") — only when it lies inside the forecast window.
@@ -242,7 +341,7 @@ def _build_enso_figure(
     fig, axes = plt.subplots(1, n_panels, figsize=(5.5 * n_panels, 6))
     coord = extract_centroid(row)
 
-    for col, (title, ref_mean, ref_std, fc_vals, fc_months) in enumerate(panels):
+    for col, (_, title, ref_mean, ref_std, fc_vals, _) in enumerate(panels):
         ax = axes[col]
 
         # Blue reference line with ±1 std band

@@ -1,7 +1,7 @@
 'use client'
 
 import { JSX, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion } from 'motion/react'
 import { Menu, Icon, Pin, Hand, } from 'lucide-react'
 import {LINK} from '@messages/navbarContent'
 import { cn } from "@/lib/utils"
@@ -11,9 +11,21 @@ import { layoutSizes } from '@/app/const_store'
 import Checkbox_isSwapy from './SwapyHandle'
 import { useUIContext } from '../contexts/UIContext'
 
-/** Localized navigation links and initial expanded-state hint. */
+/**
+ * Localized navigation links and initial expanded-state hint.
+ *
+ * @example
+ * ```ts
+ * const dengueNav: nav = {
+ *   navLinks: [{ icon: null, title: "Dengue Vis. Interface", href: "/worldView", group: "dengue" }],
+ *   isOpen: true,
+ * };
+ * ```
+ */
 interface nav {
+    /** Entries available to the left navigation. */
     navLinks: LINK[];
+    /** Initial expanded-state hint. */
     isOpen: boolean;
 }
 

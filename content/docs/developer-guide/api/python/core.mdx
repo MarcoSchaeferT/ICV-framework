@@ -1,0 +1,1424 @@
+---
+title: Core & Infrastructure
+description: Flask entry point, multi-worker response cache, Redis upload state, and Gunicorn worker lifecycle.
+---
+
+Flask entry point, multi-worker response cache, Redis upload state, and Gunicorn worker lifecycle.
+
+## `backend/index.py`
+
+Create the Flask API, register routes, and serve map and metadata assets.
+
+Importing this module configures Flasgger, resolves packaged asset paths,
+registers blueprints, and attempts to ensure both column metadata tables.
+Gunicorn preloads it before forking, so database pools and Redis clients are
+opened lazily in workers. Upload progress and response-cache invalidation
+use Redis when available, with process-local fallbacks.
+
+### `DataPaths`
+
+```python
+class DataPaths
+```
+
+Resolve packaged assets and temporary upload storage from this module.
+
+`data_sets_save_location` holds per-upload work directories; it is not
+a durable dataset catalog. PostgreSQL holds the imported relation data.
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"germany_map_states": {"type": "Path", "required": true}, "germany_map_districts": {"type": "Path", "required": true}, "world_map": {"type": "Path", "required": true}, "capitals": {"type": "Path", "required": true}, "data_sets_save_location": {"type": "Path", "required": true}, "images": {"type": "Path", "required": true}, "meta_data": {"type": "Path", "required": true}, "usa_map": {"type": "Path", "required": true}}} />
+
+#### `DataPaths.__init__`
+
+```python
+def __init__(self)
+```
+
+Resolve backend asset paths relative to this module.
+
+### `hello_world`
+
+**HTTP Endpoint:** `GET` `/api/python`
+
+```python
+@app.route('/api/python')
+def hello_world()
+```
+
+Return the small HTML development landing response at `/api/python`.
+
+### `test`
+
+**HTTP Endpoint:** `GET` `/api/test`
+
+```python
+@app.route('/api/test', methods=['GET'])
+def test()
+```
+
+Return the static JSON diagnostic payload at `/api/test`.
+
+### `UploadStatusParams`
+
+```python
+class UploadStatusParams(BaseSchema)
+```
+
+Query parameters for polling upload progress and status.
+
+
+**Example**
+
+```python
+params = UploadStatusParams(id="550e8400-e29b-41d4-a716-446655440000")
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"id": {"type": "UploadId", "required": true}}} />
+
+### `GetMapDataParams`
+
+```python
+class GetMapDataParams(BaseSchema)
+```
+
+Query parameters for retrieving packaged GeoJSON maps.
+
+
+**Example**
+
+```python
+params = GetMapDataParams(mapName="germany_map_states")
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"mapName": {"type": "MapName", "required": true}}} />
+
+### `DatasetsMetadataParams`
+
+```python
+class DatasetsMetadataParams(BaseSchema)
+```
+
+Query parameters for retrieving localized datasets metadata.
+
+
+**Example**
+
+```python
+params = DatasetsMetadataParams(LANGID="en", relationName="observations")
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"LANGID": {"type": "LangCode", "required": false, "default": "'en'"}, "relationName": {"type": "Optional[str]", "required": false, "default": "''"}}} />
+
+### `GetImageParams`
+
+```python
+class GetImageParams(BaseSchema)
+```
+
+Query parameters for reading a packaged JPEG image.
+
+
+**Example**
+
+```python
+params = GetImageParams(imagePath="sample.jpg")
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"imagePath": {"type": "ImagePath", "required": true}}} />
+
+### `CellChartDataParams`
+
+```python
+class CellChartDataParams(BaseSchema)
+```
+
+Query parameters for fetching cell-level chart data.
+
+
+**Example**
+
+```python
+params = CellChartDataParams(chart="enso", cellID=42)
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"chart": {"type": "Literal['enso', 'uncertainty']", "required": true}, "cellID": {"type": "CellId", "required": true}, "dataset": {"type": "Optional[str]", "required": false, "default": "'seas5_forecast_albopictus_habitat_probability'"}, "locale": {"type": "Optional[str]", "required": false, "default": "None"}}} />
+
+### `UncertaintySvgParams`
+
+```python
+class UncertaintySvgParams(BaseSchema)
+```
+
+Query parameters for rendering cell-level SVG plots.
+
+
+**Example**
+
+```python
+params = UncertaintySvgParams(
+filename="climate_forecast_cell.svg",
+cellID=42,
+dataset="seas5_forecast_albopictus_habitat_probability",
+)
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"filename": {"type": "str", "required": false, "default": "Field(min_length=1)"}, "cellID": {"type": "CellId", "required": true}, "dataset": {"type": "Optional[str]", "required": false, "default": "'seas5_forecast_albopictus_habitat_probability'"}, "month": {"type": "Optional[str]", "required": false, "default": "None"}, "locale": {"type": "Optional[str]", "required": false, "default": "None"}}} />
+
+### `getUploadStatus`
+
+**HTTP Endpoint:** `GET` `/api/uploadStatus` — Get upload status (progress + error) (Utility Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/get_upload_status.yml`
+
+**OpenAPI Request Parameters**
+
+<TypeTable type={{"id (query)": {"type": "string", "required": true, "description": "Upload ID returned by the setFilesToDB endpoint (Example: `3fa85f64-5717-4562-b3fc-2c963f66afa6`)"}}} />
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200", "HTTP 400"]}>
+<Tab value="HTTP 200">
+
+Current status of the upload
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "progress": 75.3,
+  "error": "false",
+  "phase": "country",
+  "has_geometry": true,
+  "db_progress": 82.5,
+  "country_progress": 35.0
+}
+```
+
+</Tab>
+<Tab value="HTTP 400">
+
+Missing id query parameter
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "ERROR": "Missing 'id' query parameter"
+}
+```
+
+</Tab>
+</Tabs>
+
+```python
+@swag_from('API_docs/get_upload_status.yml')
+@app.route('/api/uploadStatus', methods=['GET'])
+def getUploadStatus()
+```
+
+Return shared progress and errors for one upload ID.
+
+The `id` query parameter is required; an absent ID receives HTTP 400.
+Status falls back to process-local state when Redis is unavailable;
+missing or expired IDs receive default values. See
+`API_docs/get_upload_status.yml` for the public response fields.
+
+### `getMap`
+
+**HTTP Endpoint:** `GET` `/api/getMapData` — Get map GeoJSON data by name (Map Data Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/get_map_data.yml`
+
+**OpenAPI Request Parameters**
+
+<TypeTable type={{"mapName (query)": {"type": "string", "required": true, "description": "The identifier for the map data to be retrieved."}}} />
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200", "HTTP 400", "HTTP 404", "HTTP 500"]}>
+<Tab value="HTTP 200">
+
+Successful response with GeoJSON data
+
+</Tab>
+<Tab value="HTTP 400">
+
+Missing mapName.
+
+</Tab>
+<Tab value="HTTP 404">
+
+Unknown mapName.
+
+</Tab>
+<Tab value="HTTP 500">
+
+Internal server error reading map data
+
+</Tab>
+</Tabs>
+
+```python
+@swag_from('API_docs/get_map_data.yml')
+@app.route('/api/getMapData', methods=['GET'])
+def getMap()
+```
+
+Serve one packaged GeoJSON map selected by the `mapName` query field.
+
+Unknown names return HTTP 404; missing names return HTTP 400. Map names
+are resolved through a fixed local asset registry.
+
+### `load_TAR_GZ_JSON`
+
+```python
+def load_TAR_GZ_JSON(path)
+```
+
+Decode the GeoJSON payload from a packaged `.tgz` map.
+
+
+**Returns**
+
+Parsed JSON content of the selected archive member.
+
+macOS metadata entries and directories are ignored. Both conventional
+`.json` and `.geojson` member names are supported.
+
+**Parameters**
+
+<TypeTable type={{"path": {"type": "Any", "required": true, "description": "Archive path selected by the map asset registry."}}} />
+
+### `_load_metadata_from_db`
+
+```python
+def _load_metadata_from_db(lang: str, relation_name: str='') -> dict
+```
+
+Query `column_metadata_<lang>` and return a dict keyed by `column_name`.
+
+
+**Returns**
+
+Dictionary mapping each `column_name` to its metadata record.
+
+
+**Example**
+
+```python
+record = {
+"mean": {
+    "valuename": "mean",
+    "datatype": "float",
+    "dimension": "probability",
+    "description": "Habitat suitability",
+    "availability": "1",
+}
+}
+```
+
+**Parameters**
+
+<TypeTable type={{"lang": {"type": "str", "required": true, "description": "Two-letter metadata language code (`'en'` or `'de'`)."}, "relation_name": {"type": "str", "required": false, "description": "Optional relation filter; empty string loads all rows.", "default": "''"}}} />
+
+### `getDatasetsMetadata`
+
+**HTTP Endpoint:** `GET` `/api/get_datasets_metaData` — Get datasets metadata (Data Management Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/get_datasets_metadata.yml`
+
+**OpenAPI Request Parameters**
+
+<TypeTable type={{"relationName (query)": {"type": "string", "required": false, "description": "Optional relation name used to restrict the PostgreSQL metadata lookup; the CSV fallback is not relation-filtered. (Example: `MosquitoPresenceData`)"}, "LANGID (query)": {"type": "string ('en' | 'de')", "required": false, "description": "Language ID, case-insensitive en or de. Defaults to en. (Example: `en`)"}}} />
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200", "HTTP 400"]}>
+<Tab value="HTTP 200">
+
+JSON-encoded metadata string, or a JSON-encoded object with ERROR if both sources fail.
+
+- **Content-Type:** `text/html`
+
+</Tab>
+<Tab value="HTTP 400">
+
+LANGID is neither en nor de.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "ERROR": "Invalid lang 'fr'. Use 'en' or 'de'."
+}
+```
+
+</Tab>
+</Tabs>
+
+```python
+@swag_from('API_docs/get_datasets_metadata.yml')
+@app.route('/api/get_datasets_metaData', methods=['GET'])
+def getDatasetsMetadata()
+```
+
+Return localized column metadata, falling back from PostgreSQL to CSV.
+
+`LANGID` accepts `en` or `de` and defaults to `en`. An optional
+`relationName` limits the database lookup. Invalid locales return 400;
+database errors trigger the maintained CSV fallback.
+
+### `get_image`
+
+**HTTP Endpoint:** `GET` `/api/get_image` — Get image file (Utility Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/get_image.yml`
+
+**OpenAPI Request Parameters**
+
+<TypeTable type={{"imagePath (query)": {"type": "string", "required": true, "description": "Relative path to the image within the backend images directory. (Example: `mosquito.jpg`)"}}} />
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200", "HTTP 400"]}>
+<Tab value="HTTP 200">
+
+Successful response with JPEG image bytes, or a JSON-encoded ERROR string if reading fails.
+
+- **Content-Type:** `image/jpeg`
+
+</Tab>
+<Tab value="HTTP 400">
+
+Invalid, missing, or directory-traversing imagePath.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "ERROR": "Invalid or missing image path"
+}
+```
+
+</Tab>
+</Tabs>
+
+```python
+@swag_from('API_docs/get_image.yml')
+@app.route('/api/get_image', methods=['GET'])
+def get_image()
+```
+
+Read an image from the configured image directory as JPEG bytes.
+
+The `imagePath` query field names the requested file. Missing files
+return HTTP 400 and read failures return HTTP 500.
+
+### `get_cell_chart_data`
+
+**HTTP Endpoint:** `GET` `/api/get_cell_chart_data` — Get cell-level JSON data for interactive ENSO or uncertainty charts (Cell Charts)
+
+*OpenAPI Specification:* `backend/API_docs/get_cell_chart_data.yml`
+
+**OpenAPI Request Parameters**
+
+<TypeTable type={{"chart (query)": {"type": "string", "required": true, "description": "Chart family to return."}, "cellID (query)": {"type": "integer", "required": true, "description": "Nonnegative database row ID of the selected grid cell."}, "dataset (query)": {"type": "string", "required": false, "description": "For ENSO only; one of the two supported SEAS5 species relations. Defaults to albopictus."}, "locale (query)": {"type": "string", "required": false, "description": "For ENSO labels only; de or en, default en."}}} />
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200", "HTTP 400", "HTTP 404", "HTTP 500"]}>
+<Tab value="HTTP 200">
+
+JSON with Cache-Control no-cache. ENSO uses version
+`enso-suitability-v1`. Uncertainty uses version `uncertainty-v1` and
+fields `cellID`, `coordinates` (latitude, longitude), `temporal`,
+`calibration`, and `miscalibrationArea`. Temporal entries have a 1-based
+`month`, `mean`, `sd`, `lower` and `upper` (mean ±2 SD), `simulatedValue`,
+`cv`, `q05`, and `q95`. Calibration entries have `expected` and `observed`
+interval proportions. Missing/nonfinite numeric fields are null.
+
+</Tab>
+<Tab value="HTTP 400">
+
+Invalid or missing chart or cellID, or invalid ENSO dataset.
+
+</Tab>
+<Tab value="HTTP 404">
+
+No data found for the selected cell.
+
+</Tab>
+<Tab value="HTTP 500">
+
+Database or chart-data generation error.
+
+</Tab>
+</Tabs>
+
+```python
+@app.route('/api/get_cell_chart_data', methods=['GET'])
+@swag_from('API_docs/get_cell_chart_data.yml')
+def get_cell_chart_data()
+```
+
+Validate, cache, and return one cell's chart data as strict JSON.
+
+### `get_uncertainty_svg`
+
+**HTTP Endpoint:** `GET` `/api/get_uncertainty_svg` — Render cell-level uncertainty or ENSO suitability SVG (Utility Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/get_uncertainty_svg.yml`
+
+**OpenAPI Request Parameters**
+
+<TypeTable type={{"filename (query)": {"type": "string ('climate_forecast_cell.svg' | 'seasonal_uncertainty_cell.svg' | 'seasonal_calibration_cell.svg')", "required": true, "description": "Target SVG artifact name (`climate_forecast_cell.svg`, `seasonal_uncertainty_cell.svg`, or `seasonal_calibration_cell.svg`). (Example: `seasonal_uncertainty_cell.svg`)"}, "cellID (query)": {"type": "integer", "required": true, "description": "Non-negative database primary key `id` of the selected spatial grid cell. (Example: `200509`)"}, "dataset (query)": {"type": "string", "required": false, "description": "Optional SEAS5 forecast relation name for `climate_forecast_cell.svg`. (Example: `seas5_forecast_albopictus_habitat_probability`)"}, "month (query)": {"type": "string", "required": false, "description": "Optional three-letter month key (`jan`..`dec`) highlighted in `climate_forecast_cell.svg`. (Example: `aug`)"}, "locale (query)": {"type": "string ('en' | 'de')", "required": false, "description": "Plot label language (`en` or `de`) for `climate_forecast_cell.svg`.", "default": "'en'"}}} />
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200", "HTTP 400", "HTTP 404", "HTTP 500"]}>
+<Tab value="HTTP 200">
+
+Rendered SVG image bytes.
+
+- **Content-Type:** `image/svg+xml`
+
+</Tab>
+<Tab value="HTTP 400">
+
+Missing/invalid `filename` or `cellID`.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "ERROR": "Invalid or missing cellID"
+}
+```
+
+</Tab>
+<Tab value="HTTP 404">
+
+No monthly uncertainty data found for `cellID`.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "ERROR": "No data found for cellID 200509"
+}
+```
+
+</Tab>
+<Tab value="HTTP 500">
+
+Matplotlib or database error while rendering the SVG.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "ERROR": "SVG generation failed"
+}
+```
+
+</Tab>
+</Tabs>
+
+```python
+@app.route('/api/get_uncertainty_svg', methods=['GET'])
+@swag_from('API_docs/get_uncertainty_svg.yml')
+def get_uncertainty_svg()
+```
+
+Render an ENSO suitability or uncertainty SVG for one grid cell.
+
+`cellID` must be a nonnegative integer. `filename` selects the ENSO
+forecast plot (`climate_forecast_cell.svg`) or one of the seasonal
+uncertainty and calibration plots. ENSO requests also accept `dataset`,
+`month`, and `locale`. Rendered bytes are cached by plot inputs and
+served as `image/svg+xml` without shared temporary files.
+
+Invalid cell IDs or filenames return HTTP 400, missing UQ data returns
+404, and rendering failures return 500. Successful responses use
+`Cache-Control: no-cache`; the process cache may still serve the SVG.
+
+### `health`
+
+**HTTP Endpoint:** `GET` `/health` — Liveness health check (Utility Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/health.yml`
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200"]}>
+<Tab value="HTTP 200">
+
+Process is alive.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "status": "healthy"
+}
+```
+
+</Tab>
+</Tabs>
+
+```python
+@app.route('/health')
+@swag_from('API_docs/health.yml')
+def health()
+```
+
+Simple health check endpoint.
+
+### `cache_stats`
+
+**HTTP Endpoint:** `GET` `/api/cache/stats` — Get process-local response cache statistics (Utility Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/cache_stats.yml`
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200"]}>
+<Tab value="HTTP 200">
+
+Worker-local cache metrics.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "hits": 48,
+  "misses": 6,
+  "hit_rate": 0.889,
+  "entries": 6,
+  "max_entries": 256,
+  "size_bytes": 4194304,
+  "size_mb": 4.0,
+  "max_size_gb": 0.12,
+  "max_size_mb": 128.0,
+  "configured_total_mb": 512.0,
+  "ttl_seconds": 86400,
+  "epoch_evictions": 1
+}
+```
+
+</Tab>
+</Tabs>
+
+```python
+@app.route('/api/cache/stats', methods=['GET'])
+@swag_from('API_docs/cache_stats.yml')
+def cache_stats()
+```
+
+Return current cache statistics (hits, misses, size, etc.).
+
+### `cache_clear`
+
+**HTTP Endpoint:** `POST` `/api/cache/clear` — Clear the response cache across all workers (Utility Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/cache_clear.yml`
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200"]}>
+<Tab value="HTTP 200">
+
+Cache flush confirmation.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "success": true,
+  "message": "Cache cleared"
+}
+```
+
+</Tab>
+</Tabs>
+
+```python
+@app.route('/api/cache/clear', methods=['POST'])
+@swag_from('API_docs/cache_clear.yml')
+def cache_clear()
+```
+
+Manually flush the entire response cache.
+
+## `backend/types.py`
+
+Core boundary types and internal TypedDict structures for ICV-framework.
+
+Architecture Rule:
+- Pydantic Annotated types are strictly used at the Flask HTTP boundary for
+  validating incoming requests (query params, POST bodies).
+- Internal layers, database return dictionaries, and analytical processing use
+  native Python TypedDicts to prevent runtime validation overhead and code bloat.
+
+### `ColumnMetadataDict`
+
+```python
+class ColumnMetadataDict(TypedDict)
+```
+
+Internal dictionary structure of a column metadata row.
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"id": {"type": "Optional[int]", "required": true}, "relation_name": {"type": "str", "required": true}, "column_name": {"type": "str", "required": true}, "datatype": {"type": "str", "required": true}, "dimension": {"type": "str", "required": true}, "description": {"type": "str", "required": true}, "availability": {"type": "int", "required": true}}} />
+
+### `RelationSummary`
+
+```python
+class RelationSummary(TypedDict)
+```
+
+Internal dictionary structure of an unprotected database relation summary.
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"table_name": {"type": "str", "required": true}, "row_count": {"type": "int", "required": true}}} />
+
+### `DatasetMetadataItem`
+
+```python
+class DatasetMetadataItem(TypedDict)
+```
+
+Internal dictionary structure of a column descriptor in the global metadata catalog.
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"valuename": {"type": "str", "required": true}, "datatype": {"type": "str", "required": true}, "dimension": {"type": "str", "required": true}, "description": {"type": "str", "required": true}, "availability": {"type": "str", "required": true}}} />
+
+### `GeoPointDict`
+
+```python
+class GeoPointDict(TypedDict)
+```
+
+Internal dictionary structure for spatial coordinate pairs.
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"lat": {"type": "float", "required": true}, "lon": {"type": "float", "required": true}}} />
+
+## `backend/schemas/common.py`
+
+Shared Pydantic schemas, annotated types, and response wrappers.
+
+### `BaseSchema`
+
+```python
+class BaseSchema(BaseModel)
+```
+
+Base schema enforcing clean whitespace handling and attribute docstrings.
+
+Attribute docstrings under fields are automatically parsed by Pydantic
+(v2.7+) into OpenAPI JSON schemas and extracted by Fumadocs, eliminating
+redundant Field(description=...) definitions.
+
+
+**Example**
+
+```python
+class FilterParams(BaseSchema):
+dataset: str
+"""PostgreSQL dataset relation name."""
+```
+
+### `SuccessResponse`
+
+```python
+class SuccessResponse(BaseModel)
+```
+
+Generic success confirmation payload.
+
+
+**Example**
+
+```python
+res = SuccessResponse(success=True)
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"success": {"type": "bool", "required": false, "default": "True"}}} />
+
+### `MessageResponse`
+
+```python
+class MessageResponse(BaseModel)
+```
+
+Generic informative message payload.
+
+
+**Example**
+
+```python
+res = MessageResponse(message="Processing complete")
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"message": {"type": "str", "required": true}}} />
+
+## `backend/cache.py`
+
+In-memory response cache for database queries, with cross-worker
+invalidation via Redis epoch counters.
+
+Cached values stay in each Gunicorn worker's memory — they can be hundreds
+of MB, far too big for the small Redis instance. Only INVALIDATION is
+coordinated through Redis:
+
+  - every entry is tagged at write time with the current epoch of its
+    scopes (relation names it depends on)
+  - invalidate(scope) bumps the scope's epoch counter in Redis (visible to
+    ALL workers) and evicts matching local entries immediately
+  - get() compares the entry's stored epochs against Redis (one MGET per
+    hit); a mismatch means another worker invalidated the scope, so the
+    local entry is evicted and the caller re-fetches from the DB
+
+If Redis is unreachable the cache fails open: entries are stored and served
+without epoch checks (per-worker behavior, as before Redis existed), and a
+circuit breaker skips Redis for a while so requests don't pay the
+connection timeout. Epoch keys evicted by Redis (allkeys-lru) read as 0,
+which at worst causes a spurious cache miss — never stale data.
+
+Limits (whichever is hit first triggers LRU eviction):
+  - Max entries : CACHE_MAX_ENTRIES (default 256)
+  - Max size    : CACHE_TOTAL_MB / Gunicorn workers (default 512 MB total)
+  - TTL         : 24 hours
+
+Thread-safe via a threading.Lock.
+
+### `_epoch_key`
+
+```python
+def _epoch_key(scope: str) -> str
+```
+
+Return the Redis invalidation-counter key for a cache scope.
+
+**Parameters**
+
+<TypeTable type={{"scope": {"type": "str", "required": true}}} />
+
+### `_deep_getsizeof`
+
+```python
+def _deep_getsizeof(obj: Any, _seen: Optional[set]=None) -> int
+```
+
+Recursively approximate the memory size of *obj* in bytes.
+
+**Parameters**
+
+<TypeTable type={{"obj": {"type": "Any", "required": true}, "_seen": {"type": "Optional[set]", "required": false, "default": "None"}}} />
+
+### `_configured_worker_count`
+
+```python
+def _configured_worker_count() -> int
+```
+
+Read a positive worker count or use the bounded Gunicorn default.
+
+### `_CacheEntry`
+
+```python
+class _CacheEntry
+```
+
+One local response value with TTL, size, scope, and Redis-epoch metadata.
+
+#### `_CacheEntry.__init__`
+
+```python
+def __init__(self, value: Any, size_bytes: int, scopes: tuple, epochs: Optional[tuple])
+```
+
+Record the cached value and scope epochs observed at insertion.
+
+**Parameters**
+
+<TypeTable type={{"value": {"type": "Any", "required": true}, "size_bytes": {"type": "int", "required": true}, "scopes": {"type": "tuple", "required": true}, "epochs": {"type": "Optional[tuple]", "required": true}}} />
+
+### `ResponseCache`
+
+```python
+class ResponseCache
+```
+
+Thread-safe, TTL + LRU + size-bounded response cache with cross-worker invalidation.
+
+Coordinates cache invalidation across Gunicorn workers through Redis epoch
+counters while keeping serialized response payloads in process-local memory.
+
+
+**Args**
+
+- `max_entries`: Maximum number of cached responses per worker (defaults to `DEFAULT_CACHE_MAX_ENTRIES`).
+- `max_bytes`: Maximum total memory in bytes for cached values per worker (defaults to `DEFAULT_CACHE_MAX_BYTES`).
+- `ttl_seconds`: Time-to-live per entry in seconds (default `86400` = 24 h).
+
+#### `ResponseCache.__init__`
+
+```python
+def __init__(self, max_entries: int=DEFAULT_CACHE_MAX_ENTRIES, max_bytes: int=DEFAULT_CACHE_MAX_BYTES, ttl_seconds: float=86400)
+```
+
+Initialize the process-local store and lazy Redis invalidation client.
+
+**Parameters**
+
+<TypeTable type={{"max_entries": {"type": "int", "required": false, "default": "DEFAULT_CACHE_MAX_ENTRIES"}, "max_bytes": {"type": "int", "required": false, "default": "DEFAULT_CACHE_MAX_BYTES"}, "ttl_seconds": {"type": "float", "required": false, "default": "86400"}}} />
+
+#### `ResponseCache._redis`
+
+```python
+def _redis(self) -> redis.Redis
+```
+
+Create the Redis client lazily in the current worker process.
+
+#### `ResponseCache._redis_failed`
+
+```python
+def _redis_failed(self, err: Exception) -> None
+```
+
+Pause cross-worker invalidation checks after a Redis failure.
+
+**Parameters**
+
+<TypeTable type={{"err": {"type": "Exception", "required": true}}} />
+
+#### `ResponseCache._current_epochs`
+
+```python
+def _current_epochs(self, scopes: tuple) -> Optional[tuple]
+```
+
+Fetch the current epoch for each scope (missing key = 0).
+
+Returns None when Redis is unreachable (fail open). Never called
+while holding self._lock, so a slow Redis cannot serialize all
+handler threads.
+
+**Parameters**
+
+<TypeTable type={{"scopes": {"type": "tuple", "required": true}}} />
+
+#### `ResponseCache._bump_epoch`
+
+```python
+def _bump_epoch(self, scope: str) -> None
+```
+
+Increment a scope's epoch so every worker drops entries tagged with it.
+
+**Parameters**
+
+<TypeTable type={{"scope": {"type": "str", "required": true}}} />
+
+#### `ResponseCache.get`
+
+```python
+def get(self, key: str) -> Optional[Any]
+```
+
+Return a live local value, or `None` on miss or expiry.
+
+A Redis epoch mismatch also misses after another worker invalidates
+the entry's relation scope. When Redis is unavailable, the local value
+is served without a cross-worker epoch check.
+
+
+**Returns**
+
+Cached response value if present and valid, otherwise `None`.
+
+**Parameters**
+
+<TypeTable type={{"key": {"type": "str", "required": true, "description": "Deterministic cache key built by `make_cache_key`."}}} />
+
+#### `ResponseCache.set`
+
+```python
+def set(self, key: str, value: Any, scopes: Iterable[str]=(), size_bytes: Optional[int]=None) -> None
+```
+
+Store `value` under `key`, evicting stale or LRU entries as needed.
+
+**Parameters**
+
+<TypeTable type={{"key": {"type": "str", "required": true, "description": "Deterministic cache key built by `make_cache_key`."}, "value": {"type": "Any", "required": true, "description": "Response object or serialized payload to cache locally."}, "scopes": {"type": "Iterable[str]", "required": false, "description": "Relation names the value depends on; invalidating any of them from any worker marks this entry stale.", "default": "()"}, "size_bytes": {"type": "Optional[int]", "required": false, "description": "Optional precalculated byte size so callers that already serialized a response avoid the recursive object-graph walk.", "default": "None"}}} />
+
+#### `ResponseCache.invalidate`
+
+```python
+def invalidate(self, scope: str) -> int
+```
+
+Invalidate a relation scope locally and across Redis-connected workers.
+
+Bumps the scope's Redis epoch (other workers drop their entries
+lazily on next access) and evicts every local entry whose key
+contains `scope` or whose scope tag matches. Without Redis,
+invalidation remains local to this worker.
+
+
+**Returns**
+
+Number of entries evicted from the current worker's local store.
+
+**Parameters**
+
+<TypeTable type={{"scope": {"type": "str", "required": true, "description": "Database relation name or logical scope identifier."}}} />
+
+#### `ResponseCache.clear`
+
+```python
+def clear(self) -> None
+```
+
+Flush the entire cache — in every worker, via the global epoch.
+
+#### `ResponseCache.stats`
+
+```python
+def stats(self) -> dict
+```
+
+Return cache statistics.
+
+#### `ResponseCache._evict`
+
+```python
+def _evict(self, key: str) -> None
+```
+
+Remove one local entry and subtract its estimated byte size.
+
+**Parameters**
+
+<TypeTable type={{"key": {"type": "str", "required": true}}} />
+
+#### `ResponseCache._evict_lru`
+
+```python
+def _evict_lru(self) -> None
+```
+
+Remove the least-recently-used entry.
+
+#### `ResponseCache._evict_expired`
+
+```python
+def _evict_expired(self) -> None
+```
+
+Remove all entries that have exceeded their TTL.
+
+### `make_cache_key`
+
+```python
+def make_cache_key(*args: Any) -> str
+```
+
+Build a deterministic pipe-delimited cache key from positional arguments.
+
+
+**Returns**
+
+Pipe-delimited string representation of `args`.
+
+
+**Example**
+
+```python
+key = make_cache_key(
+"getDataFromDB",
+"world_mosquitos_2014_2025_gdf_mosquito_amount",
+"mosquito_amount",
+)
+```
+
+**Parameters**
+
+<TypeTable type={{"*args": {"type": "Any", "required": false, "description": "Components of the cache key (endpoint name, relation, filters)."}}} />
+
+## `backend/metadata_utils.py`
+
+Shared helpers for reading per-language dataset metadata CSV files.
+(e.g. en_metaData.csv, de_metaData.csv).
+
+### `init`
+
+```python
+def init(meta_data_base_path: Path) -> None
+```
+
+Initialise the module with the base metadata path from DataPaths.
+
+**Parameters**
+
+<TypeTable type={{"meta_data_base_path": {"type": "Path", "required": true}}} />
+
+### `getMetaDataPath`
+
+```python
+def getMetaDataPath(lang: str) -> Path
+```
+
+Return the resolved path for the metadata CSV of the given language.
+
+**Parameters**
+
+<TypeTable type={{"lang": {"type": "str", "required": true}}} />
+
+### `loadMetadataCSV`
+
+```python
+def loadMetadataCSV(lang: str) -> dict[str, dict]
+```
+
+Read the metadata CSV for *lang* and return a dict keyed by the first
+column (usually `valuename`).
+
+Returns an empty dict when the file does not exist.
+
+**Parameters**
+
+<TypeTable type={{"lang": {"type": "str", "required": true}}} />
+
+## `backend/upload_request.py`
+
+Flask request type that streams upload parts directly to their work directory.
+
+### `DirectUploadRequest`
+
+```python
+class DirectUploadRequest(Request)
+```
+
+Stream multipart files into the per-upload directory during parsing.
+
+The upload route sets `UPLOAD_DIR_ENV_KEY` before accessing
+`request.files`. Without that key, this request type delegates to
+Werkzeug's default stream factory.
+
+#### `DirectUploadRequest._get_file_stream`
+
+```python
+def _get_file_stream(self, total_content_length: int | None, content_type: str | None, filename: str | None=None, content_length: int | None=None) -> IO[bytes]
+```
+
+Write a multipart file directly into the request's upload directory.
+
+Falls back to Werkzeug when no upload directory or filename is set.
+Basename normalization and resolved-parent checks reject path traversal.
+
+**Parameters**
+
+<TypeTable type={{"total_content_length": {"type": "int | None", "required": true}, "content_type": {"type": "str | None", "required": true}, "filename": {"type": "str | None", "required": false, "default": "None"}, "content_length": {"type": "int | None", "required": false, "default": "None"}}} />
+
+## `backend/upload_state.py`
+
+Shared upload state (progress, phase, geometry flag, and error) backed by Redis,
+keyed by upload_id.
+
+Gunicorn runs multiple worker processes, so module-level globals are
+per-process: the worker handling an upload writes its own copy of the
+progress/error state while the frontend's polling requests land on other
+workers and read stale values. Redis gives all workers one shared view.
+
+State is keyed by the upload_id generated in route_setFilesToDB and returned
+to the client, so concurrent uploads (multiple users/tabs) don't clobber each
+other's progress. The client polls GET /api/uploadStatus?id=&lt;upload_id&gt;.
+
+Falls back to process-local state when Redis is unreachable (e.g. local
+development with the single-process Flask dev server and no Redis running).
+
+Configuration:
+  REDIS_URL — connection URL (default: redis://localhost:6379/0)
+
+### `_progress_key`
+
+```python
+def _progress_key(upload_id: str) -> str
+```
+
+Return the Redis key for an upload's overall percentage.
+
+**Parameters**
+
+<TypeTable type={{"upload_id": {"type": "str", "required": true}}} />
+
+### `_error_key`
+
+```python
+def _error_key(upload_id: str) -> str
+```
+
+Return the Redis key for an upload's error message.
+
+**Parameters**
+
+<TypeTable type={{"upload_id": {"type": "str", "required": true}}} />
+
+### `_phase_key`
+
+```python
+def _phase_key(upload_id: str) -> str
+```
+
+Return the Redis key for an upload's processing phase.
+
+**Parameters**
+
+<TypeTable type={{"upload_id": {"type": "str", "required": true}}} />
+
+### `_has_geometry_key`
+
+```python
+def _has_geometry_key(upload_id: str) -> str
+```
+
+Return the Redis key for the geometry-presence flag.
+
+**Parameters**
+
+<TypeTable type={{"upload_id": {"type": "str", "required": true}}} />
+
+### `_db_progress_key`
+
+```python
+def _db_progress_key(upload_id: str) -> str
+```
+
+Return the Redis key for database-ingestion progress.
+
+**Parameters**
+
+<TypeTable type={{"upload_id": {"type": "str", "required": true}}} />
+
+### `_country_progress_key`
+
+```python
+def _country_progress_key(upload_id: str) -> str
+```
+
+Return the Redis key for country-assignment progress.
+
+**Parameters**
+
+<TypeTable type={{"upload_id": {"type": "str", "required": true}}} />
+
+### `_UploadState`
+
+```python
+class _UploadState
+```
+
+Thread-safe accessor for the shared per-upload progress/error state.
+
+#### `_UploadState.__init__`
+
+```python
+def __init__(self)
+```
+
+Initialize lazy Redis access and the process-local fallback maps.
+
+#### `_UploadState._redis`
+
+```python
+def _redis(self) -> redis.Redis
+```
+
+Create a Redis client lazily for the current worker.
+
+#### `_UploadState._redis_failed`
+
+```python
+def _redis_failed(self, err: Exception) -> None
+```
+
+Warn once and switch to local state during a Redis retry interval.
+
+**Parameters**
+
+<TypeTable type={{"err": {"type": "Exception", "required": true}}} />
+
+#### `_UploadState.start`
+
+```python
+def start(self, upload_id: str) -> None
+```
+
+Initialize state for a new upload (progress=1, no error).
+
+Called by the upload route BEFORE it returns the upload_id to the
+client, so the keys always exist by the time polling starts.
+
+**Parameters**
+
+<TypeTable type={{"upload_id": {"type": "str", "required": true}}} />
+
+#### `_UploadState.set_progress`
+
+```python
+def set_progress(self, upload_id: str, progress: float) -> None
+```
+
+Store the overall upload percentage in Redis or local fallback.
+
+**Parameters**
+
+<TypeTable type={{"upload_id": {"type": "str", "required": true}, "progress": {"type": "float", "required": true}}} />
+
+#### `_UploadState.set_error`
+
+```python
+def set_error(self, upload_id: str, message: str) -> None
+```
+
+Store the upload error shown by status polling.
+
+**Parameters**
+
+<TypeTable type={{"upload_id": {"type": "str", "required": true}, "message": {"type": "str", "required": true}}} />
+
+#### `_UploadState.set_phase`
+
+```python
+def set_phase(self, upload_id: str, phase: str) -> None
+```
+
+Store the active upload phase, such as `db` or `country`.
+
+**Parameters**
+
+<TypeTable type={{"upload_id": {"type": "str", "required": true}, "phase": {"type": "str", "required": true}}} />
+
+#### `_UploadState.set_has_geometry`
+
+```python
+def set_has_geometry(self, upload_id: str, has_geometry: bool) -> None
+```
+
+Record whether the uploaded table has a geometry column.
+
+**Parameters**
+
+<TypeTable type={{"upload_id": {"type": "str", "required": true}, "has_geometry": {"type": "bool", "required": true}}} />
+
+#### `_UploadState.set_db_progress`
+
+```python
+def set_db_progress(self, upload_id: str, progress: float) -> None
+```
+
+Store database-ingestion progress as a percentage.
+
+**Parameters**
+
+<TypeTable type={{"upload_id": {"type": "str", "required": true}, "progress": {"type": "float", "required": true}}} />
+
+#### `_UploadState.set_db_ingestion_progress`
+
+```python
+def set_db_ingestion_progress(self, upload_id: str, overall_progress: float, db_progress: float) -> None
+```
+
+Update overall and DB progress in one Redis round-trip.
+
+**Parameters**
+
+<TypeTable type={{"upload_id": {"type": "str", "required": true}, "overall_progress": {"type": "float", "required": true}, "db_progress": {"type": "float", "required": true}}} />
+
+#### `_UploadState.set_country_progress`
+
+```python
+def set_country_progress(self, upload_id: str, progress: float) -> None
+```
+
+Store country-assignment progress as a percentage.
+
+**Parameters**
+
+<TypeTable type={{"upload_id": {"type": "str", "required": true}, "progress": {"type": "float", "required": true}}} />
+
+#### `_UploadState.get_status`
+
+```python
+def get_status(self, upload_id: str) -> dict
+```
+
+Return the polling payload for one upload ID.
+
+The payload contains `progress`, `error`, `phase`,
+`has_geometry`, `db_progress`, and `country_progress`. Missing
+or expired keys use in-progress defaults; this method does not verify
+that an upload ID was ever issued. Redis failures use process-local
+state, which other workers cannot observe.
+
+**Parameters**
+
+<TypeTable type={{"upload_id": {"type": "str", "required": true}}} />
+
+#### `_UploadState.try_acquire_file_lock`
+
+```python
+def try_acquire_file_lock(self, file_name: str) -> bool
+```
+
+Acquire the shared, expiring processing lock for a file basename.
+
+Return `False` when another worker holds it. With Redis unavailable,
+the fallback guards only this worker process.
+
+**Parameters**
+
+<TypeTable type={{"file_name": {"type": "str", "required": true}}} />
+
+#### `_UploadState.release_file_lock`
+
+```python
+def release_file_lock(self, file_name: str) -> None
+```
+
+Release a per-filename processing lock in Redis and local fallback.
+
+**Parameters**
+
+<TypeTable type={{"file_name": {"type": "str", "required": true}}} />
+
+## `backend/gunicorn.conf.py`
+
+Configure threaded Flask workers and preload-safe backend startup.

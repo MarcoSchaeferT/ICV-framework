@@ -1,0 +1,71 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: useGetJSONData
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **useGetJSONData**(`url`, `isAllowed?`): \[`isLoadingData`: `boolean`, `data`: [`DatabaseResponse`](../interfaces/DatabaseResponse)\]
+
+Fetches JSON with a bounded browser cache and shared in-flight GET requests.
+
+## Parameters
+
+### url
+
+`string`
+
+Absolute or relative API URL string to fetch.
+
+### isAllowed?
+
+`boolean`
+
+Set to `false` to skip fetching; omitted values allow the request.
+
+## Returns
+
+\[`isLoadingData`: `boolean`, `data`: [`DatabaseResponse`](../interfaces/DatabaseResponse)\]
+
+A tuple `[isLoadingData, data]`:
+- `isLoadingData`: True while the current URL is pending or initializing.
+- `data`: Parsed JSON on success, an `{ error }` object on failure, or an empty
+  object while disabled or before data is available.
+
+## Remarks
+
+Cache keys are exact URL strings. A usable cached value is available on the
+initial render; responses expire after five minutes. Least recently used
+eviction limits the cache to 32 entries and an estimated 256 MiB. Concurrent
+subscribers to the same URL share a request. Its controller aborts when the
+last subscriber releases it. Errors are returned in `data.error`, not thrown.
+The hook does not request images, streams, or mutation endpoints.
+
+## See
+
+ - [InterfaceContextProvider](InterfaceContextProvider) for global state shared by linked views.
+ - [LeafD3MapLayerProps](LeafD3MapLayerProps) for the Leaflet layer contract consuming `useGetJSONData`.
+ - [clearDataCache](clearDataCache) to flush all cached endpoints.
+ - [clearCacheForUrl](clearCacheForUrl) to evict a specific endpoint.
+
+## Example
+
+```tsx
+import { apiRoutes, useGetJSONData } from "@/framework";
+
+// Replace the relation name with one available in your deployment.
+function MosquitoObservationCount() {
+  const url = apiRoutes.fetchDbData({
+    relationName: "world_mosquitos_2014_2025_gdf_mosquito_amount",
+    feature: "mosquito_amount",
+    filterBy: "species",
+    filterValue: "albopictus",
+  });
+  const [isLoading, rawData] = useGetJSONData(url);
+  if (isLoading) return <span>Loading observations</span>;
+  if (rawData.error) return <span>{rawData.error}</span>;
+  return <span>{Array.isArray(rawData.response) ? rawData.response.length : 0} observations</span>;
+}
+```

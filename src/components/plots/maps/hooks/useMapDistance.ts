@@ -52,7 +52,7 @@ export interface UseMapDistanceParams {
 /**
  * Calculates on-screen pixel length corresponding to 1 kilometer using D3 spatial projections.
  *
- * Computes pixels per kilometer based on latitude displacement ($1^\circ \text{ lat} \approx 111.321\text{ km}$)
+ * Computes pixels per kilometer using an approximate distance of 111.321 km per degree of latitude
  * and writes the result into `screenDistanceOneKMRef` without triggering component re-renders.
  *
  * @param params - Configuration containing viewport coordinates, zoom, container dimensions, and output ref.

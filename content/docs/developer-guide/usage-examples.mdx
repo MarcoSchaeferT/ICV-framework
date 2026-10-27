@@ -1,0 +1,228 @@
+---
+title: Usage examples
+description: In-repository patterns for composing documented ICV components and hooks.
+---
+
+These examples show how client components compose documented TypeScript modules. Imports name the module that owns each symbol, matching application code. The examples focus on JSON data, cards, and shared selection. For maps, follow the Leaflet integration described in [Architecture](./architecture#frontend-ownership).
+
+<Callout type="info" title="Repository import paths">
+  The `@/*` alias maps to `src/*`; for example, `@/components/layout/CardWrapper` resolves to its owning module. `@/framework` also resolves and is used by TypeDoc examples to show the documented export surface, but it is not the application's general import path. Consult the [public TypeScript surface](./architecture#public-typescript-surface) and generated reference for map props and data contracts.
+</Callout>
+
+## Before copying an example
+
+- Add `"use client"` when a component uses hooks, context, browser events, or interactive framework components.
+- Build endpoint URLs with `apiRoutes`; do not interpolate query strings manually.
+- Narrow `DatabaseResponse.response` at the component boundary before visualization code consumes it.
+- Render loading, error, empty, and success states separately.
+- Keep providers around the smallest subtree that needs shared state.
+
+## Fetch typed dataset rows
+
+Use `apiRoutes` together with `useGetJSONData`. The hook provides request deduplication, abort handling, a five-minute TTL, and bounded in-memory caching. Save this example as `ObservationCount.tsx` in a client component directory. The sample relation may be absent from your deployment; replace `relationName` and `features` with columns from an available relation before running it.
+
+```tsx
+"use client";
+
+import { apiRoutes } from "@/app/api_routes";
+import { useGetJSONData } from "@/app/hooks/useFetchAndCache";
+import type { dbDATA as DatabaseResponse } from "@/app/const_store";
+
+interface ObservationRow {
+  id: number;
+  species: string;
+  mosquito_amount: number;
+}
+
+function isObservationRow(value: unknown): value is ObservationRow {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Record<string, unknown>;
+  return (
+    typeof row.id === "number" &&
+    typeof row.species === "string" &&
+    typeof row.mosquito_amount === "number"
+  );
+}
+
+export function ObservationCount() {
+  const url = apiRoutes.fetchDbData({
+    relationName: "world_mosquitos_2014_2025_gdf_mosquito_amount",
+    features: ["id", "species", "mosquito_amount"],
+    limit: 500,
+  });
+  const [isLoading, data]: [boolean, DatabaseResponse] = useGetJSONData(url);
+
+  if (isLoading) return <p aria-live="polite">Loading observations…</p>;
+  if (data.error) return <p role="alert">Could not load observations: {data.error}</p>;
+
+  const rows = Array.isArray(data.response)
+    ? data.response.filter(isObservationRow)
+    : [];
+
+  if (rows.length === 0) return <p>No observations were returned.</p>;
+  return <p>{rows.length.toLocaleString()} observations in this response (up to 500)</p>;
+}
+```
+
+Why this pattern is preferred:
+
+- Query values are encoded consistently.
+- Runtime validation prevents an untyped backend payload from leaking into the component tree.
+- A backend error is not confused with a valid empty result.
+- The row limit makes resource usage explicit; the displayed count is for this response, not necessarily the full relation. The current multi-column `features` path does not apply `filterBy` or `filterValue`.
+
+## Use the standard Vis. Interface card
+
+`CardWrapper` provides the shared visual shell and the `.gridPlotCardContent` resize boundary expected by visualization hooks. Save this component beside `ObservationCount.tsx` as `ObservationCard.tsx`.
+
+```tsx
+"use client";
+
+import CardWrapper, { CardPropsClass } from "@/components/layout/CardWrapper";
+import { ObservationCount } from "./ObservationCount";
+
+const observationCard = CardPropsClass(
+  "mosquito-observation-sample",
+  "Mosquito observations",
+  "First rows returned by the selected dataset",
+  "Source: ICV observation database",
+);
+
+export function ObservationCard() {
+  return (
+    <CardWrapper cardProps={observationCard}>
+      <div className="p-4">
+        <ObservationCount />
+      </div>
+    </CardWrapper>
+  );
+}
+```
+
+Use a stable, unique `id`. The imported `ObservationCount` is the complete component from the preceding example. Do not remove the card's content boundary when a child depends on responsive chart sizing.
+
+## Share a dataset between sibling charts
+
+`ChartDatasetProvider` owns the selected dataset and shared row limit. Axis and presentation choices stay local to each chart. This example is a complete client component, although the sibling chart cards are left as an insertion point.
+
+```tsx
+"use client";
+
+import { ChartDatasetProvider, useChartDataset } from "@/components/contexts/ChartDatasetContext";
+
+function DatasetPicker() {
+  const {
+    datasets,
+    selectedDataset,
+    setSelectedDataset,
+    isLoading,
+    error,
+  } = useChartDataset();
+
+  if (error) return <p role="alert">Could not list datasets: {error}</p>;
+
+  return (
+    <label>
+      Dataset
+      <select
+        value={selectedDataset}
+        disabled={isLoading}
+        onChange={(event) => setSelectedDataset(event.target.value)}
+      >
+        <option value="">Choose a dataset</option>
+        {datasets.map((dataset) => (
+          <option key={dataset} value={dataset}>{dataset}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+export function ChartWorkspace() {
+  return (
+    <ChartDatasetProvider>
+      <DatasetPicker />
+      {/* Sibling chart cards consume the same dataset selection here. */}
+    </ChartDatasetProvider>
+  );
+}
+```
+
+Do not move axis selection into this context. Doing so couples otherwise independent charts and causes unnecessary rerenders. `selectedDataset` stays empty until a requested relation appears in the fetched dataset list.
+
+## Coordinate linked views
+
+Use `InterfaceContextProvider` only when two or more views must share selection or viewport state. The following example links a grid-cell control to a separate status view.
+
+```tsx
+"use client";
+
+import { InterfaceContextProvider, useInterfaceContext } from "@/components/contexts/InterfaceContext";
+
+function SelectGridCellButton() {
+  const { setSelectedGridcellID } = useInterfaceContext();
+  return (
+    <button type="button" onClick={() => setSelectedGridcellID(300625)}>
+      Select grid cell 300625
+    </button>
+  );
+}
+
+function SelectionSummary() {
+  const { selectedGridcellID } = useInterfaceContext();
+  return <output>Selected grid cell: {selectedGridcellID}</output>;
+}
+
+export function LinkedViewExample() {
+  return (
+    <InterfaceContextProvider initialSelectedGridcellID={-1}>
+      <SelectGridCellButton />
+      <SelectionSummary />
+    </InterfaceContextProvider>
+  );
+}
+```
+
+Keep high-frequency pointer movement out of normal React state. ICV's map interaction ref exists specifically to avoid rerendering an entire linked Vis. Interface for every mouse event.
+
+## Build an encoded API URL without fetching
+
+Route builders are also useful for image sources, downloads, or server-side forwarding.
+
+```tsx
+import { apiRoutes } from "@/app/api_routes";
+
+const worldMapUrl = apiRoutes.fetchMapData({ mapName: "world_map" });
+const uncertaintyImageUrl = apiRoutes.getUncertaintySvg({
+  filename: "seasonal_uncertainty_cell.svg",
+  cellID: 200509,
+  dataset: "seas5_forecast_example",
+  month: "aug",
+  locale: "en",
+});
+```
+
+The typed builders restrict map asset identifiers and omit absent optional values while encoding all supplied parameters. `fetchMapData` here requests a Leaflet basemap asset; it does not initialize a map renderer.
+
+## Add a supported framework capability
+
+When a helper or component becomes reusable:
+
+1. Give it explicit input and output types close to the implementation.
+2. Add TSDoc that explains constraints and includes a realistic example.
+3. Export it from `src/framework/index.ts` only after the contract is ready for reuse.
+4. Add a focused example here when consumers must coordinate multiple APIs.
+5. Run `npm run docs:api` and review the generated TypeScript page.
+6. Run `npm run docs:check` before opening the pull request.
+
+## Avoid these integration anti-patterns
+
+| Avoid | Prefer |
+| --- | --- |
+| Importing every feature through one broad barrel | Importing each feature from its owning module and grouping symbols from that module |
+| Hand-built `/api` query strings | Typed `apiRoutes` builders |
+| Casting an entire response to the desired row type | A runtime type guard at the boundary |
+| One global context for all UI state | Feature-local state and narrowly scoped providers |
+| Treating an empty array as a request failure | Separate loading, error, empty, and success branches |
+| Unbounded data requests by default | An intentional row or spatial-detail limit |
+| Editing generated TypeDoc MDX | Updating source TSDoc and regenerating |

@@ -1,0 +1,100 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: BarchartProps
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Configuration contract for `BarchartComponent`.
+
+## Remarks
+
+The component retrieves database data and localized metadata through `useGetJSONData`, then participates in linked
+selection through `InterfaceContext`.
+
+## Example
+
+```tsx
+import { apiRoutes, type BarchartProps } from "@/framework";
+
+// Replace the relation name with one available in your deployment.
+const props: BarchartProps = {
+  chartName: "regional-incidence-barchart",
+  dataURL: apiRoutes.fetchDbData({
+    relationName: "dengue_serotypes",
+    feature: "cases",
+  }),
+  locale: "en",
+  isDummyMode: false,
+};
+```
+
+## Properties
+
+### chartName
+
+> **chartName**: `string`
+
+Stable chart/container identifier.
+
+***
+
+### dataURL
+
+> **dataURL**: `string`
+
+URL produced by `apiRoutes.fetchDbData`.
+
+***
+
+### locale?
+
+> `optional` **locale?**: `string`
+
+Locale used for value and metadata formatting.
+
+#### Default Value
+
+```ts
+"en"
+```
+
+***
+
+### translations?
+
+> `optional` **translations?**: `any`
+
+`next-intl` translator for chart labels and tooltips.
+
+***
+
+### isDummyMode?
+
+> `optional` **isDummyMode?**: `boolean`
+
+Uses bundled demonstration data instead of the backend.
+
+#### Default Value
+
+```ts
+false
+```
+
+***
+
+### dataMode?
+
+> `optional` **dataMode?**: `"linked"` \| `"generic"`
+
+Selects the reusable row-oriented chart adapter used by layout templates.
+
+***
+
+### rowLimit?
+
+> `optional` **rowLimit?**: `number` \| `null`
+
+Maximum number of generic dataset rows rendered before truncation.

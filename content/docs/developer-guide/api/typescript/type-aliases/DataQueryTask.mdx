@@ -1,0 +1,34 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: DataQueryTask
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **DataQueryTask** = `"getUniqueEntries"` \| `"getMinMax"` \| `"getCount"` \| `"getGroupedCount"`
+
+Supported analytical aggregate operations accepted by `/api/getDataFromDB`.
+
+## Remarks
+
+- `getUniqueEntries`: Returns distinct feature values as `Array<{ feature: string | number }>`.
+  When querying a `date` column, calendar years are returned instead.
+- `getMinMax`: Computes the minimum and maximum numeric values as `{ min_val: number, max_val: number }`.
+- `getCount`: Counts occurrences per feature value as `Array<{ feature: string | number, count: number }>`.
+- `getGroupedCount`: Groups feature values by a secondary category column as
+  `Array<{ feature: string | number, category: string, count: number }>`. Requires `groupBy`.
+
+## Example
+
+```ts
+import { apiRoutes, type DataQueryTask } from "@/framework";
+
+const uniqueSpeciesTask: DataQueryTask = "getUniqueEntries";
+const url = apiRoutes.fetchDbData({
+  relationName: "world_mosquitos_2014_2025_gdf_mosquito_amount",
+  feature: "species",
+  task: uniqueSpeciesTask,
+});
+```

@@ -5,6 +5,12 @@ import * as ProgressPrimitive from "@radix-ui/react-progress"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Displays completion as a horizontal progress indicator.
+ *
+ * @remarks The indicator width is computed from the supplied `value`; absent
+ * or zero values display an empty bar.
+ */
 const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root>

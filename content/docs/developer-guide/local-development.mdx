@@ -1,0 +1,85 @@
+---
+title: Local development
+description: Run and verify the complete ICV stack locally.
+---
+
+## Prerequisites
+
+- Node.js and npm compatible with `package.json` (the repository does not pin an `engines` version)
+- Docker with Compose, running locally
+- Python 3.12 for the direct Flask development command
+- A root `.env` with local database settings
+
+`compose.yaml` reads `DATABASE_USER` and `DB_PASSWORD_SECRET` for PostgreSQL. The backend container constructs its own `DATABASE_URL`; a directly run Flask process needs a database URL reachable from the host. Use local values and keep `.env` out of commits. The root `.gitignore` excludes `.env`.
+
+## Install dependencies
+
+From the repository root:
+
+```bash
+npm ci
+```
+
+`npm ci` installs the versions in `package-lock.json`. Use `npm install` when you intentionally change dependencies and the lockfile.
+
+## Run Next.js and Flask locally
+
+Ensure Docker is running and the local environment is configured, then execute:
+
+```bash
+npm run dev
+```
+
+`npm run dev` starts Next.js and the direct Flask development helper; that helper also builds and starts the PostgreSQL container. The frontend is normally at `http://localhost:3000`; Flask listens on `5222`. The Next.js `/api/*` rewrite forwards to Flask. Unlike the container stack, this command does not start the Redis container. A single-process local Flask run can use process-local upload state when Redis is unavailable; use `docker compose up` when verifying behavior shared across backend workers.
+
+To run the complete container stack, use:
+
+```bash
+docker compose up --build
+```
+
+The Compose stack includes frontend, backend, PostgreSQL, and Redis. The initial build and database setup can take time.
+
+## Work on documentation
+
+Generate the TypeScript reference and start Next.js:
+
+```bash
+npm run docs:dev
+```
+
+For TypeScript reference changes, regenerate after modifying public exports or TSDoc:
+
+```bash
+npm run docs:api
+```
+
+## Verify a change
+
+Run the checks relevant to the affected area from the repository root:
+
+```bash
+npm run docs:check
+npm run lint
+```
+
+`docs:check` regenerates TypeDoc, checks TypeScript, lints TSDoc, and checks hand-written portal frontmatter, navigation, and relative page and anchor links. For a full MDX compilation check, run `npx next build`. For backend changes, run focused tests from `backend/tests` with the configured Python environment. Some tests need PostgreSQL or other services; inspect their setup before running them.
+
+For example, this query-filter unit test runs from the repository root with the Windows virtual environment created by `npm run dev`:
+
+```powershell
+backend/.venv/Scripts/python.exe -m unittest backend.tests.test_query_filters
+```
+
+On macOS or Linux, use `./backend/.venv/bin/python -m unittest backend.tests.test_query_filters`. Select tests that exercise the changed route or helper; start PostgreSQL and Redis only for tests whose setup uses those services.
+
+## Troubleshoot local startup
+
+| Symptom | Check first |
+| --- | --- |
+| `/api/*` requests fail | Flask is listening on port `5222`; Next.js rewrite target in `next.config.mjs` matches the run mode |
+| Database connection fails | Docker is running, the `icv-database` service is healthy, and the host-run Flask `DATABASE_URL` points to the mapped local port |
+| Upload progress differs across workers | Redis is running and all workers use the same `REDIS_URL` |
+| A generated TypeScript page is stale | Run `npm run docs:api` and review the resulting diff |
+
+Continue with [Architecture](./architecture) or [Usage examples](./usage-examples).

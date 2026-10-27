@@ -1,0 +1,48 @@
+---
+title: Engineering best practices
+description: Conventions for maintainable ICV features and public APIs.
+---
+
+## Design public APIs deliberately
+
+- Treat `src/framework/index.ts` as the TypeDoc entry point and curated reusable surface.
+- Re-export a new symbol only when Vis. Interface extensions have a concrete use for it.
+- Prefer explicit props and domain types over unstructured objects.
+- Mark implementation-only declarations with `@internal` when they must remain exported for module wiring.
+- Treat changes to public prop types, response envelopes, and context values as compatibility changes.
+
+## Document intent, not syntax
+
+Public components, hooks, functions, classes, and types need a TSDoc summary. Add `@remarks` for constraints and side effects, and a runnable `@example` when usage is not obvious. Explain failure behavior without inventing thrown exceptions. Do not repeat information already guaranteed by the TypeScript signature.
+
+## Keep data access centralized
+
+Construct frontend endpoints through `apiRoutes`. Use `useGetJSONData` for JSON reads that fit its response and cache contract. Backend SQL must bind data values as parameters and compose dynamic table or column identifiers with `psycopg.sql.Identifier`; use the shared connection helpers. Keep the matching `backend/API_docs` YAML in sync with route behavior.
+
+## Make coordinated state explicit
+
+Keep purely visual state local. Use `InterfaceContext` only for selections that must synchronize views. Avoid effects that silently rewrite another component's state; expose the transition through a named callback or context action.
+
+## Extend the supported map path
+
+Use the existing Leaflet map components for standard 2D Vis. Interfaces. D3 supplies overlays and charts; `useWebGLGridLayer` renders spatial grids and country polygons on a canvas inside the Leaflet map. Keep map pointer movement out of React context on every event and clean up listeners and overlays on unmount. See [Architecture](./architecture#frontend-ownership).
+
+## Preserve visualization meaning
+
+- Display units and provenance close to the visualization.
+- Define missing-data behavior separately from zero.
+- Keep color scales and domains stable during a comparison.
+- Bound row counts and spatial detail unless an expensive unbounded request is explicitly required. For multi-column `/api/getDataFromDB` requests, `limit=-1` opts out of the server's row limit.
+- Provide a textual or tabular path to information conveyed by color or hover alone.
+
+## Localize user-facing content
+
+Put application labels in the localization system. The documentation portal, including the user guide, developer guide, and generated TypeScript reference, is maintained in English.
+
+## Keep generated files generated
+
+Do not manually edit `content/docs/developer-guide/api/typescript`. Change TSDoc or the public barrel, then run `npm run docs:api`.
+
+## Verify at the boundary
+
+Test pure transformations as units, routes at the request/response boundary, and linked views as integrated workflows. Check row ordering, missing values, coordinate order, and response variants where they affect interpretation. A successful render is not sufficient evidence for data correctness. See [Local development](./local-development#verify-a-change) for commands.

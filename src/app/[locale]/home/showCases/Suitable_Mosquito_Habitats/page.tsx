@@ -1,9 +1,8 @@
 
 "use client";
 
-import { useRef, useEffect, useState } from 'react'
+import React, { useRef, useEffect, useState } from 'react'
 import {apiRoutes } from "@/app/api_routes";
-import React from 'react';
 import { InterfaceContextProvider, useInterfaceContext, interfaceContextI } from '@/components/contexts/InterfaceContext';
 import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
@@ -15,10 +14,20 @@ import { Locale, useLocale, useTranslations } from "next-intl";
 import { t_richConfig } from "@/app/const_store";
 import { useUIContext } from '@/components/contexts/UIContext';
 
-
 const isSWAPY = true;
 
-/** Returns the modeled mosquito-habitat suitability showcase dashboard. */
+/**
+ * Renders the global mosquito-habitat suitability showcase.
+ *
+ * @returns A localized introduction and one Leaflet probability-grid card.
+ *
+ * @remarks The map initially selects a 2019 `albopictus` probability layer.
+ * Dataset switching remains available, while observation and sequence-metadata
+ * overlays are disabled for this model-focused view. The card sits below
+ * `InterfaceContextProvider` and supplies Swapy layout and loading state.
+ *
+ * @see {@link LeafD3MapLayerProps} for map-layer configuration.
+ */
 export default function Home() {
 
 const t = useTranslations("page_home.ShowCases.page_Suitable_Mosquito_Habitats");

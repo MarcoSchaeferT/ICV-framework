@@ -1,0 +1,31 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: useSizeWatchDebounced
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **useSizeWatchDebounced**(`element`): [`Size`](../interfaces/Size) \| `undefined`
+
+Debounced `ResizeObserver` hook for tracking DOM element dimensions with 1000 ms delay.
+
+## Parameters
+
+### element
+
+`HTMLElement` \| `null`
+
+Target DOM HTMLElement to observe.
+
+## Returns
+
+[`Size`](../interfaces/Size) \| `undefined`
+
+The most recently observed size, or `undefined` before the first
+debounced observation (including when `element` is null).
+
+## See
+
+[useChartResizer](useChartResizer) for plot card resizing pipeline integration.

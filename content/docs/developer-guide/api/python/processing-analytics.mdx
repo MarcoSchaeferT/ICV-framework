@@ -1,0 +1,918 @@
+---
+title: Spatial Processing & Uncertainty
+description: Spatial point-to-country assignment, ENSO suitability panels, and UQ calibration/SVG rendering.
+---
+
+Spatial point-to-country assignment, ENSO suitability panels, and UQ calibration/SVG rendering.
+
+## `backend/routes/processData/route_processData.py`
+
+Expose explicit POST commands for spatial data processing.
+
+### `AssignCountriesParams`
+
+```python
+class AssignCountriesParams(BaseSchema)
+```
+
+Parameters for assigning countries to spatial points in a relation.
+
+
+**Example**
+
+```python
+params = AssignCountriesParams(tableName="observations", reprocessAll=False)
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"tableName": {"type": "RelationName", "required": true}, "reprocessAll": {"type": "bool", "required": false, "default": "Field(default=False, strict=True, description='Whether to reprocess already assigned rows.')"}}} />
+
+<ShowCovGuard>
+
+<h3 id="aggregaterkiparams"><code>AggregateRkiParams</code></h3>
+
+```python
+class AggregateRkiParams(BaseSchema)
+```
+
+Parameters for aggregating RKI COVID-19 data by German federal state.
+
+
+**Example**
+
+```python
+params = AggregateRkiParams(
+sourceTable="aktuell_deutschland_sarscov2_infektionen",
+targetTable="rki_states",
+targetDate="2022-06-01",
+)
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"sourceTable": {"type": "RelationName", "required": false, "default": "'aktuell_deutschland_sarscov2_infektionen'"}, "targetTable": {"type": "Optional[RelationName]", "required": false, "default": "None"}, "targetDate": {"type": "Optional[str]", "required": false, "default": "None"}}} />
+
+</ShowCovGuard>
+
+### `assign_countries`
+
+**HTTP Endpoint:** `POST` `/api/processData/assignCountries` — Assign countries to a relation (Data processing)
+
+*OpenAPI Specification:* `backend/API_docs/process_assign_countries.yml`
+
+**OpenAPI Request Parameters**
+
+<TypeTable type={{"command (body)": {"type": "object", "required": true, "description": "(Example: `{'tableName': 'mosquito_observations', 'reprocessAll': False}`)"}}} />
+
+**Request Body Schema Example**
+
+```json
+{
+  "tableName": "mosquito_observations",
+  "reprocessAll": false
+}
+```
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200", "HTTP 400", "HTTP 405", "HTTP 500"]}>
+<Tab value="HTTP 200">
+
+Country assignment finished.
+
+</Tab>
+<Tab value="HTTP 400">
+
+Invalid JSON command or missing tableName.
+
+</Tab>
+<Tab value="HTTP 405">
+
+GET is not supported for this write operation.
+
+</Tab>
+<Tab value="HTTP 500">
+
+Country assignment failed.
+
+</Tab>
+</Tabs>
+
+```python
+@swag_from('../../API_docs/process_assign_countries.yml')
+@route_processData.route('/assignCountries', methods=['POST'])
+def assign_countries()
+```
+
+Update a relation's country assignments from a JSON POST command.
+
+<ShowCovGuard>
+
+<h3 id="aggregate_rki"><code>aggregate_rki</code></h3>
+
+**HTTP Endpoint:** `POST` `/api/processData/aggregateRKI` — Build RKI state aggregates (Data processing)
+
+*OpenAPI Specification:* `backend/API_docs/process_aggregate_rki.yml`
+
+**OpenAPI Request Parameters**
+
+<TypeTable type={{"command (body)": {"type": "object", "required": true, "description": "(Example: `{'targetDate': '2022-06-01'}`)"}}} />
+
+**Request Body Schema Example**
+
+```json
+{
+  "targetDate": "2022-06-01"
+}
+```
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200", "HTTP 400", "HTTP 405", "HTTP 500"]}>
+<Tab value="HTTP 200">
+
+Aggregation completed or the requested date was already available.
+
+</Tab>
+<Tab value="HTTP 400">
+
+Invalid JSON command, source relation, or date.
+
+</Tab>
+<Tab value="HTTP 405">
+
+GET is not supported for this write operation.
+
+</Tab>
+<Tab value="HTTP 500">
+
+Aggregation failed.
+
+</Tab>
+</Tabs>
+
+```python
+@swag_from('../../API_docs/process_aggregate_rki.yml')
+@route_processData.route('/aggregateRKI', methods=['POST'])
+def aggregate_rki()
+```
+
+Create or refresh state-level RKI data from a JSON POST command.
+
+</ShowCovGuard>
+
+## `backend/routes/processData/assignGeoPosToCountry.py`
+
+Assign country ISO codes to uploaded geometries in bounded SQL batches.
+
+The worker caches a world-map spatial index per process, streams source rows
+from PostgreSQL, and applies country matches through a temporary update table.
+
+### `get_db_connection_params`
+
+```python
+def get_db_connection_params() -> dict
+```
+
+Parse `DATABASE_URL` for this standalone country-assignment worker.
+
+Local runs translate the Docker hostname `icv-database` to `localhost`.
+A missing URL raises `ValueError`.
+
+### `load_world_map`
+
+```python
+def load_world_map(path: Path)
+```
+
+Read the first GeoJSON member from a compressed world-map archive.
+
+Raises `ValueError` when no readable GeoJSON member is present.
+
+**Parameters**
+
+<TypeTable type={{"path": {"type": "Path", "required": true}}} />
+
+### `_load_country_index`
+
+```python
+@lru_cache(maxsize=1)
+def _load_country_index()
+```
+
+Index the world map used by the map endpoint once per worker.
+
+### `parse_geometry`
+
+```python
+def parse_geometry(geo_str)
+```
+
+Parse one geometry for the compatibility fallback path.
+
+**Parameters**
+
+<TypeTable type={{"geo_str": {"type": "Any", "required": true}}} />
+
+### `_vectorized_updates`
+
+```python
+def _vectorized_updates(rows, tree, iso_codes, admin_names)
+```
+
+Assign a database batch using Shapely 2 vector operations.
+
+**Parameters**
+
+<TypeTable type={{"rows": {"type": "Any", "required": true}, "tree": {"type": "Any", "required": true}, "iso_codes": {"type": "Any", "required": true}, "admin_names": {"type": "Any", "required": true}}} />
+
+### `_scalar_updates`
+
+```python
+def _scalar_updates(rows, tree, polygons, iso_codes, admin_names, geometry_indices)
+```
+
+Compatibility path for Shapely versions without vectorized parsers.
+
+**Parameters**
+
+<TypeTable type={{"rows": {"type": "Any", "required": true}, "tree": {"type": "Any", "required": true}, "polygons": {"type": "Any", "required": true}, "iso_codes": {"type": "Any", "required": true}, "admin_names": {"type": "Any", "required": true}, "geometry_indices": {"type": "Any", "required": true}}} />
+
+### `_country_updates`
+
+```python
+def _country_updates(rows, country_index)
+```
+
+Match one database batch to countries with a scalar compatibility path.
+
+Vectorized Shapely matching is attempted first. A failure is logged and
+retried with per-geometry matching rather than aborting the upload.
+
+**Parameters**
+
+<TypeTable type={{"rows": {"type": "Any", "required": true}, "country_index": {"type": "Any", "required": true}}} />
+
+### `_apply_updates`
+
+```python
+def _apply_updates(writer_conn, table_name: str, updates) -> int
+```
+
+COPY one result batch and apply it with a single set-based UPDATE.
+
+**Parameters**
+
+<TypeTable type={{"writer_conn": {"type": "Any", "required": true}, "table_name": {"type": "str", "required": true}, "updates": {"type": "Any", "required": true}}} />
+
+### `assign_geo_pos_to_country`
+
+```python
+def assign_geo_pos_to_country(table_name: str, skip_existing: bool=True, progress_callback: Optional[Callable[[int, int], None]]=None, total_rows: Optional[int]=None)
+```
+
+Write `iso_a3` and `admin` for geometries in a PostgreSQL table.
+
+
+**Returns**
+
+Number of rows matched and updated with a country.
+
+The function adds missing country columns, streams rows in batches, and
+commits each update batch. Very complex polygons are skipped to bound
+memory use; metadata update failures are logged but do not stop matching.
+
+**Parameters**
+
+<TypeTable type={{"table_name": {"type": "str", "required": true, "description": "Relation containing `id` and `geometry` columns."}, "skip_existing": {"type": "bool", "required": false, "description": "Update only rows with no country code when true.", "default": "True"}, "progress_callback": {"type": "Optional[Callable[[int, int], None]]", "required": false, "description": "Optional callback receiving processed and total rows.", "default": "None"}, "total_rows": {"type": "Optional[int]", "required": false, "description": "Known row count; otherwise queried from PostgreSQL.", "default": "None"}}} />
+
+<ShowCovGuard>
+
+<h2><code>backend/routes/processData/aggregateRKIdata.py</code></h2>
+
+Aggregate raw Robert Koch Institute (RKI) COVID-19 district-level infection datasets in PostgreSQL.
+
+Epidemiological Metrics & Processing Overview:
+1. Geographic Aggregation:
+   Maps 5-digit German district IDs (`idlandkreis` / `landkreis_id`) to 2-digit
+   federal state IDs (`idbundesland` from `'01'` to `'16'`) and standard
+   German state names (e.g., `'Bayern'`, `'Berlin'`, `'Schleswig-Holstein'`).
+2. Status Flag Filtering (RKI Standard Logic):
+   Applies official RKI flag semantics for case, death, and recovery counts:
+     * Flag `0`: Historical valid record (included in valid counts where `flag IN (1, 0)`).
+     * Flag `1`: Valid record added/updated in current dataset snapshot (included where `flag IN (1, 0)`).
+     * Flag `-1`: Audit marker for cases deleted in dataset snapshot (omitted).
+     * Flag `-9`: Outcome unknown or non-applicable (omitted from death/recovery counts).
+3. Metric Calculations:
+   Computes key epidemiological indicators per federal state per reporting date (`meldedatum`):
+     * Daily metrics: `newcases`, `newdeaths`, `newrecovered`.
+     * 7-day rolling windows: `accucasesperweek`, `accudeathsperweek`, `accurecoveredperweek`.
+     * Cumulative history: `accucases`, `accudeaths`, `accurecovered` up to target date.
+4. Streamlined Window Aggregation Architecture:
+   Evaluates a complete Cartesian product grid (16 states × N dates) via SQL
+   window functions in a single pass, with incremental cache checks per `datenstand`.
+5. Caching, Metadata & Database Indexing:
+   Ensures composite indexes exist on `(datenstand, idbundesland)` and
+   `(meldedatum::date)`, registers column metadata in `column_metadata_en`
+   and `column_metadata_de`, and invalidates `response_cache` on updates.
+
+
+**Example**
+
+```python
+from backend.routes.processData.aggregateRKIdata import aggregate_rki_data
+
+result = aggregate_rki_data(
+source_table="aktuell_deutschland_sarscov2_infektionen",
+target_table="aktuell_deutschland_sarscov2_infektionen_aggregated",
+targetDate="2021-05-15",
+)
+```
+
+### `aggregate_rki_data`
+
+```python
+def aggregate_rki_data(source_table: str='aktuell_deutschland_sarscov2_infektionen', target_table: Optional[str]=None, targetDate: Optional[Union[str, date, datetime]]=None) -> Dict[str, Any]
+```
+
+Aggregates district-level RKI COVID-19 infection data into state-level metrics.
+
+Scans cumulative RKI infection records up to `targetDate` and computes single-day,
+7-day rolling window, and historical cumulative totals for all 16 German federal states.
+
+
+**Returns**
+
+Dict[str, Any]: Execution result metadata containing:
+- "message" (str): Summary description of the aggregation outcome.
+- "sourceTable" (str): Name of the source table used.
+- "targetTable" (str): Name of the target table updated.
+- "targetDate" (str): ISO string ("YYYY-MM-DD") of the processed target date.
+- "insertedRows" (int, optional): Total row count in the target table after insertion.
+
+
+**Raises**
+
+- `ValueError`: If `source_table` is empty, does not exist in the database schema,  or lacks required column aliases.
+psycopg.Error: If a PostgreSQL database execution error occurs.
+
+Side Effects:
+    - Creates `target_table` with schema constraints and indexes if non-existent.
+    - Auto-populates `column_metadata_en` and `column_metadata_de` for `target_table`.
+    - Rebuilds complete state time-series grid in `target_table` if missing target date.
+    - Inserts aggregated rows into PostgreSQL `target_table`.
+    - Invalidates cache entries in `backend.cache.response_cache`.
+
+**Parameters**
+
+<TypeTable type={{"source_table": {"type": "str", "required": false, "description": "Name of the PostgreSQL source table containing raw RKI district-level data. Defaults to \"aktuell_deutschland_sarscov2_infektionen\".", "default": "'aktuell_deutschland_sarscov2_infektionen'"}, "target_table": {"type": "Optional[str]", "required": false, "description": "Name of the target PostgreSQL table for storing aggregated state metrics. If None, defaults to `f\"{source_table}_aggregated\"`.", "default": "None"}, "targetDate": {"type": "Optional[Union[str, date, datetime]]", "required": false, "description": "Target date for aggregation (formatted as \"YYYY-MM-DD\", `date`, or `datetime`). If None, automatically selects the maximum date available in `source_table`.", "default": "None"}}} />
+
+</ShowCovGuard>
+
+## `backend/routes/processData/ensoSuitability.py`
+
+Generate ENSO suitability visualizations for a selected grid cell.
+
+The five-panel SVG/PNG plots show four climatic factors and habitat
+suitability, comparing the ERA5 2000-2025 reference with SEAS5 forecasts
+from the `seas5_forecast_*` relations. The HTTP route lives in
+`backend.index`.
+
+### `_output_filename`
+
+```python
+def _output_filename(cell_id: int, dataset_template: str, active_month: str | None) -> str
+```
+
+Build the stable filename used only by explicit offline exports.
+
+**Parameters**
+
+<TypeTable type={{"cell_id": {"type": "int", "required": true}, "dataset_template": {"type": "str", "required": true}, "active_month": {"type": "str | None", "required": true}}} />
+
+### `normalize_enso_locale`
+
+```python
+def normalize_enso_locale(locale: str | None) -> str
+```
+
+Return a supported plot locale, defaulting safely to English.
+
+**Parameters**
+
+<TypeTable type={{"locale": {"type": "str | None", "required": true}}} />
+
+### `_load_plot_text`
+
+```python
+@lru_cache(maxsize=2)
+def _load_plot_text(locale: str) -> dict
+```
+
+Load ENSO plot labels from the same messages used by Next.js.
+
+**Parameters**
+
+<TypeTable type={{"locale": {"type": "str", "required": true}}} />
+
+### `_fetch_forecast_cell_row`
+
+```python
+def _fetch_forecast_cell_row(cell_id: int, table_name: str) -> dict | None
+```
+
+Fetch a single grid-cell row from a seas5_forecast_* table by primary key.
+
+Uses SELECT * — the consolidated tables carry all reference and forecast
+columns, so no explicit column list has to be maintained.
+
+**Parameters**
+
+<TypeTable type={{"cell_id": {"type": "int", "required": true}, "table_name": {"type": "str", "required": true}}} />
+
+### `_forecast_prob_items`
+
+```python
+def _forecast_prob_items(row: dict) -> list[tuple[int, int, str]]
+```
+
+Find the forecast suitability columns (forecast_\{mon\}_\{year\}) in the row.
+
+Returns chronologically sorted (year, month_idx_1based, column_name) tuples.
+
+**Parameters**
+
+<TypeTable type={{"row": {"type": "dict", "required": true}}} />
+
+### `_build_ref_series`
+
+```python
+def _build_ref_series(row: dict, prefix: str, length: int=12)
+```
+
+Extract mean and std arrays for a reference variable across 12 calendar months.
+
+**Parameters**
+
+<TypeTable type={{"row": {"type": "dict", "required": true}, "prefix": {"type": "str", "required": true}, "length": {"type": "int", "required": false, "default": "12"}}} />
+
+### `_build_fc_series`
+
+```python
+def _build_fc_series(row: dict, prefix: str, fc_labels: list[str])
+```
+
+Extract forecast values for the given variable from \{prefix\}_fc_YYYY_MM columns.
+
+**Parameters**
+
+<TypeTable type={{"row": {"type": "dict", "required": true}, "prefix": {"type": "str", "required": true}, "fc_labels": {"type": "list[str]", "required": true}}} />
+
+### `_build_ref_suitability_series`
+
+```python
+def _build_ref_suitability_series(row: dict) -> tuple[np.ndarray, np.ndarray]
+```
+
+Extract reference suitability mean/std per calendar month (Jan..Dec).
+
+Columns: referenz_\{mon\}_\{period\} and referenz_\{mon\}_\{period\}_(std),
+where the period (e.g. "2000_2025") is discovered from the row.
+
+**Parameters**
+
+<TypeTable type={{"row": {"type": "dict", "required": true}}} />
+
+### `_build_enso_panels`
+
+```python
+def _build_enso_panels(row: dict, text: dict) -> list[tuple[str, str, np.ndarray, np.ndarray, np.ndarray, list[tuple[int, int, str]]]]
+```
+
+Build the five plot series; forecast tuples retain year and month across New Year.
+
+**Parameters**
+
+<TypeTable type={{"row": {"type": "dict", "required": true}, "text": {"type": "dict", "required": true}}} />
+
+### `_json_number`
+
+```python
+def _json_number(value: float) -> float | None
+```
+
+Return null for missing/nonfinite database values, which JSON cannot encode.
+
+**Parameters**
+
+<TypeTable type={{"value": {"type": "float", "required": true}}} />
+
+### `build_ENSO_suitability_data`
+
+```python
+def build_ENSO_suitability_data(cell_id: int, dataset_template: str='seas5_forecast_albopictus_habitat_probability', locale: str='en') -> dict | None
+```
+
+Read one cell and return localized, JSON-safe monthly ENSO chart data.
+
+Reference values have twelve calendar-month positions. Forecast values retain
+their chronological year/month, so a December-to-January window is unambiguous.
+Temperature, dewpoint, and wind retain their stored units; precipitation is
+mm/day and suitability is percent. Missing data is represented by null.
+
+
+**Example**
+
+```python
+payload = {
+"version": "enso-suitability-v1",
+"cellID": 200509,
+"dataset": "seas5_forecast_albopictus_habitat_probability",
+"coordinates": {"latitude": 52.5, "longitude": 13.25},
+"months": [{"month": 1, "label": "Jan"}],
+"title": "Climate Suitability & Drivers",
+"referenceLegend": "ERA5 2000-2025 (±1 SD)",
+"forecastLegend": "SEAS5 Forecast",
+"panels": [
+    {
+        "key": "suitability",
+        "label": "Habitat Suitability [%]",
+        "reference": [{"month": 1, "mean": 12.4, "std": 3.1, "lower": 9.3, "upper": 15.5}],
+        "forecast": [{"year": 2026, "month": 8, "value": 64.2}],
+    }
+],
+}
+```
+
+**Parameters**
+
+<TypeTable type={{"cell_id": {"type": "int", "required": true}, "dataset_template": {"type": "str", "required": false, "default": "'seas5_forecast_albopictus_habitat_probability'"}, "locale": {"type": "str", "required": false, "default": "'en'"}}} />
+
+### `_build_enso_figure`
+
+```python
+def _build_enso_figure(cell_id: int, row: dict | None, dataset_template: str, active_month: str | None=None, locale: str='en') -> Figure
+```
+
+Build a plot with 5 panels: 4 climate factors + habitat suitability.
+Each panel shows ERA5 2000-2025 reference (blue line ±1 std band) and
+SEAS5 forecast points (orange markers) for the selected grid cell.
+
+**Parameters**
+
+<TypeTable type={{"cell_id": {"type": "int", "required": true}, "row": {"type": "dict | None", "required": true}, "dataset_template": {"type": "str", "required": true}, "active_month": {"type": "str | None", "required": false, "default": "None"}, "locale": {"type": "str", "required": false, "default": "'en'"}}} />
+
+### `render_ENSO_suitability_svg`
+
+```python
+def render_ENSO_suitability_svg(cell_id: int, dataset_template: str='seas5_forecast_albopictus_habitat_probability', active_month: str | None=None, locale: str='en') -> bytes
+```
+
+Render one ENSO suitability chart directly to SVG bytes.
+
+**Parameters**
+
+<TypeTable type={{"cell_id": {"type": "int", "required": true}, "dataset_template": {"type": "str", "required": false, "default": "'seas5_forecast_albopictus_habitat_probability'"}, "active_month": {"type": "str | None", "required": false, "default": "None"}, "locale": {"type": "str", "required": false, "default": "'en'"}}} />
+
+### `create_ENSO_suitability_visualizations`
+
+```python
+def create_ENSO_suitability_visualizations(cell_id: int, out_dir: Path | str | None=None, dataset_template: str='seas5_forecast_albopictus_habitat_probability', active_month: str | None=None, locale: str='en') -> Path
+```
+
+Export one ENSO suitability SVG atomically for offline/CLI use.
+
+**Parameters**
+
+<TypeTable type={{"cell_id": {"type": "int", "required": true}, "out_dir": {"type": "Path | str | None", "required": false, "default": "None"}, "dataset_template": {"type": "str", "required": false, "default": "'seas5_forecast_albopictus_habitat_probability'"}, "active_month": {"type": "str | None", "required": false, "default": "None"}, "locale": {"type": "str", "required": false, "default": "'en'"}}} />
+
+## `backend/routes/processData/enso_schema.py`
+
+Schema rules for the rolling SEAS5/ENSO suitability datasets.
+
+### `EnsoSuitabilityColumn`
+
+```python
+@dataclass(frozen=True)
+class EnsoSuitabilityColumn
+```
+
+Parsed suitability field with a one-based month and optional baseline years.
+
+
+**Example**
+
+EnsoSuitabilityColumn(kind="forecast", month=8, year=2026)
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"kind": {"type": "EnsoSuitabilityColumnKind", "required": true}, "month": {"type": "int", "required": true}, "year": {"type": "int | None", "required": false, "default": "None"}, "reference_start_year": {"type": "int | None", "required": false, "default": "None"}, "reference_end_year": {"type": "int | None", "required": false, "default": "None"}}} />
+
+### `EnsoClimateColumn`
+
+```python
+@dataclass(frozen=True)
+class EnsoClimateColumn
+```
+
+Parsed climate field for a forecast or monthly reference statistic.
+
+
+**Example**
+
+EnsoClimateColumn(kind="reference_mean", variable="t2m", month=8)
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"kind": {"type": "EnsoClimateColumnKind", "required": true}, "variable": {"type": "EnsoClimateVariable", "required": true}, "month": {"type": "int", "required": true}, "year": {"type": "int | None", "required": false, "default": "None"}}} />
+
+### `normalize_enso_column_name`
+
+```python
+def normalize_enso_column_name(column_name: str) -> str
+```
+
+Normalize raw CSV and sanitized database names for schema matching.
+
+**Parameters**
+
+<TypeTable type={{"column_name": {"type": "str", "required": true}}} />
+
+### `parse_enso_suitability_column`
+
+```python
+def parse_enso_suitability_column(column_name: str) -> EnsoSuitabilityColumn | None
+```
+
+Parse one exact rolling suitability column.
+
+**Parameters**
+
+<TypeTable type={{"column_name": {"type": "str", "required": true}}} />
+
+### `enso_suitability_column_kind`
+
+```python
+def enso_suitability_column_kind(column_name: str) -> EnsoSuitabilityColumnKind | None
+```
+
+Return the ENSO suitability role of an exact schema column, if any.
+
+**Parameters**
+
+<TypeTable type={{"column_name": {"type": "str", "required": true}}} />
+
+### `is_enso_suitability_column`
+
+```python
+def is_enso_suitability_column(column_name: str) -> bool
+```
+
+Return whether a column belongs to the ENSO suitability schema.
+
+**Parameters**
+
+<TypeTable type={{"column_name": {"type": "str", "required": true}}} />
+
+### `parse_enso_climate_column`
+
+```python
+def parse_enso_climate_column(column_name: str) -> EnsoClimateColumn | None
+```
+
+Parse one exact ERA5 reference or SEAS5 climate forecast column.
+
+**Parameters**
+
+<TypeTable type={{"column_name": {"type": "str", "required": true}}} />
+
+### `is_enso_numeric_column`
+
+```python
+def is_enso_numeric_column(column_name: str) -> bool
+```
+
+Return whether an exact ENSO schema column must be stored as a float.
+
+**Parameters**
+
+<TypeTable type={{"column_name": {"type": "str", "required": true}}} />
+
+### `enso_column_metadata`
+
+```python
+def enso_column_metadata(column_name: str, lang: str) -> dict | None
+```
+
+Build localized metadata for one exact ENSO schema column.
+
+**Parameters**
+
+<TypeTable type={{"column_name": {"type": "str", "required": true}, "lang": {"type": "str", "required": true}}} />
+
+## `backend/routes/processData/uncertaintyVis.py`
+
+Build cell-level uncertainty data and deterministic calibration/SVG plots.
+
+The module reads monthly prediction fields from PostgreSQL. JSON chart data
+and the non-interactive Matplotlib SVG renderer use the same monthly inputs.
+
+### `fetch_pixel_row`
+
+```python
+def fetch_pixel_row(month: int, pixel_id: int, conn_params: dict, dataset_template: str) -> dict | None
+```
+
+Fetch a single spatial grid-cell row by primary key `id` for a given month.
+
+
+**Returns**
+
+Dictionary mapping `_NEEDED_COLS` (coordinates, summary statistics,
+and `sim_1..sim_50`) to column values, or `None` if no row matches.
+
+**Parameters**
+
+<TypeTable type={{"month": {"type": "int", "required": true, "description": "Calendar month index (1–12) substituted into `dataset_template`."}, "pixel_id": {"type": "int", "required": true, "description": "Database row primary key `id` for the selected grid cell."}, "conn_params": {"type": "dict", "required": true, "description": "Keyword arguments passed to `psycopg.connect`."}, "dataset_template": {"type": "str", "required": true, "description": "Relation name template containing `{month}`."}}} />
+
+### `_fetch_monthly_data`
+
+```python
+def _fetch_monthly_data(row_id: int, conn_params: dict, dataset_template: str, months_range: range) -> dict[int, dict]
+```
+
+Fetch monthly prediction and deterministic simulation values across `months_range`.
+
+Missing monthly tables or missing `row_id` entries are logged and skipped
+so partial seasonal series can still be rendered.
+
+
+**Returns**
+
+Mapping from calendar month integer to a dictionary with `lon`, `lat`,
+`geometry`, `mean`, `sd`, `cv`, `q05`, `q95`, and
+deterministic `groundTruthLabel`.
+
+**Parameters**
+
+<TypeTable type={{"row_id": {"type": "int", "required": true}, "conn_params": {"type": "dict", "required": true}, "dataset_template": {"type": "str", "required": true}, "months_range": {"type": "range", "required": true}}} />
+
+### `_json_number`
+
+```python
+def _json_number(value: float) -> float | None
+```
+
+Encode nonfinite numeric fields as JSON null.
+
+**Parameters**
+
+<TypeTable type={{"value": {"type": "float", "required": true}}} />
+
+### `build_uncertainty_chart_data`
+
+```python
+def build_uncertainty_chart_data(row_id: int, dataset_template: str='t_2024_monthly_mean_{month}_ocsvm_aegypti_predictions_2023_mod_sim', months_range: range=range(1, 13)) -> dict | None
+```
+
+Return temporal and calibration series for one selected cell as JSON data.
+
+Calibration uses the same centered-interval calculation as the SVG. The
+comparison values are deterministic samples from `sim_*` fields, not
+independently observed ground truth. Temporal bounds are mean ±2 SD.
+Non-finite floats are serialized as `None` (JSON `null`).
+
+
+**Example**
+
+```python
+payload = {
+"version": "uncertainty-v1",
+"cellID": 200509,
+"coordinates": {"latitude": 52.5, "longitude": 13.25},
+"temporal": [
+    {
+        "month": 7,
+        "mean": 0.68,
+        "sd": 0.09,
+        "lower": 0.50,
+        "upper": 0.86,
+        "simulatedValue": 0.71,
+        "cv": 0.13,
+        "q05": 0.53,
+        "q95": 0.82,
+    }
+],
+"calibration": [{"expected": 0.5, "observed": 0.5}],
+"miscalibrationArea": 0.04,
+}
+```
+
+**Parameters**
+
+<TypeTable type={{"row_id": {"type": "int", "required": true}, "dataset_template": {"type": "str", "required": false, "default": "'t_2024_monthly_mean_{month}_ocsvm_aegypti_predictions_2023_mod_sim'"}, "months_range": {"type": "range", "required": false, "default": "range(1, 13)"}}} />
+
+### `_build_uncertainty_figure`
+
+```python
+def _build_uncertainty_figure(data: dict[int, dict], plot_type: str) -> Figure
+```
+
+Build one UQ figure from an already fetched monthly data series.
+
+**Parameters**
+
+<TypeTable type={{"data": {"type": "dict[int, dict]", "required": true}, "plot_type": {"type": "str", "required": true}}} />
+
+### `render_uncertainty_svgs`
+
+```python
+def render_uncertainty_svgs(row_id: int, dataset_template: str='t_2024_monthly_mean_{month}_ocsvm_aegypti_predictions_2023_mod_sim', months_range=range(1, 13), plot_types=('uncertainty', 'calibration')) -> dict[str, bytes]
+```
+
+Render requested UQ plots to in-memory SVG bytes from one fetched monthly dataset.
+
+Serializes Matplotlib figure creation under `SVG_RENDER_LOCK` so concurrent
+worker threads do not collide on global pyplot state.
+
+
+**Raises**
+
+- `ValueError`: If `plot_types` contains an unsupported plot identifier.
+
+**Parameters**
+
+<TypeTable type={{"row_id": {"type": "int", "required": true}, "dataset_template": {"type": "str", "required": false, "default": "'t_2024_monthly_mean_{month}_ocsvm_aegypti_predictions_2023_mod_sim'"}, "months_range": {"type": "Any", "required": false, "default": "range(1, 13)"}, "plot_types": {"type": "Any", "required": false, "default": "('uncertainty', 'calibration')"}}} />
+
+### `create_uncertainty_visualizations`
+
+```python
+def create_uncertainty_visualizations(out_dir=None, grid_start=200506, grid_end=200506, dataset_template='t_2024_monthly_mean_{month}_ocsvm_aegypti_predictions_2023_mod_sim', months_range=range(1, 13), plot_type='both')
+```
+
+Export uncertainty and/or calibration SVG plots for offline/CLI use.
+
+**Parameters**
+
+<TypeTable type={{"out_dir": {"type": "Any", "required": false, "default": "None"}, "grid_start": {"type": "Any", "required": false, "default": "200506"}, "grid_end": {"type": "Any", "required": false, "default": "200506"}, "dataset_template": {"type": "Any", "required": false, "default": "'t_2024_monthly_mean_{month}_ocsvm_aegypti_predictions_2023_mod_sim'"}, "months_range": {"type": "Any", "required": false, "default": "range(1, 13)"}, "plot_type": {"type": "Any", "required": false, "default": "'both'"}}} />
+
+## `backend/routes/processData/geo_utils.py`
+
+Geospatial helper utilities for processData modules.
+
+### `extract_centroid`
+
+```python
+def extract_centroid(row: dict) -> tuple[float, float]
+```
+
+Return (latitude, longitude) of the cell centroid.
+
+If `geometry` (WKT POLYGON) is present in the row, computes the center
+from the polygon boundary coordinates. Otherwise falls back to
+`latitude` and `longitude` fields in the row dict.
+
+**Parameters**
+
+<TypeTable type={{"row": {"type": "dict", "required": true}}} />
+
+### `format_coord`
+
+```python
+def format_coord(val: float, decimals: int=2) -> str
+```
+
+Format coordinate using standard half-up rounding to match frontend tooltips.
+
+**Parameters**
+
+<TypeTable type={{"val": {"type": "float", "required": true}, "decimals": {"type": "int", "required": false, "default": "2"}}} />
+
+## `backend/routes/processData/svg_utils.py`
+
+Shared helpers for thread-safe SVG rendering and optional file export.
+
+### `figure_to_svg_bytes`
+
+```python
+def figure_to_svg_bytes(fig, *, bbox_inches: str | None=None) -> bytes
+```
+
+Serialize and close a Matplotlib figure without touching the filesystem.
+
+**Parameters**
+
+<TypeTable type={{"fig": {"type": "Any", "required": true}, "bbox_inches": {"type": "str | None", "required": false, "default": "None"}}} />
+
+### `save_svg_atomic`
+
+```python
+def save_svg_atomic(svg_data: bytes, target: Path) -> Path
+```
+
+Atomically replace one explicitly requested offline SVG export.
+
+**Parameters**
+
+<TypeTable type={{"svg_data": {"type": "bytes", "required": true}, "target": {"type": "Path", "required": true}}} />

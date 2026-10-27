@@ -1,5 +1,3 @@
-import { dataSourceURLs } from './const_store';
-
 // ─── Helper: build a URL string from a base path + typed params object ────────
 
 /**
@@ -38,11 +36,38 @@ function buildUrl(basePath: string, params?: Record<string, string | number | un
  *
  * @example
  * ```ts
+ * import { apiRoutes, type MapName } from "@/framework";
+ *
  * const publicHealthBasemap: MapName = "germany_map_districts";
  * const url = apiRoutes.fetchMapData({ mapName: publicHealthBasemap });
  * ```
  */
 export type MapName = "germany_map_states" | "germany_map_districts" | "world_map" | "usa_map" | "capitals";
+
+/**
+ * Supported analytical aggregate operations accepted by `/api/getDataFromDB`.
+ *
+ * @remarks
+ * - `getUniqueEntries`: Returns distinct feature values as `Array<{ feature: string | number }>`.
+ *   When querying a `date` column, calendar years are returned instead.
+ * - `getMinMax`: Computes the minimum and maximum numeric values as `{ min_val: number, max_val: number }`.
+ * - `getCount`: Counts occurrences per feature value as `Array<{ feature: string | number, count: number }>`.
+ * - `getGroupedCount`: Groups feature values by a secondary category column as
+ *   `Array<{ feature: string | number, category: string, count: number }>`. Requires `groupBy`.
+ *
+ * @example
+ * ```ts
+ * import { apiRoutes, type DataQueryTask } from "@/framework";
+ *
+ * const uniqueSpeciesTask: DataQueryTask = "getUniqueEntries";
+ * const url = apiRoutes.fetchDbData({
+ *   relationName: "world_mosquitos_2014_2025_gdf_mosquito_amount",
+ *   feature: "species",
+ *   task: uniqueSpeciesTask,
+ * });
+ * ```
+ */
+export type DataQueryTask = "getUniqueEntries" | "getMinMax" | "getCount" | "getGroupedCount";
 
 /**
  * Canonical frontend registry for Flask API endpoint URLs.
@@ -54,6 +79,9 @@ export type MapName = "germany_map_states" | "germany_map_districts" | "world_ma
  *
  * @example
  * ```ts
+ * import { apiRoutes } from "@/framework";
+ *
+ * // Replace the relation name with one available in your deployment.
  * const habitatUrl = apiRoutes.fetchDbData({
  *   relationName: "t_2024_monthly_mean_7_ocsvm_albopictus_predictions_2023_mod_sim",
  *   feature: "mean",
@@ -65,15 +93,13 @@ export type MapName = "germany_map_states" | "germany_map_districts" | "world_ma
 class apiRoutes {
 
     // API base
-    /** API namespace used by the Next.js proxy. @default "api" */
+    /** API namespace used by the Next.js proxy. @defaultValue "api" */
     public static readonly API_BASE = 'api';
-    /** Root path shared by all proxied Flask endpoints. @default "/api" */
+    /** Root path shared by all proxied Flask endpoints. @defaultValue "/api" */
     public static readonly API_URL = `/${apiRoutes.API_BASE}`;
 
     // ── Simple endpoints (no query parameters) ───────────────────────────
 
-    /** Endpoint that downloads and decompresses a JSON resource. */
-    public static readonly FETCH_COMPRESSED_JSON: string = `${apiRoutes.API_URL}/get_compressed_json`;
     /** Endpoint that creates a database relation from an uploaded file. */
     public static readonly CREATE_TABLE_FROM_FILE: string = `${apiRoutes.API_URL}/setFilesToDB`;
     /** Endpoint that updates an individual database value. */
@@ -95,19 +121,8 @@ class apiRoutes {
     /** Processing endpoint that assigns spatial records to country polygons. */
     public static readonly ASSIGN_COUNTRIES_TO_DATASET: string = `${apiRoutes.API_URL}/processData/assignCountries`;
 
-    /**
-     * Builds the endpoint used to aggregate an RKI dataset for a target date.
-     *
-     * @param params - Optional source relation, destination relation, and ISO date.
-     * @returns Encoded aggregation endpoint URL.
-     */
-    static aggregateRKI(params: {
-        sourceTable?: string;
-        targetTable?: string;
-        targetDate?: string;
-    }): string {
-        return buildUrl(`${apiRoutes.API_URL}/processData/aggregateRKI`, params);
-    }
+    /** POST endpoint that creates or refreshes RKI state aggregates. */
+    public static readonly AGGREGATE_RKI: string = `${apiRoutes.API_URL}/processData/aggregateRKI`;
 
     // ── Parameterised endpoints (typed function signatures) ───────────────
 
@@ -142,11 +157,18 @@ class apiRoutes {
      * @returns Encoded database-query endpoint URL.
      *
      * @remarks
-     * This method mirrors the `/api/getDataFromDB` contract in `rules.md`. Consumers should pass its result to
-     * `useGetJSONData` so caching, request deduplication, and standardized error handling remain active.
+     * This builder targets `/api/getDataFromDB` through the Next.js-to-Flask rewrite.
+     * `relationName` is required; `feature` and the remaining filters are emitted only
+     * when supplied. Generic multi-column charts pass `features` as a comma-separated
+     * query value. The response shape depends on `task` and `responseFormat`; this
+     * method only constructs the URL and does not validate the query or fetch data.
+     * JSON consumers can pass the returned URL to `useGetJSONData`.
      *
      * @example
      * ```ts
+     * import { apiRoutes } from "@/framework";
+     *
+     * // Replace the relation name with one available in your deployment.
      * const url = apiRoutes.fetchDbData({
      *   relationName: "world_mosquitos_2014_2025_gdf_mosquito_amount",
      *   feature: "mosquito_amount",
@@ -166,7 +188,8 @@ class apiRoutes {
         limit?: number;
         filterBy?: string;
         filterValue?: string;
-        task?: string;
+        /** Optional aggregate or set operation performed on a single feature. */
+        task?: DataQueryTask;
         /** Optional response representation optimized for a specific consumer. */
         responseFormat?: "map-grid-v1";
         /** Secondary grouping column used by grouped aggregate tasks. */
@@ -232,8 +255,24 @@ class apiRoutes {
     /**
      * Builds the URL for a cell-level UQ SVG visualization.
      *
-     * @param params - SVG filename and selected spatial grid-cell identifier.
+     * @param params - SVG filename and database row ID of the selected spatial cell.
      * @returns Encoded uncertainty-visualization endpoint URL.
+     *
+     * @remarks
+     * Use the database row ID corresponding to the selected grid cell, as stored
+     * in `InterfaceContext.dbRowID_of_selectedGridcellID`. The response is an SVG
+     * image; render the URL as an image source rather than parsing it as `dbDATA`.
+     *
+     * @example
+     * ```tsx
+     * import { apiRoutes } from "@/framework";
+     *
+     * const svgUrl = apiRoutes.getUncertaintySvg({
+     *   filename: "seasonal_uncertainty_cell.svg",
+     *   cellID: 200509,
+     * });
+     * <img src={svgUrl} alt="Seasonal uncertainty for the selected grid cell" />;
+     * ```
      */
     static getUncertaintySvg(params: {
         filename: string;
@@ -243,6 +282,21 @@ class apiRoutes {
         locale?: "en" | "de"; // optional: locale for backend-rendered labels
     }): string {
         return buildUrl(`${apiRoutes.API_URL}/get_uncertainty_svg`, params);
+    }
+
+    /**
+     * Builds a JSON chart-data URL for ENSO suitability or seasonal uncertainty visualizations.
+     *
+     * @param params - Chart mode (`"enso"` or `"uncertainty"`), database row `cellID`, and optional dataset/locale overrides.
+     * @returns Encoded cell-chart endpoint URL (`/api/get_cell_chart_data`).
+     */
+    static getCellChartData(params: {
+        chart: "enso" | "uncertainty";
+        cellID: number;
+        dataset?: string;
+        locale?: "en" | "de";
+    }): string {
+        return buildUrl(`${apiRoutes.API_URL}/get_cell_chart_data`, params);
     }
  
 

@@ -1,0 +1,33 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: renderStandardTooltipHTML
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **renderStandardTooltipHTML**(`props`): `string`
+
+Generates standardized HTML string for map Leaflet tooltips.
+
+## Parameters
+
+### props
+
+[`StandardTooltipProps`](../interfaces/StandardTooltipProps)
+
+Configuration matching [StandardTooltipProps](../interfaces/StandardTooltipProps).
+
+## Returns
+
+`string`
+
+HTML string representation.
+
+## Remarks
+
+Values, labels, descriptions, `chartId`, and `colorBarHtml` are
+interpolated as raw HTML. Escape untrusted content before calling this
+function; the React [StandardTooltip](StandardTooltip) component is preferable for
+plain text values.

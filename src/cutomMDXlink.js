@@ -4,14 +4,14 @@ import { Link } from "@/i18n/routing";
 /**
  * Renders locale-aware internal MDX links, smooth-scrolling anchors, and normal external anchors.
  *
- * @param {{href: string} & Record<string, unknown>} props - Link destination and forwarded anchor properties.
- * @returns {import('react').ReactElement} Link element appropriate for the destination type.
+ * @param props - Link destination and forwarded anchor properties.
+ * @returns Link element appropriate for the destination type.
  *
  * @remarks
  * Hash links first target the dedicated `scrollRefx` documentation container so section navigation does not scroll the
  * complete dashboard shell.
  */
-const CustomMDXLink = ({ href, ...props }) => {
+const CustomMDXLink = ({ href = '', ...props }) => {
 
 
 
@@ -32,8 +32,7 @@ const CustomMDXLink = ({ href, ...props }) => {
         top: "" + elem.offsetTop - 180, // Adjust offset as needed
         behavior: 'smooth'
       });
-    } else {
-      elem.scrollOffsetTop = "20px";
+    } else if (elem) {
       elem?.scrollIntoView({
         behavior: 'smooth'
       });
@@ -61,6 +60,10 @@ const CustomMDXLink = ({ href, ...props }) => {
   const isInternal = href && (href.startsWith('/') || href.startsWith('.'));
 
   if (isInternal) {
+    const explicitLocale = href.match(/^\/(en|de)(?=\/|$)/);
+    if (explicitLocale) {
+      return <Link href={href.slice(explicitLocale[0].length) || '/'} locale={explicitLocale[1]} {...props} />;
+    }
     // Use the i18n-aware Link for internal navigation
     return <Link href={href} {...props} />;
   } else {

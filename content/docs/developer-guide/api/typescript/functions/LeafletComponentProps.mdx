@@ -1,0 +1,56 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: LeafletComponentProps
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **LeafletComponentProps**(`chartName`, `dataURL`, `exampleVar?`, `center?`, `zoom?`, `isProjection_equirectangular?`): [`LeafletComponentProps`](../interfaces/LeafletComponentProps)
+
+Creates a complete base Leaflet map-container configuration.
+
+## Parameters
+
+### chartName
+
+`string`
+
+Stable DOM identifier for the map.
+
+### dataURL
+
+`string`
+
+Source URL associated with the map.
+
+### exampleVar?
+
+`any` = `null`
+
+Legacy extension value.
+
+### center?
+
+\[`number`, `number`\] = `...`
+
+Initial `[latitude, longitude]` center.
+
+### zoom?
+
+`number` = `2`
+
+Initial Leaflet zoom.
+
+### isProjection\_equirectangular?
+
+`boolean` = `false`
+
+Enables the EPSG:4326 coordinate reference system.
+
+## Returns
+
+[`LeafletComponentProps`](../interfaces/LeafletComponentProps)
+
+A configuration consumed by [LeafletMapComponent](../variables/LeafletMap).

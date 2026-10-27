@@ -1,0 +1,57 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: UseGridDataParserParams
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Parameters for the [useGridDataParser](../functions/useGridDataParser) hook.
+
+## Example
+
+```ts
+import type { UseGridDataParserParams } from "@/framework";
+
+const cellSize = { current: { lat: 0.25, lng: 0.25 } };
+const params: UseGridDataParserParams = {
+  isLoading: false,
+  rawData: {
+    response: [{ geometry: "POLYGON ((13 52, 13.25 52, 13.25 51.75, 13 51.75, 13 52))", feature: "0.73", id: 42 }],
+  },
+  gridcellSizeRef: cellSize,
+};
+```
+
+## Properties
+
+### isLoading
+
+> **isLoading**: `boolean`
+
+Whether the raw dataset query is still loading
+
+***
+
+### rawData
+
+> **rawData**: `object`
+
+Row-oriented WKT polygons or a compact `map-grid-v1` response.
+
+#### response?
+
+> `optional` **response?**: [`MapGridResponseV1`](MapGridResponseV1) \| `object`[]
+
+#### error?
+
+> `optional` **error?**: `unknown`
+
+***
+
+### gridcellSizeRef
+
+> **gridcellSizeRef**: `MutableRefObject`\<[`GridCellSize`](GridCellSize)\>
+
+Mutable ref storing the parsed cell width and height in latitude/longitude degrees

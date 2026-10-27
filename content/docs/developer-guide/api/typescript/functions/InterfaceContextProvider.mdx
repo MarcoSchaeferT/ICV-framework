@@ -1,0 +1,48 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: InterfaceContextProvider
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **InterfaceContextProvider**(`props`): `Element`
+
+Provides shared selection and viewport state to a multi-view Vis. Interface.
+
+## Parameters
+
+### props
+
+[`InterfaceContextProviderProps`](../interfaces/InterfaceContextProviderProps)
+
+Children and optional initial grid-cell/database-row keys.
+
+## Returns
+
+`Element`
+
+A context provider wrapping the linked visualizations.
+
+## Remarks
+
+Initial state defaults: spatial-layer opacity starts at 0.85; the selected grid cell
+defaults to -1 unless `initialSelectedGridcellID` is supplied.
+
+The provider owns dataset, feature, time, geography, and map-viewport state.
+High-frequency mouse events remain in a mutable ref and notify explicit
+subscribers, avoiding a full context update on each pointer move.
+
+## Example
+
+```tsx
+import { InterfaceContextProvider } from "@/framework";
+
+<InterfaceContextProvider
+  initialSelectedGridcellID={300625}
+  initialDbRowIDOfSelectedGridcell={48292}
+>
+  <div>ENSO forecast maps and climate chart</div>
+</InterfaceContextProvider>
+```

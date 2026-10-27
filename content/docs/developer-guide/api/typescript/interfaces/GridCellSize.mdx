@@ -1,0 +1,38 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: GridCellSize
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Angular cell dimensions of geographical grid cells in latitude and longitude degrees.
+
+## See
+
+[useGridDataParser](../functions/useGridDataParser) for automated grid cell dimension extraction.
+
+## Example
+
+```ts
+import type { GridCellSize } from "@/framework";
+
+const quarterDegreeCell: GridCellSize = { lat: 0.25, lng: 0.25 };
+```
+
+## Properties
+
+### lat
+
+> **lat**: `number`
+
+Cell height in latitude degrees (e.g. 0.25)
+
+***
+
+### lng
+
+> **lng**: `number`
+
+Cell width in longitude degrees (e.g. 0.25)

@@ -1,0 +1,58 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: MapMouseEvents
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+High-frequency mouse interaction event structure stored in React mutable refs.
+
+## See
+
+[interfaceContextI.mouseEvent](InterfaceContextValue#mouseevent)
+
+## Example
+
+```ts
+import type { MapMouseEvents } from "@/framework";
+
+const hoverEvent: MapMouseEvents = {
+  type: "hover",
+  position: [420, 180],
+  country: "Germany",
+};
+```
+
+## Properties
+
+### type?
+
+> `optional` **type?**: `string`
+
+Interaction event type (e.g. "hover", "click", "mousemove", "null")
+
+***
+
+### position?
+
+> `optional` **position?**: \[`number`, `number`\]
+
+Bounded container pixel coordinates `[x, y]`
+
+***
+
+### event?
+
+> `optional` **event?**: `LeafletMouseEvent`
+
+Original Leaflet mouse event instance
+
+***
+
+### country?
+
+> `optional` **country?**: `string`
+
+Inspected country or administrative boundary name

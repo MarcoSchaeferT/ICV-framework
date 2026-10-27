@@ -1,0 +1,563 @@
+---
+title: CSV Upload & Ingestion
+description: Streaming CSV header/row parsing, SQL type inference, transactional table replacement, and PostgreSQL COPY.
+---
+
+Streaming CSV header/row parsing, SQL type inference, transactional table replacement, and PostgreSQL COPY.
+
+## `backend/routes/setFilesToDB/route_setFilesToDB.py`
+
+Accept streamed CSV uploads and schedule their database ingestion.
+
+### `_get_bg_loop`
+
+```python
+def _get_bg_loop() -> asyncio.AbstractEventLoop
+```
+
+Return a running background event loop owned by the current worker.
+
+Gunicorn preloads modules before forking, so a PID change discards an
+inherited loop and starts a new daemon thread in the child process.
+
+### `setFilesToDB`
+
+**HTTP Endpoint:** `POST` `/api/setFilesToDB` — Upload CSV files to database (REST Endpoints)
+
+*OpenAPI Specification:* `backend/API_docs/set_files_to_db.yml`
+
+**OpenAPI Request Parameters**
+
+<TypeTable type={{"files (formData)": {"type": "file", "required": true, "description": "One or more CSV files to upload to the database. Files are temporarily saved before being processed and inserted into the database."}}} />
+
+**OpenAPI Responses**
+
+<Tabs items={["HTTP 200", "HTTP 400", "HTTP 500"]}>
+<Tab value="HTTP 200">
+
+Files saved, background processing started
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "SUCCESS": "Files upload started",
+  "upload_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "file_paths": [
+    "/data/uploads/3fa85f64-5717-4562-b3fc-2c963f66afa6/mosquito_data.csv"
+  ],
+  "table_exist": false
+}
+```
+
+</Tab>
+<Tab value="HTTP 400">
+
+Bad request - no files provided or invalid request
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "ERROR": "<string>"
+}
+```
+
+</Tab>
+<Tab value="HTTP 500">
+
+Error finalizing a streamed upload file before background processing starts.
+
+- **Content-Type:** `application/json`
+
+```json
+{
+  "ERROR": "Error finalizing file: Upload stream has no filesystem destination"
+}
+```
+
+</Tab>
+</Tabs>
+
+```python
+@swag_from('../../API_docs/set_files_to_db.yml')
+@route_setFilesToDB.route('', methods=['POST'])
+async def setFilesToDB()
+```
+
+Stream multipart files into an upload-specific work directory.
+
+`DirectUploadRequest` writes file parts to disk while Flask parses the
+request. The route initializes Redis-backed status (or local fallback)
+before returning `upload_id` and schedules sequential ingestion in a
+worker-local event loop. The HTTP response means processing started, not
+that the database write succeeded.
+Invalid or unsaved files return an error and remove the work directory.
+The client polls `/api/uploadStatus?id=<upload_id>` for completion or a
+background error. The work directory is removed after either outcome.
+
+## `backend/routes/setFilesToDB/uploadFileToDB.py`
+
+Replace one uploaded relation and finish its metadata and country indexes.
+
+### `uploadFileToDB`
+
+```python
+async def uploadFileToDB(file_path: Path, upload_id: str)
+```
+
+Ingest one CSV snapshot under a cross-worker filename lock.
+
+
+**Returns**
+
+`None` on success or a dict containing `error` or `restart`.
+
+Replaces the relation schema, streams row insertion, populates column
+metadata, optionally assigns countries with Shapely, and invalidates
+relation-scoped cache entries. The file-name processing lock is shared
+across workers when Redis is available and released even on failure.
+A metadata-population exception is logged and does not stop ingestion;
+a country-assignment exception becomes a processing error.
+Schema replacement and COPY are separate transactions, so a later error
+does not restore the prior table. Cache invalidation runs on success.
+
+**Parameters**
+
+<TypeTable type={{"file_path": {"type": "Path", "required": true, "description": "Uploaded CSV already streamed into its work directory."}, "upload_id": {"type": "str", "required": true, "description": "Shared progress and error-state key returned to the client."}}} />
+
+### `checkErrors`
+
+```python
+def checkErrors(result)
+```
+
+Pass through error or restart result dictionaries.
+
+**Parameters**
+
+<TypeTable type={{"result": {"type": "Any", "required": true}}} />
+
+## `backend/routes/setFilesToDB/db_utils.py`
+
+Provide pooled PostgreSQL connections and raw query helpers.
+
+Connection pools are process-local and recreated after Gunicorn forks.
+
+### `is_connection_error`
+
+```python
+def is_connection_error(e: Exception) -> bool
+```
+
+Return True if an exception indicates the database server is stopped or unreachable.
+
+**Parameters**
+
+<TypeTable type={{"e": {"type": "Exception", "required": true}}} />
+
+### `format_db_error`
+
+```python
+def format_db_error(e: Exception, context: str='') -> str
+```
+
+Format an exception into a standardized, user-facing database error message.
+
+**Parameters**
+
+<TypeTable type={{"e": {"type": "Exception", "required": true}, "context": {"type": "str", "required": false, "default": "''"}}} />
+
+### `db_error_response`
+
+```python
+def db_error_response(e: Exception, context: str='')
+```
+
+Return a Flask jsonify error response with 503 for connection errors and 500 otherwise.
+
+**Parameters**
+
+<TypeTable type={{"e": {"type": "Exception", "required": true}, "context": {"type": "str", "required": false, "default": "''"}}} />
+
+### `get_db_connection_params`
+
+```python
+def get_db_connection_params() -> dict
+```
+
+Parse the configured PostgreSQL URL for psycopg connections.
+
+Host-run development maps `icv-database` to `localhost`; container runs
+keep the Compose service hostname. The parser accepts the URL shape used
+by this project and raises `ValueError` when `DATABASE_URL` is absent.
+
+### `_positive_env_int`
+
+```python
+def _positive_env_int(name: str, default: int) -> int
+```
+
+Read a positive integer environment setting or return its fallback.
+
+**Parameters**
+
+<TypeTable type={{"name": {"type": "str", "required": true}, "default": {"type": "int", "required": true}}} />
+
+### `get_db_connection_pool`
+
+```python
+def get_db_connection_pool() -> ConnectionPool
+```
+
+Return the thread-safe pool belonging to the current worker process.
+
+A Gunicorn worker that inherited a pool during preload closes that copy
+and opens its own pool. Size and timeout come from `DB_POOL_*` settings.
+
+### `close_db_connection_pool`
+
+```python
+def close_db_connection_pool() -> None
+```
+
+Close connections owned by the current process.
+
+### `get_db_connection`
+
+```python
+@contextmanager
+def get_db_connection()
+```
+
+Borrow a connection and return it cleanly to the process-local pool.
+
+### `query_raw`
+
+```python
+async def query_raw(query: Union[str, sql.SQL, sql.Composed], params: Optional[Union[tuple, dict]]=None) -> list[dict]
+```
+
+Execute a SELECT through a server-side cursor and return dictionaries.
+
+A named cursor prevents libpq from buffering the complete result before
+Python starts consuming it.  The returned list intentionally preserves the
+existing API contract, while driver fetches use 10,000-row batches. The
+final list still contains every returned row,
+so callers must bound large results or use `query_columnar`.
+
+`params` binds values; callers compose dynamic table and column names
+with `psycopg.sql.Identifier`. Database errors propagate to the caller.
+
+**Parameters**
+
+<TypeTable type={{"query": {"type": "Union[str, sql.SQL, sql.Composed]", "required": true}, "params": {"type": "Optional[Union[tuple, dict]]", "required": false, "default": "None"}}} />
+
+### `query_columnar`
+
+```python
+async def query_columnar(query: Union[str, sql.SQL, sql.Composed], column_names: Sequence[str], params: Optional[Union[tuple, dict]]=None, fetch_size: int=10000, row_mapper: Optional[Callable[[tuple], Sequence]]=None) -> dict[str, list]
+```
+
+Stream a SELECT into column arrays without per-row dictionaries.
+
+This is the preferred path for large visualization datasets.  It avoids
+both `fetchall()` and hundreds of thousands of Python dictionaries while
+retaining a compact JSON-friendly result. Each key in `column_names`
+receives one value per row, in the supplied order. `row_mapper` may
+transform each raw tuple before values are appended. The returned arrays
+still grow with the full result set; they are not a bounded page.
+
+**Parameters**
+
+<TypeTable type={{"query": {"type": "Union[str, sql.SQL, sql.Composed]", "required": true}, "column_names": {"type": "Sequence[str]", "required": true}, "params": {"type": "Optional[Union[tuple, dict]]", "required": false, "default": "None"}, "fetch_size": {"type": "int", "required": false, "default": "10000"}, "row_mapper": {"type": "Optional[Callable[[tuple], Sequence]]", "required": false, "default": "None"}}} />
+
+### `execute_raw`
+
+```python
+async def execute_raw(query: Union[str, sql.SQL, sql.Composed], params: Optional[Union[tuple, dict]]=None) -> None
+```
+
+Execute and commit one statement without returning rows.
+
+Values are bound through `params`; dynamic identifiers must be composed
+by the caller. PostgreSQL errors propagate after the connection context
+rolls back the failed transaction.
+
+**Parameters**
+
+<TypeTable type={{"query": {"type": "Union[str, sql.SQL, sql.Composed]", "required": true}, "params": {"type": "Optional[Union[tuple, dict]]", "required": false, "default": "None"}}} />
+
+## `backend/routes/setFilesToDB/createTable.py`
+
+Infer upload column types and replace PostgreSQL table schemas.
+
+The upload path treats each CSV as a complete snapshot, including rolling
+ENSO forecast columns that may change between uploads.
+
+### `_looks_like_date`
+
+```python
+def _looks_like_date(value: str) -> bool
+```
+
+Return True if *value* matches a common date format.
+
+**Parameters**
+
+<TypeTable type={{"value": {"type": "str", "required": true}}} />
+
+### `_classify_value`
+
+```python
+def _classify_value(value: str) -> str
+```
+
+Classify a single non-empty string value as int, float, date, or string.
+
+**Parameters**
+
+<TypeTable type={{"value": {"type": "str", "required": true}}} />
+
+### `_resolve_type`
+
+```python
+def _resolve_type(counts: dict[str, int]) -> str
+```
+
+Given per-type vote counts for a column, decide on the dominant type.
+
+Rules (applied in order):
+1. If *every* non-empty value is an integer → `int`
+2. If *every* non-empty value is numeric (int or float) → `float`
+   (ints are promotable to floats)
+3. If ≥ 80 % of non-empty values look like dates → `date`
+4. Otherwise → `string`
+
+**Parameters**
+
+<TypeTable type={{"counts": {"type": "dict[str, int]", "required": true}}} />
+
+### `infer_column_types`
+
+```python
+def infer_column_types(data: ParsedData) -> dict[str, str]
+```
+
+Sample the first `_INFERENCE_SAMPLE_SIZE` rows of the CSV file and infer SQL column types.
+
+Only columns not already covered by the static metadata mapping are sampled.
+
+
+**Returns**
+
+Mapping of lowercased original column names to PostgreSQL SQL type
+strings (`'float4'`, `'int4'`, `'date'`, or `'varchar'`).
+
+**Parameters**
+
+<TypeTable type={{"data": {"type": "ParsedData", "required": true, "description": "Parsed CSV header and file path metadata."}}} />
+
+### `prepare_column_types`
+
+```python
+def prepare_column_types(data: ParsedData) -> tuple[dict[str, str], list[str]]
+```
+
+Infer and resolve SQL types once for the complete upload pipeline.
+
+**Parameters**
+
+<TypeTable type={{"data": {"type": "ParsedData", "required": true}}} />
+
+### `createTable`
+
+```python
+async def createTable(data: ParsedData) -> Optional[dict]
+```
+
+Replace the dataset table with a schema derived from the uploaded file.
+
+`DROP` and `CREATE` run in the same transaction.  If creation fails,
+PostgreSQL rolls the drop back and keeps the previous table intact.
+Column types come from static metadata, a sample of up to 1,000 rows,
+exact ENSO column rules, or `varchar` as a fallback. Returns `None`
+on success or a `{"error": ...}` dictionary on failure.
+
+**Parameters**
+
+<TypeTable type={{"data": {"type": "ParsedData", "required": true}}} />
+
+### `loadMetadata`
+
+```python
+def loadMetadata() -> List[Dict[str, str]]
+```
+
+Load legacy column-to-datatype metadata into the shared in-memory map.
+
+The mapping is populated from the configured CSV only when empty and then
+reused by subsequent table-creation calls in the same process.
+
+### `getColumnSQLdataType`
+
+```python
+def getColumnSQLdataType(orignalCol: str, inferred_types: Optional[dict[str, str]]=None) -> str
+```
+
+Return the SQL column type for *orignalCol*.
+
+Lookup order:
+1. Static metadata (CSV / in-memory cache).
+2. `inferred_types` dict (populated by `infer_column_types`).
+3. Fallback: `varchar`.
+
+**Parameters**
+
+<TypeTable type={{"orignalCol": {"type": "str", "required": true}, "inferred_types": {"type": "Optional[dict[str, str]]", "required": false, "default": "None"}}} />
+
+## `backend/routes/setFilesToDB/insertData.py`
+
+Stream CSV rows into PostgreSQL COPY while reporting upload progress.
+
+### `insertData`
+
+```python
+async def insertData(data: ParsedData, upload_id: str) -> int | None
+```
+
+Stream CSV rows through PostgreSQL COPY and report database progress.
+
+The CSV header order and resolved SQL types determine each COPY row.
+Progress uses bytes consumed and stops at 99 percent; the upload route
+sets 100 only after the whole file batch succeeds. On success, return the
+inserted row count and remove this file. On failure, record the error in
+upload state and return `None`.
+
+**Parameters**
+
+<TypeTable type={{"data": {"type": "ParsedData", "required": true}, "upload_id": {"type": "str", "required": true}}} />
+
+### `cleanUp`
+
+```python
+def cleanUp(file_path=None)
+```
+
+Clean up the specific processed file
+
+**Parameters**
+
+<TypeTable type={{"file_path": {"type": "Any", "required": false, "default": "None"}}} />
+
+## `backend/routes/setFilesToDB/parseCSVdata.py`
+
+Read uploaded CSV headers and stream rows without materializing the file.
+
+### `ParsedData`
+
+```python
+class ParsedData
+```
+
+CSV header and upload metadata shared by schema creation and COPY.
+
+`column_names` preserves source headers; `sanitized_column_names`
+aligns by index with them and names the PostgreSQL columns. `file_size`
+is measured in bytes for progress reporting. Rows remain on disk.
+
+
+**Example**
+
+```python
+parsed = ParsedData()
+parsed.db_name = "dengue_serotype_counts"
+parsed.column_names = ["Country", "Year", "Serotype Count"]
+parsed.sanitized_column_names = ["country", "year", "serotype_count"]
+parsed.file_size = 18432
+```
+
+**Attributes & Schema Fields**
+
+<TypeTable type={{"db_name": {"type": "str", "required": true}, "column_names": {"type": "list[str]", "required": true}, "sanitized_column_names": {"type": "list[str]", "required": true}, "file_size": {"type": "int", "required": true}, "file_path": {"type": "Optional[Path]", "required": true}, "inferred_types": {"type": "Optional[dict[str, str]]", "required": true}, "column_sql_types": {"type": "list[str]", "required": true}}} />
+
+#### `ParsedData.__init__`
+
+```python
+def __init__(self)
+```
+
+Initialize empty header, type, path, and size metadata.
+
+### `parseCSVdata`
+
+```python
+async def parseCSVdata(file_path: Path) -> Union[ParsedData, dict]
+```
+
+Read a UTF-8 CSV header and derive its PostgreSQL relation name.
+
+Returns a `ParsedData` instance without scanning rows, or a
+`{"error": ...}` dictionary if reading or parsing fails. The caller
+checks that error result before creating a table.
+
+**Parameters**
+
+<TypeTable type={{"file_path": {"type": "Path", "required": true}}} />
+
+### `stream_csv_rows`
+
+```python
+def stream_csv_rows(file_path: Path) -> Generator[tuple[dict, int], None, None]
+```
+
+Yield `(row, bytes_consumed)` pairs one at a time without loading the file into memory.
+
+
+**Yields**
+
+Tuples of `(row_dict, bytes_consumed)` where `bytes_consumed` is the
+underlying binary stream offset read so far (used with
+`ParsedData.file_size` for upload progress reporting).
+
+
+**Raises**
+
+- `OSError`: If `file_path` cannot be opened or read.
+csv.Error: If the CSV stream contains malformed fields exceeding the 10 MB limit.
+
+**Parameters**
+
+<TypeTable type={{"file_path": {"type": "Path", "required": true, "description": "Path to a UTF-8 (or UTF-8 with BOM) CSV file on disk."}}} />
+
+### `sanitize_names`
+
+```python
+def sanitize_names(column_names) -> list[str]
+```
+
+Convert non-empty CSV names to PostgreSQL-compatible identifiers.
+
+Spaces, hyphens, colons, and dots are replaced; leading digits receive
+`t_`. Identifiers are truncated to PostgreSQL's 63-character limit.
+The function does not resolve collisions between sanitized names.
+
+**Parameters**
+
+<TypeTable type={{"column_names": {"type": "Any", "required": true}}} />
+
+### `snanitize_date`
+
+```python
+def snanitize_date(column_value) -> str
+```
+
+Normalize legacy incomplete date text before database ingestion.
+
+Unknown year and month markers become `0001` and `01`. For a slash-
+separated value, only the final segment is kept; missing components are
+filled with the first month or day.
+
+**Parameters**
+
+<TypeTable type={{"column_value": {"type": "Any", "required": true}}} />

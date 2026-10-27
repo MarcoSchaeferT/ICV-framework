@@ -1,0 +1,63 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: DatabaseResponse
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Legacy TypeScript envelope for database reads from Flask.
+
+## Remarks
+
+The `response` member varies by backend task and is currently untyped. Narrow
+it at the consumer boundary. This interface does not precisely model all
+runtime states: `/api/getDataFromDB` can send `error: null` on success, and
+`useGetJSONData` can return an empty object before a response or `{ error }`
+after a failed request. Check those states before reading required fields.
+
+## Example
+
+```ts
+import type { DatabaseResponse } from "@/framework";
+
+const mosquitoResponse: DatabaseResponse = {
+  relationName: "world_mosquitos_2014_2025_gdf_mosquito_amount",
+  header: ["id", "species", "mosquito_amount"],
+  response: [{ id: 42, species: "albopictus", mosquito_amount: 18 }],
+  error: "",
+};
+```
+
+## Properties
+
+### relationName
+
+> **relationName**: `string`
+
+Database relation used by the request.
+
+***
+
+### header
+
+> **header**: `string`[]
+
+Ordered set of columns included in the response.
+
+***
+
+### response
+
+> **response**: `any`
+
+Task-dependent records or aggregate values returned by Flask.
+
+***
+
+### error
+
+> **error**: `string`
+
+Legacy string error field; the database route may return `null` on success.

@@ -7,6 +7,12 @@ import { useUIContext } from '@/components/contexts/UIContext';
 import { t_richConfig } from "@/app/const_store";
 import { useTranslations } from "next-intl";
 
+/**
+ * Opens the disease-selection sidebar from the landing page.
+ *
+ * @returns A localized settings button.
+ * @remarks Clicking also clears the previous disease selection in `UIContext`.
+ */
 const SettingButton = () => {
   const t = useTranslations("page_home.pageContent");
   const UI_context = useUIContext();

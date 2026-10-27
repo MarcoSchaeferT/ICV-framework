@@ -1,0 +1,38 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: getGridCellDims
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **getGridCellDims**(`geoRect`): `object`
+
+Computes angular cell height and width in degrees from polygon bounds.
+
+## Parameters
+
+### geoRect
+
+\[`number`, `number`\][]
+
+Closed array of `[lat, lng]` boundary coordinate tuples.
+
+## Returns
+
+`object`
+
+Object `{ gridDimLat, gridDimLng }` in degrees, or `{ gridDimLat: 0, gridDimLng: 0 }` when `geoRect` is empty.
+
+### gridDimLat
+
+> **gridDimLat**: `number`
+
+### gridDimLng
+
+> **gridDimLng**: `number`
+
+## See
+
+[useGridDataParser](useGridDataParser)

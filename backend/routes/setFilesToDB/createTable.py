@@ -1,12 +1,17 @@
-from pathlib import Path
+"""Infer upload column types and replace PostgreSQL table schemas.
+
+The upload path treats each CSV as a complete snapshot, including rolling
+ENSO forecast columns that may change between uploads.
+"""
+
 import csv
-import io
 import re
 import psycopg
+from functools import lru_cache
 csv.field_size_limit(100000000)
-from typing import List, Dict, Optional
-import os
+from typing import Optional
 # custom modules
+from backend.metadata_utils import loadMetadataCSV
 from backend.routes.setFilesToDB.parseCSVdata import ParsedData, stream_csv_rows
 from backend.routes.setFilesToDB.db_utils import get_db_connection_params, SQL_DATATYPES
 from backend.routes.processData.enso_schema import is_enso_numeric_column
@@ -90,17 +95,18 @@ _INFERENCE_SAMPLE_SIZE = 1000
 
 
 def infer_column_types(data: ParsedData) -> dict[str, str]:
-    """Sample the first *_INFERENCE_SAMPLE_SIZE* rows of the CSV file and
-    return an inferred SQL type for every column that is **not** already
-    covered by the metadata.
+    """Sample the first ``_INFERENCE_SAMPLE_SIZE`` rows of the CSV file and infer SQL column types.
 
-    Returns
-    -------
-    dict[str, str]
-        Mapping of *original* (lowercased) column name → SQL type string
-        (e.g. ``"float4"``, ``"int4"``, ``"date"``, ``"varchar"``).
+    Only columns not already covered by the static metadata mapping are sampled.
+
+    Args:
+        data: Parsed CSV header and file path metadata.
+
+    Returns:
+        Mapping of lowercased original column names to PostgreSQL SQL type
+        strings (``'float4'``, ``'int4'``, ``'date'``, or ``'varchar'``).
     """
-    from backend.index import metadata
+    metadata = loadMetadata()
 
     # Determine which columns need inference
     columns_to_infer: list[str] = []
@@ -153,17 +159,20 @@ def prepare_column_types(data: ParsedData) -> tuple[dict[str, str], list[str]]:
 # Table creation
 # ---------------------------------------------------------------------------
 
-async def createTable(data: ParsedData) -> dict:
+async def createTable(data: ParsedData) -> Optional[dict]:
     """Replace the dataset table with a schema derived from the uploaded file.
 
     ``DROP`` and ``CREATE`` run in the same transaction.  If creation fails,
     PostgreSQL rolls the drop back and keeps the previous table intact.
+    Column types come from static metadata, a sample of up to 1,000 rows,
+    exact ENSO column rules, or ``varchar`` as a fallback. Returns ``None``
+    on success or a ``{"error": ...}`` dictionary on failure.
     """
     try:
         conn_params = get_db_connection_params()
     except Exception as e:
         print("ERROR getting connection params", e)
-        return {"ERROR": "connecting to database: " + str(e)}
+        return {"error": "connecting to database: " + str(e)}
        
 
     db_name = data.db_name
@@ -204,27 +213,22 @@ async def createTable(data: ParsedData) -> dict:
 
     except Exception as e:
         print(f"ERROR replacing table '{db_name}': {e}")
-        return {"ERROR": "ERROR replacing table: " + str(e)}
+        return {"error": "ERROR replacing table: " + str(e)}
 
     return None
 
 
 
-def loadMetadata() -> List[Dict[str, str]]:
-    from backend.index import metadata
-    from backend.index import getMetaDataPath
+@lru_cache(maxsize=1)
+def loadMetadata() -> dict[str, str]:
+    """Load English column datatypes from the shared metadata CSV reader.
 
-    LANGID: str = ""
-    if not metadata:
-        print("loading metadata")
-        metaDataPath: Path = getMetaDataPath(LANGID)
-        print("metaDataPath", metaDataPath)
-        with open(metaDataPath) as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                metadata[row["valuename"].lower()] = row["datatype"]
-
-    return metadata
+    Cache the mapping for subsequent uploads in the same process.
+    """
+    return {
+        name.lower(): row["datatype"]
+        for name, row in loadMetadataCSV("en").items()
+    }
 
 
 def getColumnSQLdataType(orignalCol: str, inferred_types: Optional[dict[str, str]] = None) -> str:
@@ -235,9 +239,7 @@ def getColumnSQLdataType(orignalCol: str, inferred_types: Optional[dict[str, str
     2. ``inferred_types`` dict (populated by ``infer_column_types``).
     3. Fallback: ``varchar``.
     """
-    from backend.index import metadata
-    if not metadata:
-        metadata = loadMetadata()
+    metadata = loadMetadata()
 
     orignalCol = orignalCol.lower()
 

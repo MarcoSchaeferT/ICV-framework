@@ -1,0 +1,81 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: snapToGrid
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **snapToGrid**(`coords`, `gridCellDims`, `gridOffset?`): `object`
+
+Snaps latitude and longitude coordinates to top-left corner bounds of a spatial grid cell.
+
+## Parameters
+
+### coords
+
+Target coordinate pair `{ lat, lng }`. The function subtracts
+the grid offset from this object in place.
+
+#### lat
+
+`number`
+
+#### lng
+
+`number`
+
+### gridCellDims
+
+Grid cell dimensions `{ lat, lng }`.
+
+#### lat
+
+`number`
+
+#### lng
+
+`number`
+
+### gridOffset?
+
+Optional offset displacement `{ lat, lng }`.
+
+#### lat
+
+`number`
+
+#### lng
+
+`number`
+
+## Returns
+
+`object`
+
+North-west `topLeft` and cell `center` coordinate pairs.
+
+### topLeft
+
+> **topLeft**: `object`
+
+#### topLeft.lat
+
+> **lat**: `number`
+
+#### topLeft.lng
+
+> **lng**: `number`
+
+### center
+
+> **center**: `object`
+
+#### center.lat
+
+> **lat**: `number`
+
+#### center.lng
+
+> **lng**: `number`

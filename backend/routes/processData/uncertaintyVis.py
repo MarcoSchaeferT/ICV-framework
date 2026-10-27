@@ -1,9 +1,20 @@
+"""Build cell-level uncertainty data and deterministic calibration/SVG plots.
+
+The module reads monthly prediction fields from PostgreSQL. JSON chart data
+and the non-interactive Matplotlib SVG renderer use the same monthly inputs.
+"""
+
 import numpy as np
+import math
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import uncertainty_toolbox.viz as uct_viz
+from uncertainty_toolbox.metrics_calibration import (
+    get_proportion_lists_vectorized,
+    miscalibration_area_from_proportions,
+)
 from pathlib import Path
 import psycopg
 from psycopg import sql as psycopg_sql
@@ -36,7 +47,18 @@ _SVG_DIR = Path(__file__).resolve().parent / "results_svg"
 
 
 def fetch_pixel_row(month: int, pixel_id: int, conn_params: dict, dataset_template: str) -> dict | None:
-    """Fetch a single pixel row by its primary key `id`."""
+    """Fetch a single spatial grid-cell row by primary key ``id`` for a given month.
+
+    Args:
+        month: Calendar month index (1–12) substituted into ``dataset_template``.
+        pixel_id: Database row primary key ``id`` for the selected grid cell.
+        conn_params: Keyword arguments passed to ``psycopg.connect``.
+        dataset_template: Relation name template containing ``{month}``.
+
+    Returns:
+        Dictionary mapping ``_NEEDED_COLS`` (coordinates, summary statistics,
+        and ``sim_1..sim_50``) to column values, or ``None`` if no row matches.
+    """
     table = dataset_template.format(month=month)
     cols = psycopg_sql.SQL(", ").join(psycopg_sql.Identifier(c) for c in _NEEDED_COLS)
     query = psycopg_sql.SQL("SELECT {cols} FROM {tbl} WHERE {id} = {val}").format(
@@ -62,7 +84,16 @@ except ImportError:
 
 
 def _fetch_monthly_data(row_id: int, conn_params: dict, dataset_template: str, months_range: range) -> dict[int, dict]:
-    """Fetch data for all months, returning {month: row_dict}."""
+    """Fetch monthly prediction and deterministic simulation values across ``months_range``.
+
+    Missing monthly tables or missing ``row_id`` entries are logged and skipped
+    so partial seasonal series can still be rendered.
+
+    Returns:
+        Mapping from calendar month integer to a dictionary with ``lon``, ``lat``,
+        ``geometry``, ``mean``, ``sd``, ``cv``, ``q05``, ``q95``, and
+        deterministic ``groundTruthLabel``.
+    """
     data: dict[int, dict] = {}
     for month in months_range:
         try:
@@ -89,6 +120,92 @@ def _fetch_monthly_data(row_id: int, conn_params: dict, dataset_template: str, m
             "q95":  float(row["q95"]),       "groundTruthLabel": float(row[gt_col]),
         }
     return data
+
+
+def _json_number(value: float) -> float | None:
+    """Encode nonfinite numeric fields as JSON null."""
+    number = float(value)
+    return number if math.isfinite(number) else None
+
+
+def build_uncertainty_chart_data(
+    row_id: int,
+    dataset_template: str = "t_2024_monthly_mean_{month}_ocsvm_aegypti_predictions_2023_mod_sim",
+    months_range: range = range(1, 13),
+) -> dict | None:
+    """Return temporal and calibration series for one selected cell as JSON data.
+
+    Calibration uses the same centered-interval calculation as the SVG. The
+    comparison values are deterministic samples from ``sim_*`` fields, not
+    independently observed ground truth. Temporal bounds are mean ±2 SD.
+    Non-finite floats are serialized as ``None`` (JSON ``null``).
+
+    Example:
+        ```python
+        payload = {
+            "version": "uncertainty-v1",
+            "cellID": 200509,
+            "coordinates": {"latitude": 52.5, "longitude": 13.25},
+            "temporal": [
+                {
+                    "month": 7,
+                    "mean": 0.68,
+                    "sd": 0.09,
+                    "lower": 0.50,
+                    "upper": 0.86,
+                    "simulatedValue": 0.71,
+                    "cv": 0.13,
+                    "q05": 0.53,
+                    "q95": 0.82,
+                }
+            ],
+            "calibration": [{"expected": 0.5, "observed": 0.5}],
+            "miscalibrationArea": 0.04,
+        }
+        ```
+    """
+    data = _fetch_monthly_data(
+        row_id, get_db_connection_params(), dataset_template, months_range
+    )
+    if not data:
+        return None
+
+    months = sorted(data)
+    y_pred = np.array([data[month]["mean"] for month in months])
+    y_std = np.array([data[month]["sd"] for month in months])
+    y_simulated = np.array([data[month]["groundTruthLabel"] for month in months])
+    expected, observed = get_proportion_lists_vectorized(
+        y_pred, np.maximum(y_std, 1e-8), y_simulated, prop_type="interval"
+    )
+    miscalibration_area = miscalibration_area_from_proportions(expected, observed)
+    last = data[months[-1]]
+    return {
+        "version": "uncertainty-v1",
+        "cellID": row_id,
+        "coordinates": {
+            "latitude": _json_number(last["lat"]),
+            "longitude": _json_number(last["lon"]),
+        },
+        "temporal": [
+            {
+                "month": month,
+                "mean": _json_number(data[month]["mean"]),
+                "sd": _json_number(data[month]["sd"]),
+                "lower": _json_number(data[month]["mean"] - 2 * data[month]["sd"]),
+                "upper": _json_number(data[month]["mean"] + 2 * data[month]["sd"]),
+                "simulatedValue": _json_number(data[month]["groundTruthLabel"]),
+                "cv": _json_number(data[month]["cv"]),
+                "q05": _json_number(data[month]["q05"]),
+                "q95": _json_number(data[month]["q95"]),
+            }
+            for month in months
+        ],
+        "calibration": [
+            {"expected": _json_number(exp), "observed": _json_number(obs)}
+            for exp, obs in zip(expected, observed)
+        ],
+        "miscalibrationArea": _json_number(miscalibration_area),
+    }
 
 
 def _build_uncertainty_figure(data: dict[int, dict], plot_type: str) -> Figure:
@@ -138,7 +255,14 @@ def render_uncertainty_svgs(
     months_range=range(1, 13),
     plot_types=("uncertainty", "calibration"),
 ) -> dict[str, bytes]:
-    """Render requested UQ plots to memory from one fetched monthly dataset."""
+    """Render requested UQ plots to in-memory SVG bytes from one fetched monthly dataset.
+
+    Serializes Matplotlib figure creation under ``SVG_RENDER_LOCK`` so concurrent
+    worker threads do not collide on global pyplot state.
+
+    Raises:
+        ValueError: If ``plot_types`` contains an unsupported plot identifier.
+    """
     requested_types = tuple(plot_types)
     invalid_types = set(requested_types) - {"uncertainty", "calibration"}
     if invalid_types:

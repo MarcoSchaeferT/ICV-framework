@@ -24,7 +24,7 @@ const StyledGridPlotCard = styled.div<{ rowSpan: number; colSpan: number; $glow?
 `;
 
 /**
- * Props for one draggable dashboard-grid slot.
+ * Props for one draggable Vis. Interface grid slot.
  *
  * @example
  * ```tsx
@@ -53,7 +53,7 @@ interface Props {
 };
 
 /**
- * Wraps a standard dashboard card in a Swapy-compatible grid slot and loading-task provider.
+ * Wraps a standard Vis. Interface card in a Swapy-compatible grid slot and loading-task provider.
  *
  * @param props - Card content, span, presentation, and optional attention state.
  * @returns A draggable grid card whose handle is controlled by `UIContext.isSwapy`.
@@ -107,5 +107,5 @@ const SGridPlotCard: React.FC<Props> = ({
   );
 };
 
-/** Default export for the Swapy-compatible dashboard grid card. */
+/** Default export for the Swapy-compatible Vis. Interface grid card. */
 export default SGridPlotCard;

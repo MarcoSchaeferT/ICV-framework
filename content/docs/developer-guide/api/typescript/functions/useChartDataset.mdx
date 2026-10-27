@@ -1,0 +1,33 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: useChartDataset
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **useChartDataset**(): [`ChartDatasetContextValue`](../interfaces/ChartDatasetContextValue)
+
+Reads the shared dataset and row limit for a generic chart layout.
+
+## Returns
+
+[`ChartDatasetContextValue`](../interfaces/ChartDatasetContextValue)
+
+The current selection, available relations, loading/error state, and setters.
+
+## Remarks
+
+Must be called below [ChartDatasetProvider](ChartDatasetProvider); otherwise it throws.
+
+## Example
+
+```tsx
+import { useChartDataset } from "@/framework";
+
+function DatasetLabel() {
+  const { selectedDataset, isLoading } = useChartDataset();
+  return <span>{isLoading ? "Loading datasets" : selectedDataset || "Choose a dataset"}</span>;
+}
+```

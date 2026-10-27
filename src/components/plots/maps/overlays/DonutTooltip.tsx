@@ -218,7 +218,7 @@ export function DonutTooltip({
     isVisible 
 }: DonutTooltipProps) {
 
-    const labelWidth = 230;
+    const labelWidth = 280;
     const labelHeight = 160;
     // Get the center of the current hover object (pie slice)
     // Get absolute pie center in SVG coordinates
@@ -350,6 +350,12 @@ export function DonutTooltip({
                         </tr>
                     </tbody>
                 </table>
+                {/* Disclaimer section */}
+                <div className="my-1 border-t border-white/20" role="separator"></div>
+                <div className="mt-2 flex items-start gap-1.5 text-[10px] leading-tight text-amber-300/80">
+                    <span className="shrink-0 mt-px" aria-hidden="true">⚠</span>
+                    <span>{t.rich('tooltipDonut.disclaimer', { ...t_richConfig })}</span>
+                </div>
             </div>
         </>
     );

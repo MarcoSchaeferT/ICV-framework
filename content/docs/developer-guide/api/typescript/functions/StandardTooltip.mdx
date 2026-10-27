@@ -1,0 +1,31 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: StandardTooltip
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **StandardTooltip**(`props`): `Element`
+
+Standardized React component for map and chart tooltips.
+
+## Parameters
+
+### props
+
+[`StandardTooltipProps`](../interfaces/StandardTooltipProps)
+
+Configuration matching [StandardTooltipProps](../interfaces/StandardTooltipProps).
+
+## Returns
+
+`Element`
+
+A styled tooltip card rendering the primary metric, optional secondary metric, and key-value attribute table.
+
+## Remarks
+
+Text fields (`value`, `description`, `rows`) are rendered safely as React text nodes, whereas
+`colorBarHtml` is injected via `dangerouslySetInnerHTML` and must only contain trusted markup.

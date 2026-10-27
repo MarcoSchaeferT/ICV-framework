@@ -1,0 +1,60 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: useGridDataParser
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **useGridDataParser**(`params`): [`UseGridDataParserResult`](../interfaces/UseGridDataParserResult)
+
+Converts a grid response into cells keyed by their spatial grid index.
+
+## Parameters
+
+### params
+
+[`UseGridDataParserParams`](../interfaces/UseGridDataParserParams)
+
+Loading state, raw response, and mutable cell-size ref.
+
+## Returns
+
+[`UseGridDataParserResult`](../interfaces/UseGridDataParserResult)
+
+Indexed cells, parse errors, feature range, and cell dimensions.
+
+## Remarks
+
+Accepts row-oriented WKT polygons and column-oriented `map-grid-v1` data.
+Compact geometry prefers exact corner columns, then exact bounds, then
+legacy latitude/longitude anchors. Invalid compact cells are skipped.
+Row-oriented cell dimensions come from the first polygon; compact dimensions
+come from `cellSize`. The result is memoized by raw response identity and
+writes its dimensions to `gridcellSizeRef.current` after rendering.
+
+## Example
+
+```ts
+import { useRef } from "react";
+import { useGridDataParser, type GridCellSize } from "@/framework";
+
+const rawData = {
+  response: [{
+    id: 42,
+    geometry: "POLYGON ((13 52, 13.25 52, 13.25 51.75, 13 51.75, 13 52))",
+    feature: "0.73",
+  }],
+};
+
+function ParsedCellCount() {
+  const cellSizeRef = useRef<GridCellSize>({ lat: 0.25, lng: 0.25 });
+  const { gridData, parseErrors } = useGridDataParser({
+    isLoading: false,
+    rawData,
+    gridcellSizeRef: cellSizeRef,
+  });
+  return parseErrors.length ? "Parse failed" : `${gridData.size} cells`;
+}
+```

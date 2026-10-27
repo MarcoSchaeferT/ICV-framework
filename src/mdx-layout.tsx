@@ -8,18 +8,16 @@
 export default function MdxLayout({ children }: { children: React.ReactNode }) {
   // Create any shared layout or styles here
   return (
-      <div className="prose dark:prose-invert max-w-none
-        prose-headings:font-semibold prose-headings:tracking-tight
-        prose-h1:text-5xl prose-h2:text-4xl prose-h3:text-3xl prose-h4:text-2xl prose-h5:text-xl prose-h6:text-lg
-        prose-p:leading-relaxed prose-p:text-base
-        prose-a:text-blue-600 dark:prose-a:text-blue-400 hover:prose-a:underline
-        prose-code:text-pink-600 dark:prose-code:text-pink-400 prose-code:before:content-[''] prose-code:after:content-['']
-        prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:rounded-xl prose-pre:p-4
-        prose-img:rounded-xl prose-img:shadow-md
-        prose-table:
-        prose-th:border-r prose-th:border-gray-300 dark:prose-th:border-gray-700
-        prose-td:border-r prose-td:border-gray-300 dark:prose-td:border-gray-600
-        
+      <div className="legacy-mdx not-fumadocs-codeblock not-fumadocs-code dark:legacy-mdx-invert max-w-none
+        legacy-mdx-headings:font-semibold legacy-mdx-headings:tracking-tight
+        legacy-mdx-h1:text-5xl legacy-mdx-h2:text-4xl legacy-mdx-h3:text-3xl legacy-mdx-h4:text-2xl legacy-mdx-h5:text-xl legacy-mdx-h6:text-lg
+        legacy-mdx-p:leading-relaxed legacy-mdx-p:text-base
+        legacy-mdx-a:text-blue-600 dark:legacy-mdx-a:text-blue-400 hover:legacy-mdx-a:underline
+        legacy-mdx-code:text-pink-600 dark:legacy-mdx-code:text-pink-400 legacy-mdx-code:before:content-[''] legacy-mdx-code:after:content-['']
+        legacy-mdx-pre:bg-gray-900 legacy-mdx-pre:text-gray-100 legacy-mdx-pre:rounded-xl legacy-mdx-pre:p-4
+        legacy-mdx-img:rounded-xl legacy-mdx-img:shadow-md
+        legacy-mdx-th:border-r legacy-mdx-th:border-gray-300 dark:legacy-mdx-th:border-gray-700
+        legacy-mdx-td:border-r legacy-mdx-td:border-gray-300 dark:legacy-mdx-td:border-gray-600
       "
       >
         {children}
@@ -39,18 +37,17 @@ export function MdxLayoutTooltip({ children }: { children: React.ReactNode }) {
   return (
       <div
         className="
-          prose prose-invert
-          prose-headings:font-semibold prose-headings:tracking-tight
-          prose-h1:text-5xl prose-h2:text-4xl prose-h3:text-3xl prose-h4:text-2xl prose-h5:text-xl prose-h6:text-lg
-          prose-h1:text-white
-          prose-a:text-blue-600 dark:prose-a:text-blue-400 hover:prose-a:underline
-          prose-code:text-pink-600 dark:prose-code:text-pink-400 prose-code:before:content-[''] prose-code:after:content-['']
-          prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:rounded-xl prose-pre:p-4
-          prose-img:rounded-xl prose-img:shadow-md
-          prose-table:
-          prose-th:border-r prose-th:border-gray-300 dark:prose-th:border-gray-700
-          prose-td:border-r prose-td:border-gray-300 dark:prose-td:border-gray-600
-          prose-strong:text-white
+          legacy-mdx legacy-mdx-tooltip legacy-mdx-invert not-fumadocs-codeblock not-fumadocs-code
+          legacy-mdx-headings:font-semibold legacy-mdx-headings:tracking-tight
+          legacy-mdx-h1:text-5xl legacy-mdx-h2:text-4xl legacy-mdx-h3:text-3xl legacy-mdx-h4:text-2xl legacy-mdx-h5:text-xl legacy-mdx-h6:text-lg
+          legacy-mdx-h1:text-white
+          legacy-mdx-a:text-blue-600 dark:legacy-mdx-a:text-blue-400 hover:legacy-mdx-a:underline
+          legacy-mdx-code:text-pink-600 dark:legacy-mdx-code:text-pink-400 legacy-mdx-code:before:content-[''] legacy-mdx-code:after:content-['']
+          legacy-mdx-pre:bg-gray-900 legacy-mdx-pre:text-gray-100 legacy-mdx-pre:rounded-xl legacy-mdx-pre:p-4
+          legacy-mdx-img:rounded-xl legacy-mdx-img:shadow-md
+          legacy-mdx-th:border-r legacy-mdx-th:border-gray-300 dark:legacy-mdx-th:border-gray-700
+          legacy-mdx-td:border-r legacy-mdx-td:border-gray-300 dark:legacy-mdx-td:border-gray-600
+          legacy-mdx-strong:text-white
           relative
           inline-block
          
@@ -74,15 +71,12 @@ export function MdxLayoutTooltip({ children }: { children: React.ReactNode }) {
 export function MdxLayoutAbout({ children }: { children: React.ReactNode }) {
   // Create any shared layout or styles here
   return (
-      <div className="prose 
-        prose-a:text-accent 
+      <div className="legacy-mdx not-fumadocs-codeblock not-fumadocs-code
+        legacy-mdx-a:text-accent
         text-lg text-muted-foreground mb-6
-        prose-a:no-underline
-        prose-p
+        legacy-mdx-a:no-underline
         text-justify
-        text-muted-foreground
-        
-            "
+      "
             >
         {children}
             </div>

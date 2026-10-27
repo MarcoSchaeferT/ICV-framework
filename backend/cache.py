@@ -49,6 +49,7 @@ _REDIS_RETRY_SECONDS = 30.0
 
 
 def _epoch_key(scope: str) -> str:
+    """Return the Redis invalidation-counter key for a cache scope."""
     return _EPOCH_KEY_PREFIX + scope
 
 
@@ -83,6 +84,7 @@ def _deep_getsizeof(obj: Any, _seen: Optional[set] = None) -> int:
 # ---------------------------------------------------------------------------
 
 def _configured_worker_count() -> int:
+    """Read a positive worker count or use the bounded Gunicorn default."""
     configured = os.getenv("GUNICORN_WORKERS", "").strip()
     if configured.isdigit() and int(configured) > 0:
         return int(configured)
@@ -104,6 +106,7 @@ DEFAULT_CACHE_MAX_ENTRIES = int(os.getenv("CACHE_MAX_ENTRIES", "256"))
 # ---------------------------------------------------------------------------
 
 class _CacheEntry:
+    """One local response value with TTL, size, scope, and Redis-epoch metadata."""
     __slots__ = ("value", "created_at", "size_bytes", "scopes", "epochs")
 
     def __init__(
@@ -113,6 +116,7 @@ class _CacheEntry:
         scopes: tuple,
         epochs: Optional[tuple],
     ):
+        """Record the cached value and scope epochs observed at insertion."""
         self.value = value
         self.created_at = time.monotonic()
         self.size_bytes = size_bytes
@@ -128,18 +132,17 @@ class _CacheEntry:
 # ---------------------------------------------------------------------------
 
 class ResponseCache:
-    """
-    Thread-safe, TTL + LRU + size-bounded response cache with cross-worker
-    invalidation through Redis epoch counters.
+    """Thread-safe, TTL + LRU + size-bounded response cache with cross-worker invalidation.
 
-    Parameters
-    ----------
-    max_entries : int
-        Maximum number of cached responses (default dynamically loaded).
-    max_bytes : int
-        Maximum total memory for cached values (default dynamically loaded).
-    ttl_seconds : float
-        Time-to-live per entry in seconds (default 86 400 = 24 h).
+    Coordinates cache invalidation across Gunicorn workers through Redis epoch
+    counters while keeping serialized response payloads in process-local memory.
+
+    Args:
+        max_entries: Maximum number of cached responses per worker
+            (defaults to ``DEFAULT_CACHE_MAX_ENTRIES``).
+        max_bytes: Maximum total memory in bytes for cached values per worker
+            (defaults to ``DEFAULT_CACHE_MAX_BYTES``).
+        ttl_seconds: Time-to-live per entry in seconds (default ``86400`` = 24 h).
     """
 
     def __init__(
@@ -148,6 +151,7 @@ class ResponseCache:
         max_bytes: int = DEFAULT_CACHE_MAX_BYTES,
         ttl_seconds: float = 86_400,       # 24 hours
     ):
+        """Initialize the process-local store and lazy Redis invalidation client."""
         self._max_entries = max_entries
         self._max_bytes = max_bytes
         self._ttl = ttl_seconds
@@ -174,6 +178,7 @@ class ResponseCache:
     # ------------------------------------------------------------------
 
     def _redis(self) -> redis.Redis:
+        """Create the Redis client lazily in the current worker process."""
         if self._redis_client is None:
             with self._redis_client_lock:
                 if self._redis_client is None:
@@ -187,6 +192,7 @@ class ResponseCache:
         return self._redis_client
 
     def _redis_failed(self, err: Exception) -> None:
+        """Pause cross-worker invalidation checks after a Redis failure."""
         if not self._warned:
             self._warned = True
             print(
@@ -226,7 +232,18 @@ class ResponseCache:
     # ------------------------------------------------------------------
 
     def get(self, key: str) -> Optional[Any]:
-        """Return the cached value for *key*, or ``None`` on miss / expiry."""
+        """Return a live local value, or ``None`` on miss or expiry.
+
+        A Redis epoch mismatch also misses after another worker invalidates
+        the entry's relation scope. When Redis is unavailable, the local value
+        is served without a cross-worker epoch check.
+
+        Args:
+            key: Deterministic cache key built by ``make_cache_key``.
+
+        Returns:
+            Cached response value if present and valid, otherwise ``None``.
+        """
         with self._lock:
             entry = self._store.get(key)
             if entry is None:
@@ -264,13 +281,15 @@ class ResponseCache:
         scopes: Iterable[str] = (),
         size_bytes: Optional[int] = None,
     ) -> None:
-        """Store *value* under *key*, evicting stale / LRU entries as needed.
+        """Store ``value`` under ``key``, evicting stale or LRU entries as needed.
 
-        *scopes* are the relation names the value depends on; invalidating
-        any of them (from any worker) makes this entry stale.
-
-        ``size_bytes`` lets callers that already serialized a response avoid
-        the expensive recursive object-graph walk.
+        Args:
+            key: Deterministic cache key built by ``make_cache_key``.
+            value: Response object or serialized payload to cache locally.
+            scopes: Relation names the value depends on; invalidating any of
+                them from any worker marks this entry stale.
+            size_bytes: Optional precalculated byte size so callers that already
+                serialized a response avoid the recursive object-graph walk.
         """
         entry_scopes = (_GLOBAL_SCOPE, *scopes)
         epochs = self._current_epochs(entry_scopes)
@@ -302,11 +321,18 @@ class ResponseCache:
             self._current_bytes += size
 
     def invalidate(self, scope: str) -> int:
-        """Invalidate *scope* (a relation name) across ALL workers.
+        """Invalidate a relation scope locally and across Redis-connected workers.
 
         Bumps the scope's Redis epoch (other workers drop their entries
         lazily on next access) and evicts every local entry whose key
-        contains *scope*. Returns the number of locally evicted entries.
+        contains ``scope`` or whose scope tag matches. Without Redis,
+        invalidation remains local to this worker.
+
+        Args:
+            scope: Database relation name or logical scope identifier.
+
+        Returns:
+            Number of entries evicted from the current worker's local store.
         """
         self._bump_epoch(scope)
         with self._lock:
@@ -354,6 +380,7 @@ class ResponseCache:
     # ------------------------------------------------------------------
 
     def _evict(self, key: str) -> None:
+        """Remove one local entry and subtract its estimated byte size."""
         entry = self._store.pop(key, None)
         if entry is not None:
             self._current_bytes -= entry.size_bytes
@@ -383,12 +410,21 @@ response_cache = ResponseCache()
 
 
 def make_cache_key(*args: Any) -> str:
-    """Build a deterministic cache key from positional arguments.
+    """Build a deterministic pipe-delimited cache key from positional arguments.
 
-    Typical usage::
+    Args:
+        *args: Components of the cache key (endpoint name, relation, filters).
 
-        key = make_cache_key("getDataFromDB", relationName, feature,
-                             filterBy, filterValue, startDate, endDate,
-                             task, aggregation_level)
+    Returns:
+        Pipe-delimited string representation of ``args``.
+
+    Example:
+        ```python
+        key = make_cache_key(
+            "getDataFromDB",
+            "world_mosquitos_2014_2025_gdf_mosquito_amount",
+            "mosquito_amount",
+        )
+        ```
     """
     return "|".join(str(a) for a in args)

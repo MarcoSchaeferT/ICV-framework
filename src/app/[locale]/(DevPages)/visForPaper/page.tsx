@@ -1,16 +1,14 @@
 
 "use client";
 
-import { useRef, useEffect, useMemo } from 'react'
+import React, { useRef, useEffect, useMemo } from 'react'
 import {apiRoutes } from "@/app/api_routes";
-import React from 'react';
 import { InterfaceContextProvider, useInterfaceContext } from '@/components/contexts/InterfaceContext';
 import SGridPlotCard from '@/components/layout/SwapyGridPlotCard';
 import { CardPropsClass } from '@/components/layout/CardWrapper';
 import LeafD3MapLayerComponent, {LeafD3MapLayerProps}  from '@/components/plots/maps/LeafD3Map';
 import { createSwapy, Swapy } from 'swapy';
 import LinechartComponent, { LinechartProps } from '@/components/plots/linechart/linechart';
-
 import { useLocale ,useTranslations } from "next-intl";
 import { t_richConfig } from "@/app/const_store";
 import { useGetJSONData } from "@/app/hooks/useFetchAndCache";
@@ -19,15 +17,12 @@ import {ViewMainInfoComponent} from '@/components/ViewPageMainInfo';
 import * as d3 from 'd3';
 import { useUIContext } from '@/components/contexts/UIContext';
 import { useLoadingTask, LoadingSpinnerAnimation } from '@/components/plots/maps/utils/loadingSpinner';
-
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-
-
 
 const isSWAPY = true;
 

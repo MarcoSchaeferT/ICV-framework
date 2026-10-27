@@ -14,6 +14,8 @@ const TileLayer = dynamic(() => import("react-leaflet").then(mod => mod.TileLaye
  *
  * @example
  * ```ts
+ * import type { LeafletComponentProps } from "@/framework";
+ *
  * const baseMap: LeafletComponentProps = {
  *   chartName: "global-albopictus-map",
  *   dataURL: "/api/getMapData?mapName=world_map",
@@ -33,11 +35,11 @@ export interface LeafletComponentProps {
   dataURL: any;
   /** Legacy extension value retained for existing map consumers. */
   exampleVar: any;
-  /** Initial `[latitude, longitude]` center used by React-Leaflet. @default [51.505, -0.09] */
+  /** Initial `[latitude, longitude]` center used by React-Leaflet. @defaultValue [51.505, -0.09] */
   center?: [number, number];
-  /** Initial Leaflet zoom. @default 2 */
+  /** Initial Leaflet zoom. @defaultValue 2 */
   zoom?: number;
-  /** Whether to use `L.CRS.EPSG4326` instead of Web Mercator. @default false */
+  /** Whether to use `L.CRS.EPSG4326` instead of Web Mercator. @defaultValue false */
   isProjection_equirectangular?: boolean;
 }
 
@@ -51,10 +53,6 @@ export interface LeafletComponentProps {
  * @param zoom - Initial Leaflet zoom.
  * @param isProjection_equirectangular - Enables the EPSG:4326 coordinate reference system.
  * @returns A configuration consumed by {@link LeafletMapComponent}.
- * @default exampleVar null
- * @default center [51.505, -0.09]
- * @default zoom 2
- * @default isProjection_equirectangular false
  */
 export function LeafletComponentProps(
     chartName: string,
@@ -79,7 +77,10 @@ export function LeafletComponentProps(
  *
  * @example
  * ```tsx
- * const props: Props = {
+ * import type { LeafletMapProps } from "@/framework";
+ * import { LeafletComponentProps } from "@/framework";
+ *
+ * const props: LeafletMapProps = {
  *   chartProps: LeafletComponentProps(
  *     "berlin-vector-map",
  *     "/api/getMapData?mapName=world_map",
@@ -91,7 +92,7 @@ export function LeafletComponentProps(
  * };
  * ```
  */
-interface Props {
+export interface LeafletMapProps {
   /** Leaflet layers and controls. */
   children: React.ReactNode;
   /** Map-container configuration. */
@@ -106,9 +107,9 @@ interface Props {
  *
  * @remarks
  * Leaflet accesses browser globals and therefore must not be imported during server rendering. Analytical layers are
- * supplied as children by `LeafD3Map` or `LeafD3MapGermanyCovid`; this component owns only the map container and CRS.
+ * supplied as children by `LeafD3Map` or companion map layers; this component owns only the map container and CRS.
  */
-const LeafletMapComponent: React.FC<Props> = ({ children,   chartProps = {} as LeafletComponentProps }: Props) => {
+const LeafletMapComponent: React.FC<LeafletMapProps> = ({ children, chartProps = {} as LeafletComponentProps }: LeafletMapProps) => {
 
 let props = chartProps;
 

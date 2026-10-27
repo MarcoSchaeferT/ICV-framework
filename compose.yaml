@@ -1,4 +1,5 @@
 services:
+
   icv-database:
     container_name: icv-database
     image: ghcr.io/marcoschaefert/icv-database:test
@@ -6,9 +7,8 @@ services:
     build:
       context: .
       dockerfile: ./db/Dockerfile.db
-      network: host
     ports:
-      - "5333:5333"
+      - "127.0.0.1:5333:5333"
     environment:
       POSTGRES_DB: icv-database
       POSTGRES_USER: ${DATABASE_USER}
@@ -18,11 +18,33 @@ services:
     networks:
       - icv-network
 
+  # Local, read-only database browser. Start explicitly with `npm run db-view`.
+  icv-database-view:
+    image: ghcr.io/sosedoff/pgweb:0.17.0
+    profiles:
+      - tools
+    restart: "no"
+    depends_on:
+      - icv-database
+    command:
+      - "--bind=0.0.0.0"
+      - "--listen=8081"
+      - "--skip-open"
+      - "--readonly"
+      - "--lock-session"
+    environment:
+      PGWEB_DATABASE_URL: "postgresql://${DATABASE_USER}:${DB_PASSWORD_SECRET}@icv-database:5333/icv-database?sslmode=disable"
+    ports:
+      - "127.0.0.1:8081:8081"
+    networks:
+      - icv-network
+
   icv-redis:
     image: redis:7-alpine
-    restart: always
-    # Holds transient upload progress/error state + cache invalidation epochs
-    # shared across the Gunicorn workers of icv-backend — no persistence needed.
+    restart: unless-stopped
+    container_name: icv-redis
+    # Holds transient upload progress/error state shared across the Gunicorn
+    # workers of icv-backend — no persistence needed.
     command: [ "redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru" ]
     tmpfs:
       - /data
@@ -32,31 +54,33 @@ services:
   icv-frontend:
     container_name: icv-frontend
     image: ghcr.io/marcoschaefert/icv-frontend:test
+    restart: unless-stopped
     environment:
       IS_DOCKER: "true"
-      NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE}
-      NEXT_PUBLIC_SHOW_DISCLAIMER: ${NEXT_PUBLIC_SHOW_DISCLAIMER}
-      NEXT_PUBLIC_SHOW_COV: ${NEXT_PUBLIC_SHOW_COV}
-      NEXT_PUBLIC_SHOW_LEGAL_TEXTS: ${NEXT_PUBLIC_SHOW_LEGAL_TEXTS}
-      NEXT_PUBLIC_SHOW_LAYOUT_TEMPLATES: ${NEXT_PUBLIC_SHOW_LAYOUT_TEMPLATES}
+      DEMO_MODE: ${DEMO_MODE}
+      SHOW_DISCLAIMER: ${SHOW_DISCLAIMER}
+      SHOW_COV: ${SHOW_COV}
+      SHOW_LEGAL_TEXTS: ${SHOW_LEGAL_TEXTS}
+      SHOW_LAYOUT_TEMPLATES: ${SHOW_LAYOUT_TEMPLATES}
     build:
       context: .
       dockerfile: ./Dockerfile.frontend
       network: host
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     networks:
       - icv-network
 
   icv-backend:
     container_name: icv-backend
     image: ghcr.io/marcoschaefert/icv-backend:test
+    restart: unless-stopped
     build:
       context: .
       dockerfile: ./backend/Dockerfile.backend
       network: host
     ports:
-      - "5222:5222"
+      - "127.0.0.1:5222:5222"
     networks:
       - icv-network
     depends_on:
@@ -68,7 +92,12 @@ services:
       REDIS_URL: "redis://icv-redis:6379/0"
       IS_DOCKER: "true"
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-}
-      # Global response-cache budget divided across Gunicorn workers.
+      # Each Gunicorn worker owns a small thread-safe PostgreSQL pool.
+      DB_POOL_MIN_SIZE: ${DB_POOL_MIN_SIZE:-1}
+      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-4}
+      DB_POOL_TIMEOUT_SECONDS: ${DB_POOL_TIMEOUT_SECONDS:-30}
+      # Global response-cache budget. backend/cache.py divides it across
+      # Gunicorn workers so the configured limit is not multiplied per process.
       CACHE_TOTAL_MB: ${CACHE_TOTAL_MB:-512}
 
 volumes:
@@ -78,6 +107,3 @@ networks:
   icv-network:
     name: icv-network
     driver: bridge
-
-#    driver_opts:
-#      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"

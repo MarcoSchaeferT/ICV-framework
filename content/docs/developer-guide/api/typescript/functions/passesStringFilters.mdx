@@ -1,0 +1,40 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: passesStringFilters
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+> **passesStringFilters**(`value`, `includeFilter?`, `excludeFilter?`): `boolean`
+
+Determines whether a value passes optional include and exclude substring
+filters. Multiple values in either filter use OR semantics.
+
+## Parameters
+
+### value
+
+`string`
+
+String to test; matching is case-sensitive.
+
+### includeFilter?
+
+[`MapStringFilter`](../type-aliases/MapStringFilter)
+
+Allowed substrings; omitted or empty values allow all.
+
+### excludeFilter?
+
+[`MapStringFilter`](../type-aliases/MapStringFilter)
+
+Rejected substrings; any match takes precedence.
+
+## Returns
+
+`boolean`
+
+`true` when no exclusion matches and at least one inclusion matches,
+or when the inclusion filter is disabled.

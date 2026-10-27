@@ -1,0 +1,42 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: CardWrapperProps
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Props accepted by [CardWrapper](../functions/CardWrapper).
+
+## Example
+
+```tsx
+import { CardPropsClass, type CardWrapperProps } from "@/framework";
+
+const props: CardWrapperProps = {
+  children: <div id="serotype-distribution-chart" />,
+  cardProps: CardPropsClass(
+    "serotype-distribution",
+    "Serotype distribution",
+    "Sample counts across regions",
+    "Source: Surveillance",
+  ),
+};
+```
+
+## Properties
+
+### children
+
+> **children**: `ReactNode`
+
+Visualization or table rendered in the card body.
+
+***
+
+### cardProps
+
+> **cardProps**: [`CardPropsClass`](CardPropsClass)
+
+Card heading, help, footer, styling, and identity.

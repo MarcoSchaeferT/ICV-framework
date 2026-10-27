@@ -7,11 +7,27 @@ import { Locale, usePathname, useRouter } from '@/i18n/routing';
 import {Globe} from 'lucide-react';
 
 
-/** Locale options and presentation mode for the route-preserving language control. */
+/**
+ * Locale options and presentation mode for the route-preserving language control.
+ *
+ * @example
+ * ```ts
+ * const localeProps: Props = {
+ *   children: "Deutsch",
+ *   defaultValue: "de",
+ *   label: "Language",
+ *   style: "dropdown",
+ * };
+ * ```
+ */
 interface Props {
+    /** Visible language label or icon content. */
     children: ReactNode;
+    /** Locale code selected on initial render. */
     defaultValue: string;
+    /** Accessible label for the language control. */
     label: string;
+    /** Compact chip or full dropdown presentation. */
     style: 'chip' | 'dropdown';
 }
 

@@ -36,46 +36,159 @@ import { LoadingSpinnerAnimation, useLoadingTask } from "../maps/utils/loadingSp
 import { StandardTooltip } from "../maps/helpers";
 import { categoricalColors2 } from "@/app/const_store";
 
+/**
+ * Supported chart renderers in the generic layout-template registry.
+ *
+ * @example
+ * ```ts
+ * import type { GenericChartKind } from "@/framework";
+ *
+ * const mosquitoTrendKind: GenericChartKind = "line";
+ * ```
+ */
 export type GenericChartKind = "line" | "bar" | "pie";
 
+/**
+ * Localized metadata record used to populate chart axis selectors.
+ *
+ * @remarks
+ * Axis choices are derived from `datatype`; `dimension` is displayed as a
+ * unit label and `description` supplies explanatory tooltip text.
+ *
+ * @example
+ * ```ts
+ * const mosquitoCountColumn: ColumnMetadata = {
+ *   column_name: "mosquito_amount",
+ *   datatype: "int",
+ *   dimension: "observations",
+ *   description: "Aedes albopictus observations",
+ * };
+ * ```
+ */
 interface ColumnMetadata {
+  /** Database column identifier. */
   column_name: string;
+  /** Backend datatype used to determine eligible X and Y axes. */
   datatype: "string" | "float" | "int" | "date" | string;
+  /** Physical or count unit, when available. */
   dimension?: string;
+  /** Human-readable column description, when available. */
   description?: string;
+  /** Backend availability marker; generic charts do not filter on it. */
   availability?: string | number;
 }
 
+/**
+ * One metadata-derived option for a generic chart's X or Y selector.
+ *
+ * @example
+ * ```ts
+ * const mosquitoCountAxis: AxisOption = {
+ *   value: "mosquito_amount",
+ *   columnName: "mosquito_amount",
+ *   datatype: "int",
+ *   label: "mosquito_amount [observations]",
+ *   description: "Aedes albopictus observations",
+ * };
+ * ```
+ */
 interface AxisOption {
+  /** Backend field identifier stored as the select value. */
   value: string;
+  /** Original database column name. */
   columnName: string;
+  /** Datatype used to classify the axis. */
   datatype: string;
+  /** Human-readable selector label, including unit where available. */
   label: string;
+  /** Optional metadata explanation shown in tooltips. */
   description?: string;
 }
 
+/**
+ * Recharts-ready point derived from one database row.
+ *
+ * @remarks `rowIndex` retains the source-row position for linked tooltip and
+ * selection behavior after invalid values are omitted or points are sorted.
+ *
+ * @example
+ * ```ts
+ * const berlinObservation: GenericChartPoint = {
+ *   x: "Berlin",
+ *   y: 18,
+ *   rowIndex: 0,
+ * };
+ * ```
+ */
 interface GenericChartPoint {
+  /** Horizontal category, date, or numeric value. */
   x: string | number;
+  /** Vertical numeric measure. */
   y: number;
+  /** Original database-row index retained for linked interaction. */
   rowIndex: number;
 }
 
+/**
+ * Recharts tooltip state plus the selected chart-axis metadata.
+ *
+ * @example
+ * ```ts
+ * const tooltip: GenericChartTooltipProps = {
+ *   active: true,
+ *   payload: [{ payload: { x: "Berlin", y: 18, rowIndex: 0 } }],
+ *   chartName: "albopictus-observations",
+ *   locale: "de",
+ *   xOption: { value: "city", columnName: "city", datatype: "string", label: "City" },
+ *   yOption: { value: "mosquito_amount", columnName: "mosquito_amount", datatype: "int", label: "Observations" },
+ * };
+ * ```
+ */
 interface GenericChartTooltipProps {
+  /** Whether Recharts currently displays the tooltip. */
   active?: boolean;
+  /** Hovered point wrapped in the Recharts tooltip payload. */
   payload?: ReadonlyArray<{ payload?: GenericChartPoint }>;
+  /** Stable chart identifier used for linked tooltip behavior. */
   chartName: string;
+  /** Locale used to format tooltip text. */
   locale: string;
+  /** Selected horizontal-axis metadata, if configured. */
   xOption?: AxisOption;
+  /** Selected vertical-axis metadata, if configured. */
   yOption?: AxisOption;
 }
 
+/**
+ * Task-specific database payload used by generic multi-column charts.
+ *
+ * @remarks
+ * The hook's general `dbDATA.response` contract is intentionally broad;
+ * this local view narrows it to row objects. Rows may be truncated by the
+ * backend when a positive row limit is supplied.
+ *
+ * @example
+ * ```ts
+ * const observations: MultiColumnResponse = {
+ *   response: [{ species: "albopictus", mosquito_amount: 18 }],
+ *   error: "",
+ *   isTruncated: false,
+ *   rowLimit: 100,
+ * };
+ * ```
+ */
 interface MultiColumnResponse {
+  /** Records keyed by requested database column name. */
   response?: Record<string, unknown>[];
+  /** Backend error message, if the request failed. */
   error?: string;
+  /** Whether the backend stopped after the requested row limit. */
   isTruncated?: boolean;
+  /** Effective row limit reported with a truncated response. */
   rowLimit?: number;
 }
 
+/** Default maximum rows requested by the generic chart layout. @defaultValue 100 */
 export const DEFAULT_GENERIC_CHART_ROW_LIMIT = 100;
 const PIE_COLORS = categoricalColors2.length > 0
   ? categoricalColors2
@@ -188,6 +301,15 @@ function formatDateCategory(value: unknown) {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Renders a metadata-backed axis selector for one generic chart card.
+ *
+ * @param props - Axis label, current column, available options, and change handler.
+ * @returns A select control disabled when no compatible metadata column exists.
+ *
+ * @remarks X choices depend on the renderer kind while Y choices require a
+ * numeric backend datatype. Each chart owns its own selection state.
+ */
 function AxisSelect({
   axis,
   value,
@@ -226,7 +348,38 @@ function AxisSelect({
   );
 }
 
-/** Generic row-oriented line/bar chart used only by the layout templates. */
+/**
+ * Renders a configurable line, bar, or pie chart for a shared dataset.
+ *
+ * @param props - Unique chart ID, renderer kind, and optional per-chart row limit.
+ * @returns Axis controls and a chart or a loading/error/empty state.
+ *
+ * @remarks
+ * When `rowLimit` is omitted, uses the value from {@link useChartDataset} (defaults to 100).
+ * Passing `null` requests an unbounded result.
+ *
+ * Reads the selected relation from {@link ChartDatasetProvider} while keeping
+ * X and Y axis choices local to this chart. Requests localized column metadata
+ * and the selected columns through `useGetJSONData`, then registers loading
+ * with the nearest `LoadingSpinnerProvider`. The chart must be rendered below
+ * both providers, as `SGridPlotCard` does for card-level loading state.
+ *
+ * @example
+ * ```tsx
+ * import { GenericCartesianChart, ChartDatasetProvider } from "@/framework";
+ * import { LoadingSpinnerProvider } from "@/components/plots/maps/utils/loadingSpinner";
+ *
+ * function MosquitoTrendCard() {
+ *   return (
+ *     <ChartDatasetProvider>
+ *       <LoadingSpinnerProvider>
+ *         <GenericCartesianChart chartName="albopictus-trend" kind="line" rowLimit={100} />
+ *       </LoadingSpinnerProvider>
+ *     </ChartDatasetProvider>
+ *   );
+ * }
+ * ```
+ */
 export default function GenericCartesianChart({
   chartName,
   kind,

@@ -2,6 +2,7 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+/** Renders the main bordered card container. */
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -15,6 +16,7 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/** Renders the unpadded card container used inside Vis. Interface grids. */
 const CardGrid = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
@@ -30,6 +32,7 @@ const CardGrid = React.forwardRef<
 ))
 CardGrid.displayName = "CardGrid"
 
+/** Lays out a card heading, description, and optional action. */
 function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -43,6 +46,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/** Renders the compact header used by grid cards. */
 const CardHeaderGrid = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
@@ -55,6 +59,7 @@ const CardHeaderGrid = React.forwardRef<
 ))
 CardHeaderGrid.displayName = "CardHeaderGrid"
 
+/** Renders the primary title within a card header. */
 function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -65,6 +70,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/** Renders secondary text within a card header. */
 function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -75,6 +81,7 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/** Positions a card action beside its heading. */
 function CardAction({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -88,6 +95,7 @@ function CardAction({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/** Adds standard horizontal padding around card body content. */
 function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -98,6 +106,7 @@ function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
+/** Renders a minimal-padding body for Vis. Interface grid cards. */
 const CardContentGrid = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
@@ -106,6 +115,7 @@ const CardContentGrid = React.forwardRef<
 ))
 CardContentGrid.displayName = "CardContentGrid"
 
+/** Renders the action or summary area at the bottom of a card. */
 function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div

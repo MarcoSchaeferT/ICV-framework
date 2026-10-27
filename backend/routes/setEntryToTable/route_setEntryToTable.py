@@ -1,16 +1,30 @@
+"""Insert form submissions and initialize feedback/page-visit relations."""
+
 from flask import request, jsonify, Blueprint
 from pathlib import Path
 import os
 from os import listdir
 from flasgger import swag_from
-from backend.routes.setFilesToDB.db_utils import query_raw, execute_raw, get_db_connection_params
-import psycopg
+from pydantic import ValidationError
+from backend.schemas import BaseSchema, RelationName
+from backend.routes.setFilesToDB.db_utils import query_raw, execute_raw, db_error_response
 from psycopg import errors as psycopg_errors, sql
-
 
 
 # Blueprint configuration
 route_setEntryToTable = Blueprint('setEntryToTable', __name__)
+
+
+class SetEntryParams(BaseSchema):
+    """Form parameters for inserting a row into an existing table.
+
+    Example:
+        ```python
+        params = SetEntryParams(relationName="feedback_csv")
+        ```
+    """
+    relationName: RelationName
+
 
 #***************#
 # *** Route *** #
@@ -18,11 +32,21 @@ route_setEntryToTable = Blueprint('setEntryToTable', __name__)
 @swag_from('../../API_docs/set_entry_to_table.yml')
 @route_setEntryToTable.route("", methods=["POST"])
 async def setEntryToTable():
+  """Insert posted form fields into the named PostgreSQL relation.
+
+  ``relationName`` is required. The feedback and page-visit relations are
+  created on demand; other relation names must already exist. Column names
+  use ``psycopg.sql.Identifier`` and values use bound placeholders. Missing
+  fields return 400, absent relations 404, and insert failures 500.
+  """
   if request.method == "POST":
-    relation_name = request.form.get('relationName')
-    if not relation_name:
-      return jsonify({"ERROR": "Missing relationName parameter"}), 400
-      
+    try:
+      params = SetEntryParams.model_validate({"relationName": request.form.get('relationName')})
+    except ValidationError as err:
+      err_msg = str(err.errors()[0]["msg"] if err.errors() else err)
+      return jsonify({"error": err_msg}), 400
+
+    relation_name = params.relationName
     print(relation_name)
 
     if relation_name == "feedback_csv":
@@ -40,7 +64,7 @@ async def setEntryToTable():
         values.append(value)
     
     if not columns:
-      return jsonify({"ERROR": "No data provided to insert"}), 400
+      return jsonify({"error": "No data provided to insert"}), 400
 
     # Build safe INSERT query
     insert_query = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
@@ -49,28 +73,22 @@ async def setEntryToTable():
         sql.SQL(", ").join(sql.Placeholder() * len(values))
     )
     
-    print(insert_query.as_string(psycopg.connect(**get_db_connection_params())))
+    print(insert_query.as_string())
 
     # insert the data into the table
     try:
       await execute_raw(insert_query, tuple(values))
     except psycopg_errors.UndefinedTable:
-      data = {"ERROR": f"Table '{relation_name}' does not exist. Please create the table first."}
-      return jsonify(data), 404
+      return jsonify({"error": f"Table '{relation_name}' does not exist. Please create the table first."}), 404
     except Exception as e:
-      data = {"ERROR": f"Error inserting data into table: {str(e)}"}
-      return jsonify(data), 500
+      return db_error_response(e, "Error inserting data into table")
 
-    return (
-      jsonify(
-        {"SUCCESS": "Form data submitted successfully"}
-      ),
-      200,
-    )
+    return jsonify({"SUCCESS": "Form data submitted successfully"}), 200
 
   
 
 async def create_Feedback_Relation():
+  """Create the legacy ``feedback_csv`` table, logging creation failures."""
   create_query = """
     CREATE TABLE feedback_csv (
       id SERIAL PRIMARY KEY,
@@ -89,6 +107,7 @@ async def create_Feedback_Relation():
 
 
 async def ensure_feedback_csv_exists():
+    """Create ``feedback_csv`` when absent from the public relation list."""
     from backend.routes.getDataFromDB.route_getListOfRelationsDB  import getListOfRelationsDB 
 
     result = await getListOfRelationsDB()
@@ -101,6 +120,7 @@ async def ensure_feedback_csv_exists():
         await create_Feedback_Relation()
 
 async def create_page_visits_relation():
+  """Create the ``page_visits`` table, logging creation failures."""
   create_query = """
     CREATE TABLE page_visits (
       id SERIAL PRIMARY KEY,
@@ -115,6 +135,7 @@ async def create_page_visits_relation():
     print("Error creating page_visits table:", e)
 
 async def ensure_page_visits_exists():
+    """Create ``page_visits`` when absent from the public relation list."""
     from backend.routes.getDataFromDB.route_getListOfRelationsDB  import getListOfRelationsDB 
 
     result = await getListOfRelationsDB()

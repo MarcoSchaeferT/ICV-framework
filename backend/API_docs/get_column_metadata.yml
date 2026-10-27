@@ -1,0 +1,74 @@
+tags:
+  - Data Management Endpoints
+summary: Get column metadata for a relation
+description: >-
+  Returns all localized column metadata rows for the requested PostgreSQL
+  relation and language (`en` or `de`). Exact ENSO suitability columns default
+  their `dimension` to `%` when stored empty.
+parameters:
+  - name: relationName
+    in: query
+    description: Required database relation name.
+    required: true
+    schema:
+      type: string
+      example: "seas5_forecast_albopictus_habitat_probability"
+  - name: lang
+    in: query
+    description: Metadata language code (`en` or `de`).
+    required: false
+    schema:
+      type: string
+      enum: ["en", "de"]
+      default: "en"
+      example: "en"
+responses:
+  200:
+    description: Array of column metadata row objects ordered by `id`.
+    content:
+      application/json:
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                example: 1
+              relation_name:
+                type: string
+                example: "seas5_forecast_albopictus_habitat_probability"
+              column_name:
+                type: string
+                example: "suitability_2026_08"
+              datatype:
+                type: string
+                example: "float"
+              dimension:
+                type: string
+                example: "%"
+              description:
+                type: string
+                example: "Forecasted habitat suitability for August 2026"
+              availability:
+                type: integer
+                example: 1
+  400:
+    description: Missing `relationName` or unsupported `lang`.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+              example: "Missing required query param 'relationName'."
+  500:
+    description: Database query error.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            error:
+              type: string

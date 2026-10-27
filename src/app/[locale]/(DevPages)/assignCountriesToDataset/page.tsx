@@ -36,6 +36,9 @@ export default function AssignCountriesPage() {
       // 1. Fetch all relations
       const listRes = await fetch(apiRoutes.GET_LIST_OF_DATASETS, { signal });
       const listData = await listRes.json();
+      if (!listRes.ok || !listData || typeof listData !== "object") {
+        throw new Error(listData?.error || `HTTP ${listRes.status}`);
+      }
       const allNames: string[] = Object.keys(listData).filter(
         (n) => n !== "User" && n !== "Test" && !n.startsWith("column_metadata_")
       );
@@ -48,7 +51,10 @@ export default function AssignCountriesPage() {
               apiRoutes.fetchDbColumnNames({ relationName: name }),
               { signal }
             );
-            const cols: string[] = await colRes.json();
+            const cols = (await colRes.json()) as string[];
+            if (!colRes.ok || !Array.isArray(cols)) {
+              return null;
+            }
             // Keep tables that have geo_pos or geometry column
             const hasGeometry = cols.some((c) => c === "geometry");
             const hasIsoA3 = cols.some((c) => c === "iso_a3");
@@ -132,22 +138,22 @@ export default function AssignCountriesPage() {
             body: JSON.stringify({ tableName: currentTable, reprocessAll }),
           });
 
-          const data = await response.json();
+          const data = await response.json().catch(() => null);
           resultsList.push({
             tableName: currentTable,
             status: response.status,
             data,
           });
 
-          if (response.status === 200) {
+          if (response.ok) {
             setQueue((prev) =>
               prev.map((item) =>
                 item.name === currentTable
                   ? {
                       ...item,
                       status: "completed",
-                      updatedRows: data.updatedRows,
-                      message: data.message,
+                      updatedRows: data?.updatedRows,
+                      message: data?.message,
                     }
                   : item
               )
@@ -160,7 +166,7 @@ export default function AssignCountriesPage() {
                   ? {
                       ...item,
                       status: "error",
-                      message: data.error || "Failed to process",
+                      message: data?.error || `Failed to process (HTTP ${response.status})`,
                     }
                   : item
               )

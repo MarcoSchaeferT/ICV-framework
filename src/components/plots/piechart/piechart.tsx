@@ -18,6 +18,8 @@ import GenericCartesianChart from '../generic/GenericCartesianChart';
  *
  * @example
  * ```tsx
+ * import type { PieChartProps } from "@/framework";
+ *
  * const props: PieChartProps = {
  *   chartName: "dengue-serotype-distribution",
  *   data: [
@@ -33,17 +35,17 @@ import GenericCartesianChart from '../generic/GenericCartesianChart';
 export interface PieChartProps {
     /** Stable chart/container identifier. */
     chartName: string;
-    /** Encoded backend database API URL. @default "" */
+    /** Encoded backend database API URL. @defaultValue "" */
     dataURL?: string;
-    /** Target feature name for data parsing. @default "" */
+    /** Target feature name for data parsing. @defaultValue "" */
     feature?: string;
-    /** Discrete category labels and numeric counts. @default [] */
+    /** Discrete category labels and numeric counts. @defaultValue [] */
     data?: { name: string; value: number; }[];
-    /** Locale used for value formatting. @default "en" */
+    /** Locale used for value formatting. @defaultValue "en" */
     locale?: string;
     /** `next-intl` translator for chart labels and tooltips. */
     translations?: any;
-    /** Uses bundled demonstration data. @default false */
+    /** Uses bundled demonstration data. @defaultValue false */
     isDummyMode?: boolean;
     /** Selects the reusable row-oriented chart adapter used by layout templates. */
     dataMode?: "linked" | "generic";
@@ -61,17 +63,14 @@ export interface PieChartProps {
  * @param isDummyMode - Whether to render bundled demonstration data.
  * @param dataURL - Encoded database API URL.
  * @param feature - Target feature identifier for extraction.
+ * @param dataMode - `linked` uses supplied categories; `generic` uses the shared dataset chart.
+ * @param rowLimit - Optional maximum rows for generic mode.
  * @returns Configuration object accepted by `PieChartComponent`.
- *
- * @default data []
- * @default locale "en"
- * @default translations {}
- * @default isDummyMode false
- * @default dataURL ""
- * @default feature ""
  *
  * @example
  * ```tsx
+ * import { PieChartProps } from "@/framework";
+ *
  * const chartConfig = PieChartProps(
  *   "serotype-piechart",
  *   [{ name: "DENV-1", value: 120 }, { name: "DENV-2", value: 85 }],
@@ -113,7 +112,7 @@ const COLORS = categoricalColors2 && categoricalColors2.length > 0 ? categorical
  * Categorical pie-chart visual component built with Recharts and responsive containers.
  *
  * @param props - Configuration properties containing dataset URLs, static records, or dummy mode flags.
- * @returns Responsive SVG pie chart element synchronized with dashboard loading tasks.
+ * @returns Responsive SVG pie chart element synchronized with Vis. Interface loading tasks.
  *
  * @remarks
  * In accordance with ICV architectural rules, async network calls use `useGetJSONData` for LRU caching
@@ -245,6 +244,15 @@ const LinkedPieChartComponent = ({ ChartProps }: { ChartProps: PieChartProps }) 
   );
 };
 
+/**
+ * Chooses the generic or linked categorical pie-chart implementation.
+ *
+ * @param props - Pie-chart configuration, including the optional data mode.
+ * @returns A generic row-oriented chart or the linked category breakdown.
+ *
+ * @remarks Defaults to `dataMode = "linked"` when omitted. Generic mode reads the shared relation from `ChartDatasetProvider`;
+ * linked mode consumes the configured URL or bundled demonstration records.
+ */
 const PieChartComponent = ({ ChartProps }: { ChartProps: PieChartProps }) => {
   if (ChartProps.dataMode === "generic") {
     return (

@@ -9,7 +9,9 @@ import { isEnsoSuitabilityColumn } from "@/app/[locale]/home/showCases/ENSO_Suit
  *
  * @example
  * ```ts
- * const habitatMetadata: metaDataT = {
+ * import type { MetadataRecord } from "@/framework";
+ *
+ * const habitatMetadata: MetadataRecord = {
  *   mean: {
  *     valuename: "mean",
  *     dimension: "probability",
@@ -37,14 +39,15 @@ const warnedFeatures = new Set<string>();
  * Aligns raw dataset numerical features to human-readable physical units (e.g. Kelvin to Celsius, meters to millimeters).
  *
  * Performs physical unit transformations based on metadata definitions:
- * - Precipitation (m $\rightarrow$ mm): Multiplies meters by 1000 and sets unit to `"mm"`.
- * - Temperature (Kelvin $\rightarrow$ Celsius): Subtracts 273.15 ($T_{^\circ\text{C}} = T_{\text{K}} - 273.15$) and sets unit to `"°C"`.
- * - Ratios $\rightarrow$ Percentages (`%`): Multiplies ratio by 100.
+ * - Precipitation: multiplies meters by 1000 and displays millimeters.
+ * - Temperature: subtracts 273.15 from Kelvin and displays Celsius.
+ * - Percentages: multiplies a ratio by 100.
  *
  * @param value - Raw numerical feature value extracted from database response.
  * @param featureName - Dataset column feature name (e.g. `"temperature_surface"`, `"precipitation"`, `"prob_7"`).
  * @param metaData - Metadata dictionary matching {@link metaDataT}.
- * @param isDecimals - Optional flag preserving floating-point decimal precision instead of integer rounding.
+ * @param isDecimals - When true, precipitation is rounded to one decimal and
+ * Kelvin conversions to two decimals; percentages still round to whole numbers.
  * @returns Object containing transformed numerical `value` and display `unit` string.
  *
  * @remarks
@@ -52,11 +55,13 @@ const warnedFeatures = new Set<string>();
  *
  * @see {@link metaDataT} for metadata schema definitions.
  * @see {@link ColorMapLegend} for legend scale tick rendering.
- * @see {@link LeafD3Map} for map tooltip feature formatting.
+ * @see {@link LeafD3MapLayerProps} for map tooltip feature formatting.
  *
  * @example
  * ```ts
- * const metaData: metaDataT = {
+ * import { alignFeature_to_Metadata, type MetadataRecord } from "@/framework";
+ *
+ * const metaData: MetadataRecord = {
  *   temp_kelvin: { valuename: "temp_kelvin", dimension: "K", description: "Surface temperature", availability: "2020" }
  * };
  * const { value, unit } = alignFeature_to_Metadata(300.15, "temp_kelvin", metaData, true);

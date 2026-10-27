@@ -1,0 +1,106 @@
+---
+description: Generated reference for the public ICV TypeScript API.
+title: ChartDatasetContextValue
+---
+
+[**ICV TypeScript API**](..)
+
+***
+
+Dataset selection shared by the generic charts in one layout-template page.
+
+## Remarks
+
+The dataset and row limit are shared; each chart keeps its own axis and feature selection.
+`selectedDataset` is empty until the requested relation appears in the fetched list.
+
+## Example
+
+```tsx
+import { useChartDataset, type ChartDatasetContextValue } from "@/framework";
+
+function MosquitoDatasetSelection() {
+  const selection: ChartDatasetContextValue = useChartDataset();
+  return (
+    <button onClick={() => selection.setSelectedDataset("world_mosquitos_2014_2025_gdf_mosquito_amount")}>
+      {selection.selectedDataset || "Select mosquito observations"}
+    </button>
+  );
+}
+```
+
+## Properties
+
+### selectedDataset
+
+> **selectedDataset**: `string`
+
+Selected relation name, or an empty string until a valid selection exists.
+
+***
+
+### setSelectedDataset
+
+> **setSelectedDataset**: (`dataset`) => `void`
+
+Requests a relation from the currently available dataset list.
+
+#### Parameters
+
+##### dataset
+
+`string`
+
+#### Returns
+
+`void`
+
+***
+
+### datasets
+
+> **datasets**: `string`[]
+
+Sorted dataset relation names returned by the backend.
+
+***
+
+### isLoading
+
+> **isLoading**: `boolean`
+
+Whether the relation-list request is pending.
+
+***
+
+### error?
+
+> `optional` **error?**: `string`
+
+Backend or network error reported by the relation-list request.
+
+***
+
+### rowLimit
+
+> **rowLimit**: `number` \| `null`
+
+Maximum rows fetched by generic charts; `null` leaves the choice to the consumer.
+
+***
+
+### setRowLimit
+
+> **setRowLimit**: (`limit`) => `void`
+
+Updates the shared maximum row count.
+
+#### Parameters
+
+##### limit
+
+`number` \| `null`
+
+#### Returns
+
+`void`

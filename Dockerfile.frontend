@@ -27,7 +27,7 @@ RUN \
   if [ -f yarn.lock ]; then \
   yarn install --frozen-lockfile; \
   elif [ -f package-lock.json ]; then \
-  npm ci --legacy-peer-deps --no-audit --no-fund; \
+  npm ci --legacy-peer-deps; \
   elif [ -f pnpm-lock.yaml ]; then \
   corepack enable pnpm && pnpm install --frozen-lockfile; \
   else \
@@ -39,6 +39,9 @@ RUN \
 # =============================================================================
 FROM base AS builder
 
+# python3 + py3-yaml needed by `npm run docs:api:python` during the build
+RUN apk add --no-cache python3 py3-yaml
+
 WORKDIR /app
 
 # Copy dependencies from deps stage
@@ -47,28 +50,36 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copy only necessary source files
 COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* ./
 COPY next.config.mjs ./
-COPY tsconfig.json ./
-COPY tailwind.config.ts ./
+COPY tsconfig.json tsconfig.typedoc.json typedoc.json tsdoc.json ./
 COPY postcss.config.mjs ./
 COPY components.json ./
+COPY scripts ./scripts
 COPY src ./src
 COPY public ./public
 COPY messages ./messages
+COPY content ./content
+COPY source.config.ts ./
+COPY backend/*.py ./backend/
+COPY backend/schemas ./backend/schemas
+COPY backend/routes ./backend/routes
+COPY backend/API_docs ./backend/API_docs
 
 # Build environment
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV IS_DOCKER=true
 
-# Build the application
+# Generate API docs from TS + Backend sources, remove temporary backend files,
+# and build the Next.js standalone application
 RUN \
+  npm run docs:api && rm -rf ./backend && \
   if [ -f yarn.lock ]; then \
-  yarn run build; \
+  yarn next build; \
   elif [ -f package-lock.json ]; then \
   npm run next-docker-build; \
   elif [ -f pnpm-lock.yaml ]; then \
-  corepack enable pnpm && pnpm run build; \
+  corepack enable pnpm && pnpm next build; \
   else \
-  npm run build; \
+  npx next build; \
   fi
 
 # =============================================================================
@@ -98,6 +109,7 @@ RUN mkdir .next && chown nextjs:nodejs .next
 # Copy standalone build output
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/content ./content
 
 # Disables Node's 5-minute requestTimeout so multi-GB CSV uploads over slow
 # connections are not aborted mid-transfer (see server-timeouts.cjs)

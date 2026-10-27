@@ -3,7 +3,7 @@
     "tasks": [
         {
             "type": "shell",
-            "label": "generate-prisma-client",
+            "label": "start-development-stack",
             "command": "npm run dev",
             "problemMatcher": []
         },
@@ -11,7 +11,7 @@
             "type": "docker-run",
             "label": "docker-run: flask-server",
             "dockerRun": {
-                "image": "ICV-framework:latest",
+                "image": "ICV-framework:test",
                 "env": {
                     "FLASK_ENV": "development",
                     "FLASK_DEBUG": "1"

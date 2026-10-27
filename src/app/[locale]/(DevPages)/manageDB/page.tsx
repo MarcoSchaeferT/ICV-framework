@@ -4,15 +4,27 @@ import { useEffect, useState, useCallback } from "react";
 import { apiRoutes } from "@/app/api_routes";
 import { useUIContext } from "@/components/contexts/UIContext";
 
-/** Database-relation summary returned by the administration endpoint. */
+/**
+ * Database-relation summary returned by the administration endpoint.
+ *
+ * @example
+ * ```ts
+ * const relation: Relation = {
+ *   table_name: "aktuell_deutschland_sarscov2_infektionen_aggregated",
+ *   row_count: 16,
+ * };
+ * ```
+ */
 interface Relation {
+  /** Database relation identifier. */
   table_name: string;
+  /** Number of rows currently stored in the relation. */
   row_count: number;
 }
 
 /** Returns the development database-relation inspection and deletion utility. */
 export default function ManageDBPage() {
-  const { setIsDemoModeDialogOpen, demoMode } = useUIContext();
+  const { setIsDemoModeDialogOpen, demoMode, configReady } = useUIContext();
   const [relations, setRelations] = useState<Relation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,26 +32,27 @@ export default function ManageDBPage() {
 
   /* ───────── Fetch relations ───────── */
   const fetchRelations = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     try {
       const res = await fetch(apiRoutes.MANAGE_DB);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data: Relation[] = await res.json();
-      setRelations(data);
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(body?.error || `HTTP ${res.status}`);
+      }
+      setRelations(body as Relation[]);
     } catch (e: any) {
-      setError(e.message ?? "Failed to fetch relations");
+      setError(e instanceof Error ? e.message : "Failed to fetch relations");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchRelations();
+    void fetchRelations();
   }, [fetchRelations]);
 
   /* ───────── Delete handler ───────── */
   const handleDelete = async (name: string) => {
+    if (!configReady) return;
     if (demoMode) {
       setIsDemoModeDialogOpen(true);
       return;
@@ -55,9 +68,11 @@ export default function ManageDBPage() {
         apiRoutes.manageDbRelation({ relationName: name }),
         { method: "DELETE" }
       );
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(body?.error || `HTTP ${res.status}`);
       // Refresh the list after successful deletion
+      setLoading(true);
+      setError(null);
       await fetchRelations();
     } catch (e: any) {
       alert(`Delete failed: ${e.message}`);
@@ -84,7 +99,11 @@ export default function ManageDBPage() {
         {/* Reload button */}
         <div className="mb-4 flex justify-end">
           <button
-            onClick={fetchRelations}
+            onClick={() => {
+              setLoading(true);
+              setError(null);
+              void fetchRelations();
+            }}
             disabled={loading}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
@@ -137,7 +156,7 @@ export default function ManageDBPage() {
                     <td className="px-6 py-4 text-right">
                       <button
                         onClick={() => handleDelete(rel.table_name)}
-                        disabled={deletingName === rel.table_name}
+                        disabled={!configReady || deletingName === rel.table_name}
                         className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-red-600 transition-colors disabled:opacity-50"
                       >
                         {deletingName === rel.table_name

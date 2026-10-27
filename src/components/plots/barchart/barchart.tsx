@@ -2,17 +2,14 @@
 import { BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Bar, Legend, Rectangle } from 'recharts';
 import dummyData from '../dummyData';
 
-import {PrintDataLoadingErrors, handleLoadDataError } from '@/app/helpers';
+import stateMappersGermany, { PrintDataLoadingErrors, handleLoadDataError } from '@/app/helpers';
+import { getCovidStateMapId } from '@/app/covidStates';
 import {useGetJSONData} from '@/app/hooks/useFetchAndCache';
-import { use, useEffect, useMemo, useRef, useState } from 'react';
-import { useInterfaceContext, interfaceContextI } from '@/components/contexts/InterfaceContext';
-import {
-  metaDataT,
-  alignFeature_to_Metadata,
-} from '../MetaDataHandler';
+import { useEffect, useMemo, useState } from 'react';
+import { useInterfaceContext } from '@/components/contexts/InterfaceContext';
+import { metaDataT } from '../MetaDataHandler';
 import { apiRoutes } from '@/app/api_routes';
 import { useLoadingTask, LoadingSpinnerAnimation } from '../maps/utils/loadingSpinner';
-import  CovidDataStates from "@/components/dataTableClasses/CovidDataStates";
 import { t_richConfig, dbDATA } from '@/app/const_store';
 import { getGoodReadableRange, StandardTooltip } from '../maps/helpers';
 import GenericCartesianChart from '../generic/GenericCartesianChart';
@@ -26,15 +23,16 @@ import GenericCartesianChart from '../generic/GenericCartesianChart';
  * 
  * @example
  * ```tsx
+ * import { apiRoutes, type BarchartProps } from "@/framework";
+ *
+ * // Replace the relation name with one available in your deployment.
  * const props: BarchartProps = {
- *   chartName: "germany-covid-incidence",
+ *   chartName: "regional-incidence-barchart",
  *   dataURL: apiRoutes.fetchDbData({
- *     relationName: "aktuell_deutschland_sarscov2_infektionen",
- *     feature: "accuCasesPerWeek",
- *     targetDate: "2024-01-31",
+ *     relationName: "dengue_serotypes",
+ *     feature: "cases",
  *   }),
- *   locale: "de",
- *   translations: useTranslations("covid_view_barchart"),
+ *   locale: "en",
  *   isDummyMode: false,
  * };
  * ```
@@ -44,11 +42,11 @@ export interface BarchartProps {
     chartName: string;
     /** URL produced by `apiRoutes.fetchDbData`. */
     dataURL: string;
-    /** Locale used for value and metadata formatting. @default "en" */
+    /** Locale used for value and metadata formatting. @defaultValue "en" */
     locale?: string;
     /** `next-intl` translator for chart labels and tooltips. */
     translations?: any;
-    /** Uses bundled demonstration data instead of the backend. @default false */
+    /** Uses bundled demonstration data instead of the backend. @defaultValue false */
     isDummyMode?: boolean;
     /** Selects the reusable row-oriented chart adapter used by layout templates. */
     dataMode?: "linked" | "generic";
@@ -64,11 +62,9 @@ export interface BarchartProps {
  * @param locale - Locale for labels and number formatting.
  * @param translations - `next-intl` translator for the chart namespace.
  * @param isDummyMode - Uses bundled demonstration data.
+ * @param dataMode - `linked` uses the Vis. Interface selection; `generic` uses the shared dataset chart.
+ * @param rowLimit - Optional maximum rows for generic mode.
  * @returns Configuration accepted by `BarchartComponent`.
- * @default dataURL ""
- * @default locale "en"
- * @default translations {}
- * @default isDummyMode false
  */
 export function BarchartProps(
     chartName: string,
@@ -90,21 +86,58 @@ export function BarchartProps(
     };
 }
 
-/** Array-oriented database payload consumed by the state bar-chart adapter. */
+/**
+ * Array-oriented database payload consumed by the state bar-chart adapter.
+ *
+ * @example
+ * ```ts
+ * const stateCounts: Data = {
+ *   geometry: ["Berlin", "Brandenburg"],
+ *   features: [[120], [96]],
+ *   bundesland: ["Berlin", "Brandenburg"],
+ * };
+ * ```
+ */
 type Data = {
+  /** Source geometry or region identifiers in response order. */
   geometry: string[];
+  /** Feature value arrays aligned with `geometry`. */
   features: number[][];
+  /** Optional federal-state names aligned with the response rows. */
   bundesland?: string[];
 };
 
 
-/** Standard database wrapper narrowed to the bar-chart payload. */
+/**
+ * Standard database wrapper narrowed to the bar-chart payload.
+ *
+ * @example
+ * ```ts
+ * const cases: dbDat = {
+ *   relationName: "aktuell_deutschland_sarscov2_infektionen_aggregated",
+ *   header: ["bundesland", "accucases"],
+ *   response: { geometry: ["Berlin"], features: [[120]], bundesland: ["Berlin"] },
+ *   error: "",
+ * };
+ * ```
+ */
 interface dbDat extends dbDATA {
+  /** Array-oriented state records consumed by the bar-chart adapter. */
   response: Data;
 }
 
 
-/** Recharts-ready state/category records derived from backend arrays. */
+/**
+ * Recharts-ready state/category records derived from backend arrays.
+ *
+ * @example
+ * ```ts
+ * const casesByState: barChartData = [
+ *   { name: "Berlin", feature: [120], bundesland: "Berlin" },
+ *   { name: "Brandenburg", feature: [96], bundesland: "Brandenburg" },
+ * ];
+ * ```
+ */
 type barChartData = {
   name: string;
   feature: number[];
@@ -115,7 +148,7 @@ type barChartData = {
 /**
  * Custom tooltip component for Barchart using shared StandardTooltip
  */
-const CustomBarchartTooltip = ({ active, payload, label, locale, yLabel, xLabel, featureDescription, t }: any) => {
+const CustomBarchartTooltip = ({ active, payload, label, locale, yLabel, featureDescription, t }: any) => {
   if (!active || !payload || !payload.length) return null;
 
   const dataPoint = payload[0]?.payload || {};
@@ -144,6 +177,16 @@ const CustomBarchartTooltip = ({ active, payload, label, locale, yLabel, xLabel,
 };
 
 
+/**
+ * Renders the legacy bar chart synchronized with shared Vis. Interface selections.
+ *
+ * @param props - Bar-chart configuration including the data URL and translator.
+ * @returns A responsive chart with loading, metadata, and selection feedback.
+ *
+ * @remarks JSON data and localized metadata are fetched through
+ * `useGetJSONData`; `useLoadingTask` scopes pending work to the containing
+ * Vis. Interface card. Bar selection updates linked state in `InterfaceContext`.
+ */
 const LinkedBarchartComponent = ({chartProps}: {chartProps: BarchartProps}) => {
 
   
@@ -152,11 +195,7 @@ const LinkedBarchartComponent = ({chartProps}: {chartProps: BarchartProps}) => {
   let t = chartProps.translations;
   let locale = chartProps.locale;
   
-  const isDataNotAvailable = useRef(false);
-  const selectedBarId = useRef<number>(-1);
-  const [isSorting, setIsSorting] = useState(true);
   const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
-  const [isUpdated, setIsUpdated] = useState(false);
 
   const [isDataLoading, rawData] = useGetJSONData(props.dataURL);
   const [isLoading_Metadata, rawMetaData] = useGetJSONData(apiRoutes.getDatasetsMetadata({ LANGID: locale || "en" }));
@@ -174,7 +213,7 @@ const LinkedBarchartComponent = ({chartProps}: {chartProps: BarchartProps}) => {
   /********************
   * *** LOAD DATA *** *
   *********************/
-  let collectDataLoadingErrors: string[] = [];
+  let collectDataLoadingErrors: (string | undefined)[] = [];
   const params = useMemo(() => getParamsOfURL(props.dataURL), [props.dataURL]);
   const feature = useMemo(() => params['feature']?.replace(/[_*]/g, ''), [params]);
 
@@ -184,88 +223,18 @@ const LinkedBarchartComponent = ({chartProps}: {chartProps: BarchartProps}) => {
   const data = rawData as unknown as dbDat;
   const metaData = rawMetaData as unknown as metaDataT;
 
-  const data_unsorted_per_feature = useRef({
-    persistentData: null as barChartData | null,
-    currentFeature: "",
-    get: function () {
-      return this.persistentData;
-    },
-    set: function (newData: barChartData | null) {
-      this.persistentData = newData;
-    },
-    getFeatureName: function () {
-      return this.currentFeature;
-    },
-    setFeatureName: function (featureName: string) {
-      this.currentFeature = featureName;
-    },
-  });
-
-  let procData = useMemo(() => {
-    selectedBarId.current = -1; // Reset selected bar when sorting is toggled
-
+  const procData = useMemo(() => {
     if (data.response && data.response.features) {
-      let processed = processData(data, contextT, feature + "_1", metaData);
-      if (isSorting) {
-        return processed.sort((a, b) => Number(b.feature) - Number(a.feature));
-      } else {
-        return processed;
-      }
-    } else {
-
-      let feature_condition = !data_unsorted_per_feature.current?.get() && feature !== ""  && feature !== data_unsorted_per_feature.current?.getFeatureName();
-      let unsorted_data_length = data_unsorted_per_feature.current?.get()?.length || 0; 
-
-      // this condition should be true only if the data has changed, order of the data is not important
-      let data_change_condition = data_unsorted_per_feature !== null && data_unsorted_per_feature.current?.get() !== null && data?.response && isDictSortedDesc(data.response) === false && (data.response as unknown as barChartData).length > 0 && unsorted_data_length > 0 && areDictsEqual(data.response, data_unsorted_per_feature.current?.get()) === false;
-
-      if (!isDataLoading && !isLoading_Metadata && 
-        (feature_condition || data_change_condition) && data?.response) {
-
-        data_unsorted_per_feature.current?.set(data.response as unknown as barChartData);
-        data_unsorted_per_feature.current?.setFeatureName(feature);
-      } 
-
-      if (isSorting) {
-          const list = Array.isArray(data?.response) 
-            ? (data.response as unknown as barChartData) 
-            : (data_unsorted_per_feature.current?.get() || []);
-          return [...list].sort((a, b) => Number(b.feature) - Number(a.feature));
-      } else {
-        const unsortedData = data_unsorted_per_feature.current?.get();
-        if (Array.isArray(unsortedData)) {
-          return unsortedData as unknown as barChartData;
-        } else {
-          return [];
-        }
-      }
+      return processData(data).sort((a, b) => Number(b.feature) - Number(a.feature));
     }
-  }, [data, contextT, feature, metaData, isSorting, data_unsorted_per_feature, isDataLoading, isLoading_Metadata]);
+    const list = Array.isArray(data?.response) ? data.response as barChartData : [];
+    return [...list].sort((a, b) => Number(b.feature) - Number(a.feature));
+  }, [data]);
 
-  try {
-    procData = procData;
-  } catch (error) {
-    console.log("Error slicing procData:", error);
-  }
-
-
-  useEffect(() => {
-    let barID = CovidDataStates.mapperFunctions.mapper__MapTable__ID_to_ID(contextT.selectedStateID);
-
-    if(isSorting === false){
-      console.log("selectedStateID", contextT.selectedStateID, " barID", barID);
-       selectedBarId.current = (barID-1);
-      }
-    else {
-      const selectedState = CovidDataStates.mapperFunctions.mapper__MapTable__ID_to_State(contextT.selectedStateID);
-      const idx = procData.findIndex((bar) => bar.bundesland === selectedState);
-       selectedBarId.current =(idx >= 0 ? idx : -1);
-    }
-  }, [contextT.selectedStateID, isSorting, procData]);
-
-  useEffect(() => {
-      setIsUpdated(prev => !prev);
-  }, [contextT.selectedStateID]);
+  const selectedBarId = useMemo(() => {
+    const selectedState = stateMappersGermany.Map__ID_to_State(contextT.selectedStateID);
+    return procData.findIndex((bar) => bar.bundesland === selectedState);
+  }, [contextT.selectedStateID, procData]);
 
   
 console.log("procData", procData);
@@ -276,7 +245,6 @@ const [NminY, NmaxY, ticks] = useMemo(() => {
       return [0, 0, []];
     }
     let dataMin=0, dataMax = 0;
-    let federal_state: string = "";
     try {
       dataMin = Math.min(...procData.map((d) => d.feature[0]));
       dataMax = Math.max(...procData.map((d) => d.feature[0]));
@@ -346,11 +314,6 @@ let [xLabel, yLabel] = useMemo(() => {
     return metaData[curFeat]?.description || metaData[feature]?.description || "";
   }, [metaData, contextT.curFeature, feature]);
 
-  // set up tooltip style
-  const nameMapping: Record<string, string> = {
-    feature: yLabel
-  };
-
   
 
 
@@ -389,52 +352,24 @@ let [xLabel, yLabel] = useMemo(() => {
          <ChartHeader ErrorData={collectDataLoadingErrors} />
       </div>
     );
-  }else if (contextT.curFeatureValue == "NA" || contextT.curFeatureValue == "undefined" || collectDataLoadingErrors.some((error) => error !== undefined)) {
-    isDataNotAvailable.current = true;
-  }else {
-    isDataNotAvailable.current = false;
   }
+
+  const isDataNotAvailable = contextT.curFeatureValue == "NA" ||
+    contextT.curFeatureValue == "undefined" ||
+    collectDataLoadingErrors.some((error) => error !== undefined);
 
   return (
     <div className="flex flex-col h-full w-full min-h-0 relative"> 
       <LoadingSpinnerAnimation />
-      <div className="flex items-center mt-1 ml-8">
-        {/*<button
-          className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-sm"
-          style={{ width: '70px'}}
-          onClick={() => {
-        setIsSorting((prev) => !prev);
-         selectedBarId.current =(-1); // Reset selected bar when sorting is toggled
-        }}
-        >
-          Sort
-          <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={2}
-          stroke="currentColor"
-          className="w-4 h-4 mr-1 ml-1 mb-1"
-          style={{ display: 'inline' }}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M3 10h18M3 14h12M3 18h6"
-          />
-        </svg>
-        </button>*/}
-        
-      </div>
       {/* Chart Section dynamically filling available space */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 mt-1">
          <ChartHeader ErrorData={collectDataLoadingErrors} />
-      {isDataNotAvailable.current && (
+      {isDataNotAvailable && (
           <div className="flex items-center justify-center h-full">
             <div className="text-red-500">No data available</div>
           </div>
           )}
-          {!isDataNotAvailable.current && (
+          {!isDataNotAvailable && (
             <>
           <ResponsiveContainer>
           <BarChart
@@ -455,7 +390,7 @@ let [xLabel, yLabel] = useMemo(() => {
                   : i+1;
               }
             )}
-            tickFormatter={(tick) => CovidDataStates.mapperFunctions.Table__State_to_Abbr(tick)}
+            tickFormatter={(tick) => stateMappersGermany.Table__State_to_Abbr(tick)}
             />
           <YAxis
             tick={{ fontSize: 14 }}
@@ -472,7 +407,7 @@ let [xLabel, yLabel] = useMemo(() => {
             domain={[NminY, NmaxY]}
           />
           <Tooltip
-            content={<CustomBarchartTooltip locale={locale} yLabel={yLabel} xLabel={xLabel} featureDescription={featureDescription} t={t} />}
+            content={<CustomBarchartTooltip locale={locale} yLabel={yLabel} featureDescription={featureDescription} t={t} />}
             cursor={{ fill: "rgba(255, 255, 255, 0.08)" }}
           />
          <Bar 
@@ -485,21 +420,13 @@ let [xLabel, yLabel] = useMemo(() => {
           }}
           onClick={(data: any, index: number) => {
             const payload = data && (data.payload ?? data);
-            let mapID = null;
-            if (isSorting === false) {
-              mapID = CovidDataStates.mapperFunctions.mapper__TableMap__ID_to_ID(index+1);
-            }
-            else {
-              const stateName = payload?.bundesland;
-              mapID = CovidDataStates.mapperFunctions.mapper__TableMap__ID_to_ID(CovidDataStates.mapperFunctions.mapper__MapTable__State_to_ID(stateName));
-            }
+            const mapID = getCovidStateMapId(payload ?? {});
             console.log("mapID", mapID, index);
-            contextT.setSelectedStateID(mapID)
-            contextT.setMapSelectionObj
+            if (mapID !== -1) contextT.setSelectedStateID(mapID);
           }}
           shape={(props: any) => {
             const { x, y, width, height } = props;
-            const isSelected = selectedBarId.current === props.index;
+            const isSelected = selectedBarId === props.index;
             const isHovered = hoveredBarIndex === props.index;
 
             let fill = "grey";
@@ -548,24 +475,13 @@ let [xLabel, yLabel] = useMemo(() => {
 }
 
 
-const ChartHeader = ({ ErrorData }: { ErrorData: string[] }) => {
-  //const t = useTranslations("common");
-  let c = useInterfaceContext();
-  let debug = true;
-  
-  return (
-    <>
-    {debug ? (<PrintDataLoadingErrors listOfErrors={ErrorData} />): (<></>)}
-    </>
-  );
+/** Shows distinct data-loading errors above a linked bar chart. */
+const ChartHeader = ({ ErrorData }: { ErrorData: (string | undefined)[] }) => {
+  return <PrintDataLoadingErrors listOfErrors={ErrorData} />;
 }
 
-function processData(data: dbDat, interfacContext: interfaceContextI, featureName: string, metaData: metaDataT) : barChartData{
-
-  let procData: barChartData = [];
-  procData = data.response.features.map(feature => ({ name: "", feature }));
-
-  return procData;
+function processData(data: dbDat): barChartData {
+  return data.response.features.map(feature => ({ name: "", feature }));
 }
 
 function getParamsOfURL(url: string) {
@@ -578,45 +494,15 @@ function getParamsOfURL(url: string) {
 }
 
 
-function areDictsEqual(dict1: any, dict2: any): boolean {
-  /**
- * Compares two dictionaries to determine if they are equal based on the `feature` property
- * of their values. The function assumes that the values of the dictionaries are objects containing
- * a `feature` property of type `number`.
- * **/
-
-  const values1 = Object.values(dict1).map((x) => (x as { feature: number }).feature);
-  const values2 = Object.values(dict2).map((x) => (x as { feature: number }).feature);
-
-  if (values1.length !== values2.length) {
-    return false;
-  }
-
-  for (let i = 0; i < values1.length; i++) {
-    if (values1[i] !== values2[i]) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-function isDictSortedDesc(dict: any) {
-  if (!dict || typeof dict !== 'object' || Object.keys(dict).length === 0) {
-    return true; // Empty or non-object dictionaries are considered sorted
-  }
 /**
- * Checks if the values of a dictionary are sorted in descending order based on the `feature` property.
+ * Chooses the generic or linked bar-chart implementation.
+ *
+ * @param props - Chart configuration; `dataMode` controls the implementation.
+ * @returns A generic row-oriented chart or a linked Vis. Interface bar chart.
+ *
+ * @remarks Defaults to `dataMode = "linked"` when omitted. Generic mode reads the relation from `ChartDatasetProvider`;
+ * linked mode follows `InterfaceContext` and the supplied `dataURL`.
  */
-  const keys = Object.values(dict).map(x => (x as { feature: number }).feature);
-  for (let i = 0; i < keys.length - 1; i++) {
-    if (keys[i] < keys[i + 1]) {
-      return false;
-    }
-  }
-  return true;
-}
-
 const BarchartComponent = ({ chartProps }: { chartProps: BarchartProps }) => {
   if (chartProps.dataMode === "generic") {
     return (

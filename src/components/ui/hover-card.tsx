@@ -5,12 +5,14 @@ import * as HoverCardPrimitive from "@radix-ui/react-hover-card"
 
 import { cn } from "@/lib/utils"
 
+/** Owns the open state of contextual hover content. */
 function HoverCard({
   ...props
 }: React.ComponentProps<typeof HoverCardPrimitive.Root>) {
   return <HoverCardPrimitive.Root data-slot="hover-card" {...props} />
 }
 
+/** Marks the element that opens the hover card. */
 function HoverCardTrigger({
   ...props
 }: React.ComponentProps<typeof HoverCardPrimitive.Trigger>) {
@@ -19,6 +21,11 @@ function HoverCardTrigger({
   )
 }
 
+/**
+ * Renders the portal-mounted hover card panel.
+ *
+ * @remarks Defaults: `align = "center"`, `sideOffset = 4` pixels.
+ */
 function HoverCardContent({
   className,
   align = "center",

@@ -1,3 +1,4 @@
+/** Static sample records used only by demonstration chart code. */
 const dummyData = [
   { name: 'Page A', uv: 400, pv: 2400, amt: 2400 },
   { name: 'Page B', uv: 300, pv: 2210, amt: 2290 },

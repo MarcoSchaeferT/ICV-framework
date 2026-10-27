@@ -2,9 +2,30 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Native HTML input attributes accepted by the shared styled input.
+ *
+ * @example
+ * ```tsx
+ * import type { InputProps } from "@/components/ui/input";
+ * const observationDateInput: InputProps = {
+ *   type: "date",
+ *   "aria-label": "Observation date",
+ * };
+ * ```
+ */
 export interface InputProps
   extends React.InputHTMLAttributes<HTMLInputElement> {}
 
+/**
+ * Ref-forwarding input styled for the application's light and dark themes.
+ *
+ * @example
+ * ```tsx
+ * import { Input } from "@/components/ui/input";
+ * <Input type="date" aria-label="Observation date" />;
+ * ```
+ */
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, ...props }, ref) => {
     return (

@@ -11,6 +11,8 @@ import { useDebounceCallback } from "@react-hook/debounce";
  *
  * @example
  * ```ts
+ * import type { Size } from "@/framework";
+ *
  * const mapCardSize: Size = { width: 960, height: 640 };
  * ```
  */
@@ -25,7 +27,8 @@ export interface Size {
  * Debounced `ResizeObserver` hook for tracking DOM element dimensions with 1000 ms delay.
  *
  * @param element - Target DOM HTMLElement to observe.
- * @returns Element size object matching {@link Size}, or undefined if element is null.
+ * @returns The most recently observed size, or `undefined` before the first
+ * debounced observation (including when `element` is null).
  *
  * @see {@link useChartResizer} for plot card resizing pipeline integration.
  */
@@ -43,11 +46,10 @@ export const useSizeWatchDebounced = (element: HTMLElement | null): Size | undef
 /**
  * React Component observer bridge pairing with {@link useChartResizer}.
  *
- * Attaches a `ResizeObserver` to the parent `.gridPlotCardContent` element and dispatches dimension updates
- * to the parent component state.
+ * Observes the supplied element and dispatches dimension updates to parent state.
  *
  * @param props - Object containing target `element`, mutable `sizeRef`, and `setSize` dispatcher.
- * @returns An empty React fragment `<></>`.
+ * @returns `null`; the component renders no visible element.
  *
  * @remarks
  * Rendered side-by-side with plot elements inside grid card components. Modifies `sizeRef.current` and invokes `setSize`
@@ -58,7 +60,17 @@ export const useSizeWatchDebounced = (element: HTMLElement | null): Size | undef
  *
  * @example
  * ```tsx
- * <SizeHook element={element} sizeRef={sizeRef} setSize={setSizes} />
+ * import { SizeHook, useChartResizer } from "@/framework";
+ *
+ * function ObservedCard() {
+ *   const { dimensions, element, sizeRef, setSizes } = useChartResizer("observed-card");
+ *   return (
+ *     <div className="gridPlotCardContent">
+ *       <SizeHook element={element} sizeRef={sizeRef} setSize={setSizes} />
+ *       <div id="observed-card">Width: {dimensions.width}px</div>
+ *     </div>
+ *   );
+ * }
  * ```
  */
 const SizeHook = ({
@@ -92,5 +104,5 @@ const SizeHook = ({
     return null;
 };
 
-/** Default export for the ResizeObserver bridge used by dashboard visualizations. */
+/** Default export for the ResizeObserver bridge used by Vis. Interface visualizations. */
 export default SizeHook;

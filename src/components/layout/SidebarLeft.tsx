@@ -12,10 +12,23 @@ import { t_richConfig } from '@/app/const_store';
 import {Link} from '@/i18n/routing';
 import Image from "next/image";
 import Checkbox_isSwapy from './SwapyHandle'
-/** Optional external state and style hooks retained by the disease sidebar. */
+/**
+ * Optional external state and style hooks retained by the disease sidebar.
+ *
+ * @example
+ * ```ts
+ * const sidebarProps: DiseaseSidebarProps = {
+ *   isOpen: true,
+ *   className: "dengue-sidebar",
+ * };
+ * ```
+ */
 interface DiseaseSidebarProps {
+  /** Legacy open-state input; the current component does not read it. */
   isOpen?: boolean
+  /** Legacy toggle callback; the current component does not invoke it. */
   onToggle?: () => void
+  /** Additional classes for the sidebar wrapper. */
   className?: string
 }
 
@@ -56,21 +69,25 @@ export function DiseaseSidebar({ className }: DiseaseSidebarProps) {
   const defaultTransmission = transmissionDataLocal[defaultTransmissionKey].transmissionPath;
 
   const [selectedTransmission, setSelectedTransmission] = useState<string>(defaultTransmissionKey)
-  const [selectedDisease, setSelectedDisease] = useState<string>(defaultDisease)
-
-  const [isOpen, setSidebarOpen] = useState(false)
+  const [pendingDisease, setPendingDisease] = useState<string>(defaultDisease)
+  const isOpen = UI_contextT.isSidebarOpen;
+  const contextDisease = UI_contextT.sidebarSelection.disease;
+  const selectedDisease = contextDisease === "---"
+    ? pendingDisease
+    : contextDisease || (UI_contextT.sidebarSelection.transmissionPath === "" ? pendingDisease : "");
    const toggleSidebar = () => {
-    UI_contextT.setIsSidebarOpen(!isOpen)
-    setSidebarOpen(!isOpen)
+    UI_contextT.setIsSidebarOpen((open) => !open)
   }
 
   const handleTransmissionChange = (value: string) => {
     setSelectedTransmission(value)
-    setSelectedDisease("") // Reset disease selection when transmission changes
-    let sel = UI_contextT.sidebarSelection;
-    sel.disease = "";
-    sel.transmissionPath = value;
-    UI_contextT.setSidebarSelection(sel);
+    setPendingDisease("") // Reset disease selection when transmission changes
+    UI_contextT.setSidebarSelection((previous) => ({
+      ...previous,
+      disease: "",
+      transmissionPath: transmissionDataLocal[value].transmissionPath,
+      group: undefined,
+    }));
   }
 
   useEffect(() => {
@@ -85,19 +102,8 @@ export function DiseaseSidebar({ className }: DiseaseSidebarProps) {
       UI_contextT.setSidebarSelection(selection);
       console.log("Initial selection set in sidebar:", selection);
     }
-  }, [selectedDisease])
+  }, [selectedDisease, selectedTransmission, transmissionDataLocal, UI_contextT])
 
-  useEffect(() => {
-    
-  
-    if(isOpen != UI_contextT.isSidebarOpen) setSidebarOpen(UI_contextT.isSidebarOpen);
-    if(selectedDisease != UI_contextT.sidebarSelection.disease) {
-      setSelectedDisease(UI_contextT.sidebarSelection.disease);
-      console.log("Disease updated from context:", UI_contextT.sidebarSelection.disease);
-    }
-   
-  }, [selectedTransmission, UI_contextT.sidebarSelection, UI_contextT.isSidebarOpen]);
-  
 
   return (
     <>
@@ -155,7 +161,6 @@ export function DiseaseSidebar({ className }: DiseaseSidebarProps) {
             href="/"
             onClick={() => {
               UI_contextT.setIsSidebarOpen(false);
-              setSidebarOpen(false);
             }}
             className="flex items-center gap-2.5 font-semibold hover:text-amber-500 transition-colors group"
           >
@@ -191,7 +196,6 @@ export function DiseaseSidebar({ className }: DiseaseSidebarProps) {
               href="/"
               onClick={() => {
                 UI_contextT.setIsSidebarOpen(false);
-                setSidebarOpen(false);
               }}
               className="flex items-center justify-center gap-2.5 w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-[#279BBA]/25 to-blue-600/25 hover:from-[#279BBA]/40 hover:to-blue-600/40 border border-[#279BBA]/40 text-white hover:text-amber-400 font-medium text-sm transition-all duration-200 shadow-sm hover:shadow-md hover:scale-[1.01] active:scale-[0.99] group"
             >
@@ -229,7 +233,7 @@ export function DiseaseSidebar({ className }: DiseaseSidebarProps) {
         <label className="text-sm font-medium text-sidebar-foreground">{t.rich("disease", t_richConfig)}</label>
         <Select value={selectedDisease} onValueChange={
           (value) => {
-            setSelectedDisease(value);
+            setPendingDisease(value);
             let selection: SidebarSelectionI = new Object() as SidebarSelectionI;
              selection.disease = "---";
             UI_contextT.setSidebarSelection({ transmissionPath: transmissionDataLocal[selectedTransmission].transmissionPath, disease: "---" } as SidebarSelectionI);

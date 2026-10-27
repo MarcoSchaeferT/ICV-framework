@@ -74,12 +74,12 @@
                 "run",
                 "--no-reload"
             ],
-            "preLaunchTask": "generate-prisma-client",
+            "preLaunchTask": "start-development-stack",
             "jinja": true,
             "autoStartBrowser": true
         },
         {
-            "name": "Python: Flask with Prisma (Docker)",
+            "name": "Python: Flask (Docker)",
             "type": "debugpy",
             "request": "attach",
             "connect": {

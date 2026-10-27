@@ -1,35 +1,31 @@
+# Upload: File Requirements
 
-# Upload: File Requirements  
-This document describes the requirements that a file must meet in order to be processed by the system.
-## Overview
-- The uploaded file must be a CSV file encoded in UTF-8
-- The CSV must include a header row and the data is tabular.
-- The CSV field separator must be a comma (`,`)
-- The data needs to be grid-based, meaning that each row represents a grid cell with a defined rectangular footprint
-- One column must contain a GeoJSON-like POLYGON that defines a rectangle (grid footprint). All other columns can be named and used freely.
-- Floating-point values must be formatted as decimal numbers with (`.`) (e.g., `12.34` and not `12,34`).
-## Geometry column requirements
-- There must be exactly one geometry column named (`geometry`).
-- Coordinates must follow GeoJSON order: `[longitude, latitude]`.
-- The POLYGON must define a rectangle using 5 coordinate points: the four corners plus a repeat of the first point to close the polygon.
-- Example of a valid rectangle polygon (POLYGON ((2 2, 3 2, 3 3, 2 3, 2 2))):
+## CSV format
 
-## Mapping to the Views
-- **Prediction View**: the filename must contain `probability`. (e.g. *mosquito_habitat_probability_2020.csv*)
-- **Training Data View**: the filename must contain `named` and must not contain `probability`. (e.g. *mosquito_training_data_named_2020.csv*)
+- Save the file as a UTF-8 encoded `.csv` with a header row and comma-separated fields.
+- Use unique column names without spaces around the comma separators.
+- Write decimal values with a period, for example `12.34`.
+- Keep the filename shorter than 70 characters. The upload form rejects files larger than 2,500 MB.
+- Do not include an `id` column: ICV creates a record ID for each imported row.
 
-## Sample valid data 
-```
-id, country, geometry, precipitation
-1, Germany, "POLYGON ((2 2, 3 2, 3 3, 2 3, 2 2))", 22
-2, Germany, "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))", 45
-3, France, "POLYGON ((30 30, 31 30, 31 31, 30 31, 30 30))", 10
+The filename, without `.csv`, determines the dataset name. Uploading another file with the same resulting name replaces the existing dataset and its rows. Check the filename before uploading a new snapshot.
+
+## Geometry for grid-based maps
+
+Grid datasets need a column named `geometry`. Write each grid cell as a rectangular WKT `POLYGON`, with longitude before latitude. List the four corners and repeat the first corner as the fifth point to close the polygon. Enclose the whole value in double quotes so its internal commas stay in one CSV field.
+
+Other tabular datasets may omit `geometry`; the upload then skips country assignment and the dataset cannot provide grid cells to a map.
+
+For example, this CSV defines one rectangular grid cell and a numeric feature:
+
+```csv
+geometry,precipitation
+"POLYGON ((10 50, 11 50, 11 51, 10 51, 10 50))",22.5
 ```
 
+## Filenames used by map filters
 
-| id | country   | `geometry`                                                                                         | precipitation |
-|----|--------|-------------------------------------------------------------------------------------------------------|---------------|
-| 1  | Germany | "POLYGON ((2 2, 3 2, 3 3, 2 3, 2 2))"                                                                | 22            |
-| 2  | Germany | "POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))"                                                                | 45            |
-| 3  | France | "POLYGON ((30 30, 31 30, 31 31, 30 31, 30 30))"                                                       | 10            |
+- For probability datasets, include `probability` in the filename, for example `mosquito_habitat_probability_2020.csv`.
+- For training datasets, include `named` and omit `probability`, for example `mosquito_training_data_named_2020.csv`.
 
+These words help the corresponding dataset filters find uploaded files. The dataset must also have the columns expected by the chosen view.

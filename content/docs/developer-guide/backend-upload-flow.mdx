@@ -1,0 +1,59 @@
+---
+title: Backend CSV upload flow
+description: Trace CSV transfer, asynchronous ingestion, progress, and cache invalidation across the stack.
+---
+
+## Scenario: upload one CSV snapshot
+
+`src/components/Upload.tsx` checks a selected file's `.csv` suffix, name length, and 2,500 MB client limit. It sends one file per `multipart/form-data` POST to `/api/setFilesToDB` with `XMLHttpRequest`, so the browser can display transfer progress. The Flask route accepts one or more `files` parts; its response means processing has started, not that database ingestion has succeeded.
+
+```text
+Browser transfer → Next.js /api/* rewrite → DirectUploadRequest streams to disk
+  → POST returns upload_id → worker-local background loop processes the CSV
+  → PostgreSQL table and metadata → optional country assignment
+  → relation cache invalidation → GET /api/uploadStatus?id=... reports result
+```
+
+## Transfer and scheduling
+
+1. `backend/index.py` installs `DirectUploadRequest` and registers the upload blueprint. The route creates a UUID and its own directory below `backend/assets/uploads_tmp` before accessing `request.files`.
+2. `backend/upload_request.py` directs multipart file streams into that directory. It keeps only the filename basename and checks the resolved destination remains inside the upload directory.
+3. The route rejects absent or unsaved files, finalizes the streamed files, initializes status for the upload ID, then schedules processing on an event loop owned by the current worker. It returns HTTP 200 with `upload_id`, temporary `file_paths`, `SUCCESS`, and a best-effort `table_exist` value. That existence value reflects the last checked file in a batch; it does not report processing success.
+4. The frontend polls `apiRoutes.uploadStatus({ id: uploadId })` about once per second. The route in `backend/index.py` requires `id`; a missing ID returns HTTP 400. An unknown or expired ID currently receives default in-progress values rather than a 404.
+
+The browser shows transfer progress from XHR events, then backend progress from the status response. The upload page sends files sequentially even though the backend can accept a batch in one request.
+
+## Ingestion stages
+
+`backend/routes/setFilesToDB/route_setFilesToDB.py` processes saved files sequentially. For each file, `uploadFileToDB.py` takes a per-filename processing lock and follows these stages:
+
+| Stage | Implementation | Observable result |
+| --- | --- | --- |
+| Parse | `parseCSVdata.py` reads the UTF-8 CSV header, derives a sanitized relation name from the filename, and keeps rows on disk. | Header and byte size are available for schema and progress work. |
+| Replace schema | `createTable.py` resolves column types from metadata and sampled rows, then drops and recreates the relation in one PostgreSQL transaction. | This file is treated as a complete snapshot of the named relation. |
+| Insert | `insertData.py` streams CSV rows through psycopg `COPY` in a separate transaction. | Byte-based database progress advances; the overall percentage stays below 100 until the entire request batch succeeds. |
+| Enrich | `route_columnMetadata.py` populates localized column metadata. If a `geometry` column exists, `assignGeoPosToCountry.py` assigns countries using Shapely. | Status can enter the `country` phase. A metadata exception is logged; a country-assignment exception is reported as an upload error. |
+| Publish fresh reads | `response_cache.invalidate(relationName)` bumps a Redis epoch and removes matching local entries. | Future backend reads can fetch the new relation after a successful ingestion. |
+
+Country assignment loads the packaged `backend/assets/worldmap_midRes.geo.json.tgz`, the same archive served by the map endpoint.
+
+The worker sets phase `complete` and progress `100` only after every file in the request batch succeeds. It removes the upload-specific directory on success or error and releases the per-filename lock in a `finally` block.
+
+## Read status and handle failure
+
+`GET /api/uploadStatus?id=...` returns `progress`, `error`, `phase`, `has_geometry`, `db_progress`, and `country_progress`. The no-error sentinel is the string `"false"`; any other `error` value signals failure. The UI stops polling on error or progress `100`, and retries a few transient polling failures. A polling failure does not cancel backend processing. There is no cancellation endpoint in this flow.
+
+Redis shares status and file locks between Gunicorn workers. The ingestion coroutine itself runs on a daemon thread in the worker that accepted the request; Redis is not a durable job queue and this flow does not retry an interrupted worker job. If Redis is unavailable, `backend/upload_state.py` falls back to process-local state, so a poll routed to another worker may not see current progress. Redis status keys expire after 24 hours. Keep the returned upload ID while diagnosing an in-progress upload.
+
+**Current consistency limit:** The schema replacement and `COPY` insertion are separate transactions. If insertion or a later stage fails, the previous dataset is not automatically restored. Relation cache invalidation runs on the full success path. Inspect the relation and status before retrying or treating a failed upload as rolled back.
+
+## Change and verify this flow
+
+| Contract to change | Source to inspect | Verify |
+| --- | --- | --- |
+| Form field or initial response | `src/components/Upload.tsx`, `route_setFilesToDB.py`, `backend/API_docs/set_files_to_db.yml` | Multipart request, validation, response status, and `upload_id` handling. |
+| Progress or error semantics | `backend/upload_state.py`, `/api/uploadStatus`, `backend/API_docs/get_upload_status.yml` | Polling reaches a terminal success or error, including multiple files and Redis fallback. |
+| CSV schema or values | `parseCSVdata.py`, `createTable.py`, `insertData.py` | Type resolution, sanitized names, COPY values, and failure behavior. |
+| Cache freshness | `uploadFileToDB.py`, `backend/cache.py`, browser consumers | Backend epoch invalidation and any browser cache eviction needed after mutation. |
+
+See [Backend query flow](./backend-query-flow) for the read path and [Local development](./local-development#verify-a-change) for focused checks.

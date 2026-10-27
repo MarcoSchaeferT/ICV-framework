@@ -1,0 +1,94 @@
+tags:
+  - Cell Charts
+summary: Get cell-level JSON data for interactive ENSO or uncertainty charts
+description: |
+  Select a chart family with `chart`. Both variants use the database row ID of
+  the selected map cell and return JSON with a version discriminator. ENSO data
+  includes five localized climate/suitability panels. Each panel has twelve
+  Jan-Dec reference entries (month, mean, std, lower, upper) and chronological
+  forecast entries (year, month, value). Uncertainty data includes one monthly
+  temporal series and a 100-point centered-interval calibration curve. The
+  calibration comparison uses a deterministic sample from the model's `sim_*`
+  columns, not independently observed ground truth. Cache entries are scoped
+  to all relations used in the response.
+parameters:
+  - name: chart
+    in: query
+    type: string
+    required: true
+    enum: [enso, uncertainty]
+    description: Chart family to return.
+  - name: cellID
+    in: query
+    type: integer
+    required: true
+    description: Nonnegative database row ID of the selected grid cell.
+  - name: dataset
+    in: query
+    type: string
+    required: false
+    description: For ENSO only; one of the two supported SEAS5 species relations. Defaults to albopictus.
+  - name: locale
+    in: query
+    type: string
+    required: false
+    description: For ENSO labels only; de or en, default en.
+responses:
+  200:
+    description: |
+      JSON with Cache-Control no-cache. ENSO uses version
+      `enso-suitability-v1`. Uncertainty uses version `uncertainty-v1` and
+      fields `cellID`, `coordinates` (latitude, longitude), `temporal`,
+      `calibration`, and `miscalibrationArea`. Temporal entries have a 1-based
+      `month`, `mean`, `sd`, `lower` and `upper` (mean ±2 SD), `simulatedValue`,
+      `cv`, `q05`, and `q95`. Calibration entries have `expected` and `observed`
+      interval proportions. Missing/nonfinite numeric fields are null.
+    schema:
+      type: object
+      properties:
+        version:
+          type: string
+          enum: [enso-suitability-v1, uncertainty-v1]
+        cellID:
+          type: integer
+        coordinates:
+          type: object
+        dataset:
+          type: string
+          description: ENSO only; selected SEAS5 relation.
+        months:
+          type: array
+          description: ENSO only; Jan-Dec month numbers and localized labels.
+          items:
+            type: object
+        title:
+          type: string
+          description: ENSO only; localized chart title.
+        referenceLegend:
+          type: string
+          description: ENSO only; localized reference label.
+        forecastLegend:
+          type: string
+          description: ENSO only; localized forecast label.
+        panels:
+          type: array
+          description: ENSO only; five panels with key, label, reference, and forecast fields.
+          items:
+            type: object
+        temporal:
+          type: array
+          items:
+            type: object
+        calibration:
+          type: array
+          items:
+            type: object
+        miscalibrationArea:
+          type: number
+          x-nullable: true
+  400:
+    description: Invalid or missing chart or cellID, or invalid ENSO dataset.
+  404:
+    description: No data found for the selected cell.
+  500:
+    description: Database or chart-data generation error.
