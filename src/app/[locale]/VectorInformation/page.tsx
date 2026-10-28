@@ -18,7 +18,7 @@ export function generateStaticParams() {
  */
 export default function BlogPage() {
 
-  const t = useTranslations('page_domainInfo');
+  const t = useTranslations('page_vectorInformation');
   const locale = useLocale() as Locale;
 
   return (

@@ -14,7 +14,6 @@ import {
     useWebGLGridLayer,
     useLayerUpdateDebounce,
     useTooltipCleanup,
-    useDynamicSettingsTop,
 } from './hooks';
 import { clampCoordinates, removeReusedTooltip } from './utils/mapUtils';
 import MapContentChild from './MapContentChild';
@@ -71,6 +70,7 @@ import { Locale } from '@/i18n/routing';
 import useChartResizer from '@/app/hooks/useChartResizer';
 import * as GEOjson from 'geojson';
 import {HoverCardTooltip} from '@/components/layout/InfoCards';
+import { CardHeaderAction } from '@/components/layout/CardHeaderAction';
 import ColorMapLegend from './overlays/ColorMapLegend';
 import LatLngZoomLegend from './overlays/LatLngZoomLegend';
 import { DonutTooltip } from './overlays/DonutTooltip';
@@ -258,13 +258,15 @@ export interface LeafD3MapLayerProps {
          * @defaultValue true
          */
         areSettingsOpen?: boolean;
+        /** Whether a button for showing and hiding map controls is rendered. @defaultValue true */
+        isSettingsToggleVisible?: boolean;
         /**
          * Enable a CSS opacity+scale transition when toggling the settings panel.
          * @defaultValue false
          */
         isSettingsBlendAnimation?: boolean;
         /**
-         * If `true`, the settings-toggle gear icon auto-hides after the panel closes.
+         * If `true`, show the setting for automatic control-panel hiding.
          * @defaultValue false
          */
         isAutoHideSettingsToggle?: boolean;
@@ -611,6 +613,7 @@ export function LeafD3MapLayerProps(
         zoom,
         mapUIsettings: {
             areSettingsOpen: true,
+            isSettingsToggleVisible: true,
             isSettingsBlendAnimation: false,
             isAutoHideSettingsToggle: false,
             isLongitudeSlider: true,
@@ -1018,7 +1021,6 @@ const strokeWidth = props.mapStyles?.strokeWidth ?? 1.5;
     const [selectedCountry, setSelectedCountry] = useState<string>("");
     const [isSettingsOpen, setIsSettingsOpen] = useState(true);
     const [isSettingsOpenFixed, setIsSettingsOpenFixed] = useState(props.mapUIsettings.areSettingsOpen ?? true);
-    const { containerRef: settingsContainerRef, settingsTop: settingsButtonTop } = useDynamicSettingsTop();
     const curMouseEvent = useRef<string>("null");
     const screenDistanceOneKM = useRef<number>(0);
     const curDatasetname = useRef<string>(initialRelationName);
@@ -1026,6 +1028,7 @@ const strokeWidth = props.mapStyles?.strokeWidth ?? 1.5;
     const curPropertyNames = useRef<string>("");
     const hoverCountry = useRef<string>("0");
     const toolTipRef = useRef<any>(null);
+    const isDonutTooltipVisibleRef = useRef(false);
     const cursorMarkerRef = useRef<L.Marker | null>(null);
     const [showSuccessCountryDropdown, setShowSuccessCountryDropdown] = useState(false);
     const [showSuccessTimerangeDropdown, setShowSuccesTimerangeDropdown] = useState(false);
@@ -2700,6 +2703,8 @@ const HandleMouseMoveX = useCallback(
         return;
     }
 
+    if (isDonutTooltipVisibleRef.current) return;
+
         
         removeAllTooltips();
         
@@ -3007,6 +3012,7 @@ function MapMouseEvents() {
             };
 
               const handleMouseMove = (event: L.LeafletMouseEvent) => {
+                if (isDonutTooltipVisibleRef.current) return;
 
                
            
@@ -3876,6 +3882,8 @@ function MapDrawLayer_SequenceMetadata(countryCounts: { [key: string]: any }) {
             !countryCounts ||
             Object.keys(countryCounts).length === 0
         ) {
+            isDonutTooltipVisibleRef.current = false;
+            root.current?.render(null);
             if (map && SVGLayer_ref.current) {
                 if (map.hasLayer(SVGLayer_ref.current)) {
                     map.removeLayer(SVGLayer_ref.current);
@@ -3892,6 +3900,8 @@ function MapDrawLayer_SequenceMetadata(countryCounts: { [key: string]: any }) {
 
         // cleanup function to remove the SVG layer when component unmounts or dependencies change
         return () => {
+            isDonutTooltipVisibleRef.current = false;
+            root.current?.render(null);
             if (map) {
                 map.off("zoom move viewreset", updatePieCharts);
                 if (SVGLayer_ref.current && map.hasLayer(SVGLayer_ref.current)) {
@@ -3903,7 +3913,7 @@ function MapDrawLayer_SequenceMetadata(countryCounts: { [key: string]: any }) {
             piesMerged.current = undefined;
         };
 
-    }, [countryCounts, isSequenceMetaData, pieSize, isLoading_sequenceMetadata, isLoadingSequenceBreakdown, map, L]);
+    }, [countryCounts, isSequenceMetaData, pieSize, isLoading_sequenceMetadata, isLoadingSequenceBreakdown, map, L, removeAllTooltips, removeGridCellHighlight, contextT.mouseEvent, contextT.notifyMouseEvent]);
 
     /**
      * Re-projects and re-scales all existing donut-chart `<g>` groups
@@ -4099,13 +4109,14 @@ function MapDrawLayer_SequenceMetadata(countryCounts: { [key: string]: any }) {
                     })
                     .on("mouseover", function(event, arcData) {
                        event.stopPropagation();
-                        // move grid-data-tooltip out of sight
-                        if (contextT.mouseEvent.current.event) {
-                            if (L) {
-                                contextT.mouseEvent.current.event.latlng = L.latLng(-90, -180);
-                            }
-                        }
-                        // Show tooltip on pie slice click
+                         isDonutTooltipVisibleRef.current = true;
+                         removeAllTooltips();
+                         removeGridCellHighlight(hoverGridCellLayerRef);
+                         contextT.mouseEvent.current.type = 'mouseout';
+                         contextT.mouseEvent.current.event = undefined;
+                         contextT.mouseEvent.current.position = [0, 0];
+                         contextT.notifyMouseEvent();
+                         // Show the donut tooltip after clearing grid hover state.
                         const renderLabel = d3.select(this).attr("label");
                         const renderColor = d3.select(this).attr("fill");
                           
@@ -4151,12 +4162,8 @@ function MapDrawLayer_SequenceMetadata(countryCounts: { [key: string]: any }) {
                         select.raise(); // bring to front
                     })
                     .on("mouseout", function(_event, arcData) {
-                        // Remove any previous tooltip
-                        if(root.current && map){
-                            root.current.render(
-                                <DonutTooltip arcData={0} d={0} countryCounts={{}} locale={""} HexHighlightCol={""} basePieSize={0} thickness={0} isVisible={false} />
-                            );
-                        }
+                        isDonutTooltipVisibleRef.current = false;
+                        root.current?.render(null);
                         const select = d3.select(this);
                         // Shrink back: transition outerRadius from enlarged to normal
                         select.transition()
@@ -4292,18 +4299,25 @@ useEffect(() => {
         <>
   
        
-<div ref={settingsContainerRef} className="@container relative size-full" >
-    <div className="absolute right-14 z-600" style={{ top: `${settingsButtonTop}px` }}>
-        <button
-            onClick={() =>{
-                 setIsSettingsOpen(true);
-                 setIsSettingsOpenFixed(!isSettingsOpenFixed);
-            }}
-            className="p-1  rounded-full shadow-md hover:bg-gray-600 bg-black "
+<div className="@container relative size-full" >
+    {mapUIsettings.isSettingsToggleVisible !== false && (
+      <CardHeaderAction>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={t(isSettingsOpenFixed ? 'hideMapControls' : 'showMapControls')}
+          title={t(isSettingsOpenFixed ? 'hideMapControls' : 'showMapControls')}
+          onClick={() => {
+            setIsSettingsOpen(true);
+            setIsSettingsOpenFixed((open) => !open);
+          }}
+          className="h-8 w-8 text-white hover:text-slate-900 focus-visible:ring-white"
         >
-            <Settings className="text-white " />
-        </button>
-    </div>
+          <Settings className="h-5 w-5" aria-hidden="true" />
+        </Button>
+      </CardHeaderAction>
+    )}
     <PrintDataLoadingErrors listOfErrors={collectDataLoadingErrors.current}/>
     <SizeHook element={element} sizeRef={sizeRef} setSize={setSizes}/>
 

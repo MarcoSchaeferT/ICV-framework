@@ -299,21 +299,21 @@ export default function Home() {
     getTranslation('climateFactorsPlot', 'Climatic Factors'),
     "", ""
   );
-  climateFactorsCardProps.infoCard = { content: MDX.DummyContent, footer: undefined };
+  climateFactorsCardProps.infoCard = { content: MDX.pages.ShowCases.ENSOClimate };
 
   let forecastMapCardProps = CardPropsClass(
     "enso_fc_map",
     getTranslation('forecastMap', 'Forecast Map'),
     "", ""
   );
-  forecastMapCardProps.infoCard = { content: MDX.DummyContent, footer: undefined };
+  forecastMapCardProps.infoCard = { content: MDX.pages.ShowCases.ENSOForecast };
 
   let referenceMapCardProps = CardPropsClass(
     "enso_ref_map",
     getTranslation('referenceMap', 'Reference Map'),
     "", ""
   );
-  referenceMapCardProps.infoCard = { content: MDX.DummyContent, footer: undefined };
+  referenceMapCardProps.infoCard = { content: MDX.pages.ShowCases.ENSOReference };
 
   let mainInfoHeading = getTranslation('mainInfo.heading', 'ENSO Suitability');
 

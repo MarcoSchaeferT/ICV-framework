@@ -63,14 +63,14 @@ export const showCasesList: Record<Locale, ShowcaseItem[]> = {
       description: "Investigate mosquito habitat suitability predictions for different years and species",
       backgroundImage: "/showCases/suitable_mosquito_habitats.png",
       icon: <InfoIcon />,
-      link: "/worldView",
+      link: "/PredictionView",
     },
     {
       title: "Training Data View",
       description: "Explore climate, land-use, and population data used to train the mosquito habitat suitability model",
       backgroundImage: "/showCases/training_data_view.png",
       icon: <CubesIcon />,
-      link: "/rawDataView",
+      link: "/TrainingDataView",
     },
     {
       title: "USA Habitats/Sightings",
@@ -135,14 +135,14 @@ export const showCasesList: Record<Locale, ShowcaseItem[]> = {
       description: "Untersuchen Sie Vorhersagen zur Eignung von Mückenlebensräumen für verschiedene Jahre und Arten",
       backgroundImage: "/showCases/suitable_mosquito_habitats.png",
       icon: <InfoIcon />,
-      link: "/worldView",
+      link: "/PredictionView",
     },
     {
       title: "Trainingsdaten-Ansicht",
       description: "Erkunden Sie Klima-, Landnutzungs- und Bevölkerungsdaten, mit denen Modelle zur Eignung von Mückenlebensräumen trainiert werden",
       backgroundImage: "/showCases/training_data_view.png",
       icon: <CubesIcon />,
-      link: "/rawDataView",
+      link: "/TrainingDataView",
     },
     {
       title: "USA Lebensräume/Sichtungen",

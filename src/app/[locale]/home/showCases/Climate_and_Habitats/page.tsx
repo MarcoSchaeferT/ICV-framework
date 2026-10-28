@@ -382,7 +382,7 @@ function ShowDataSet({ query, locale, t }: { query: string ; locale: string; t: 
 function DynamicLineChart({ featureRaw, name }: { featureRaw: string, name: string }) {
   let c = useInterfaceContext();
   const locale = useLocale();
-  let t = useTranslations("page_rawDataView.linechart");
+  let t = useTranslations("page_trainingDataView.linechart");
 
 
   let dataSet = new URL("http://blub"+c.curDatasetURL).searchParams.get('relationName');

@@ -122,6 +122,7 @@ export function MiniMapOverlay({
 
     // Disable all interactive UI elements & sliders for minimap
     p.mapUIsettings.areSettingsOpen = false;
+    p.mapUIsettings.isSettingsToggleVisible = false;
     p.mapUIsettings.isLongitudeSlider = false;
     p.mapUIsettings.isLatitudeSlider = false;
     p.mapUIsettings.isZoomSlider = false;

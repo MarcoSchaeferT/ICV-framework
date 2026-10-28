@@ -37,7 +37,7 @@ export default function Home() {
 
   const locale = useLocale() as Locale;
   let md = MDXContentProvider[locale];
-  const t = useTranslations("page_rawDataView.pageContent");
+  const t = useTranslations("page_trainingDataView.pageContent");
 
   const UI_contextT = useUIContext();
   const layoutSizes = UI_contextT.layoutDims;
@@ -95,6 +95,9 @@ export default function Home() {
      let d3MapCardProps2_overveiwDetail = CardPropsClass(
           t.rich('tab_detailView', {...t_richConfig})?.toString() || '',
           "","","");
+  const mapCardProps = CardPropsClass("Map1", t('card_mapView'), "", "");
+  mapCardProps.infoCard = { content: md.pages.TrainingDataView.map.Info };
+  mapCardProps.infoCardInteraction = { content: md.pages.TrainingDataView.map.Interaction };
   
 
   // intitialize data table context
@@ -130,7 +133,7 @@ export default function Home() {
      <>
      <InterfaceContextProvider>
       <main className="flex max-h-fit flex-col items-center justify-between " style={{paddingTop: layoutSizes.gapSize}}>
-        <ViewMainInfoComponent heading={mainInfoHeading} mdxContent={md.pages.RawDataView.mainInfo} />
+        <ViewMainInfoComponent heading={mainInfoHeading} mdxContent={md.pages.TrainingDataView.mainInfo} />
 
         {/*** START: grid layout ***/}
         <div ref={swapContainerRef} className={`w-full grid grid-cols-12 md:grid-cols-12`} style={{
@@ -150,7 +153,7 @@ export default function Home() {
           <SGridPlotCard rowColSpan={[1,3]} cardProps={CardPropsClass("Stat3","","","", )}> <ShowDataSet query = 'colorMap' locale={locale} t={t}/> </SGridPlotCard>
           <SGridPlotCard rowColSpan={[1,3]} cardProps={CardPropsClass("Stat4","","","", )}> <ShowDataSet query = 'dataSet' locale={locale} t={t}/> </SGridPlotCard>
 
-          <SGridPlotCard rowColSpan={[8,6]} cardProps={CardPropsClass("Map1","Map View","","")}><LeafD3MapLayerComponent props={mapPropsWorld1}/></SGridPlotCard>
+          <SGridPlotCard rowColSpan={[8,6]} cardProps={mapCardProps}><LeafD3MapLayerComponent props={mapPropsWorld1}/></SGridPlotCard>
            <SGridPlotCard rowColSpan={[8,6]} cardProps={CardPropsClass("Map14","","","")}>
           <Tabs className="size-full flex flex-col h-full" defaultValue="account">
             <TabsList className='justify-start flex bg-gray-400 text-white rounded-t-md rounded-b-none border-b border-gray-200 h-10'>
@@ -316,7 +319,7 @@ function ShowDataSet({ query, locale, t }: { query: string ; locale: string; t: 
 function DynamicLineChart({ featureRaw, name }: { featureRaw: string, name: string }) {
   let c = useInterfaceContext();
   const locale = useLocale();
-  let t = useTranslations("page_rawDataView.linechart");
+  let t = useTranslations("page_trainingDataView.linechart");
 
 
   let dataSet = new URL("http://blub"+c.curDatasetURL).searchParams.get('relationName');

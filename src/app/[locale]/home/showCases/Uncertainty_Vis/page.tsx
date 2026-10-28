@@ -132,8 +132,7 @@ let MDX = MDXContentProvider[locale];
     let d3MapCardProps_overview = CardPropsClass(
       getTranslation('coefficientMap', 'Global Coefficient of Variation Map'),
       getTranslation('coefficientMap', 'Global Coefficient of Variation Map'),"","");
-      d3MapCardProps_overview.infoCard = {content: MDX.DummyContent, footer: undefined};
-      d3MapCardProps_overview.infoCardInteraction = {content: MDX.DummyContent, footer: undefined};
+      d3MapCardProps_overview.infoCard = {content: MDX.pages.ShowCases.UncertaintyMap};
 
     
      // build the page

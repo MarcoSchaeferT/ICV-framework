@@ -152,7 +152,6 @@ export default function Home() {
     t.rich('headingDetailView', { ...t_richConfig })?.toString() || '',
     t.rich('headingDetailView', { ...t_richConfig })?.toString() || "", "", "");
   d3MapCardProps2_overveiwDetail.infoCard = { content: MDX.pages.PredictionView.detailView.Info, footer: undefined };
-  d3MapCardProps2_overveiwDetail.infoCardInteraction = { content: undefined, footer: undefined };
 
   d3MapCardProps_overview.infoCard = { content: MDX.pages.PredictionView.overview.Info, footer: undefined };
   d3MapCardProps_overview.infoCardInteraction = { content: MDX.pages.PredictionView.overview.Interaction, footer: undefined };

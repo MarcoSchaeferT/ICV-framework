@@ -1,159 +1,114 @@
-
-import { InfoIcon, } from "lucide-react"
-import { OpenInBrowser,GoogleDocs} from "iconoir-react";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card"
-import MdxLayout, {MdxLayoutTooltip} from '@/mdx-layout';
+import { ArrowUpRight, BarChart3, InfoIcon, MousePointerClick, X } from 'lucide-react';
+import { useId } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import { Button } from '@/components/ui/button';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Link } from '@/i18n/routing';
+import MdxLayout, { MdxLayoutTooltip } from '@/mdx-layout';
 import { MDXContentProvider } from '@messages/markdown/MDXContentProvider';
-import { Button } from "@/components/ui/button";
-import { Link } from "@/i18n/routing";
-import { useLocale, useTranslations } from "next-intl";
 
+/** Shows the available card explanation and interaction help in one click-opened panel. */
+export function CardInfoPopover({
+  title,
+  info: Info,
+  interaction: Interaction,
+  infoFooter: InfoFooter,
+  interactionFooter: InteractionFooter,
+}: {
+  title: string;
+  info?: React.FC;
+  interaction?: React.FC;
+  infoFooter?: React.FC;
+  interactionFooter?: React.FC;
+}) {
+  const t = useTranslations('component_infoCard');
+  const titleId = useId();
 
-
-/**
- * Renders localized MDX explaining the data and purpose of a Vis. Interface component.
- *
- * @param props - Optional MDX body/footer and icon color.
- * @returns An information icon with a full documentation hover card.
- */
-export const HoverCardComponentInfo: React.FC<{ MDXContent?: React.FC; Footer?: React.FC, color?: string }> = ({
-  MDXContent = "",
-  Footer = "",
-  color = "white",
-}) => {
-
-  const locale = useLocale();
-  const MDXContext = MDXContentProvider[locale];
-  if (!MDXContent) MDXContent = MDXContext.DummyContent;
-  if (!Footer) Footer = MDXContext.FooterContent;
-  
-  const t = useTranslations("component_infoCard");
-  return (
-    <div>
-    <HoverCard openDelay={50} closeDelay={400}>
-      <HoverCardTrigger asChild defaultChecked={true}>
-        <InfoIcon className={`h-5 w-5 cursor-pointer text-${color} transition-colors duration-200 hover:text-blue-500 hover:scale-110`} />
-      </HoverCardTrigger>
-      <HoverCardContent className="legacy-mdx-info-card max-w-[30vw] min-w-[400px] max-h-[80vh] overflow-y-auto z-1000 rounded-lg shadow-lg bg-white border-4 border-gray-200 p-4">
-       
-       <div className="flex items-start gap-3 pb-5">
-        <div className="flex items-center gap-3 w-full">
-          <div className="shrink-0 mt-1 bg-blue-200 rounded-full p-3 shadow">
-            <InfoIcon className="h-4 w-4 text-blue-600" />
-          </div>
-          <div className="flex-1 flex items-center justify-between pb-2 pt-4">
-            <div className="text-md text-blue-600 pb-0">{t.rich("headingComponentInfo")}</div>
-            <Button
-              asChild
-              variant="outline"
-              className="px-4 py-1  pb-1 rounded-lg shadow hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200 flex items-center gap-2 mb-0"
-            >
-              <Link href={`/docs`} target="" rel="noopener noreferrer">
-                <GoogleDocs className="h-4 w-4  text-blue-600" />
-                <span className="font-medium">{t.rich("openFullDocs")}</span>
-              </Link>
-            </Button>
-          </div>
-        </div>
-          </div>
-     
-        <div className=" ml-6 mr-6">
-         <MdxLayout >
-                <MDXContent />
-              </MdxLayout>
-              </div>
-          <div className="flex items-center justify-between mt-10 border-t border-slate-200 dark:border-slate-700">
-            <div className="text-xs text-gray-400 px-2 pt-2  rounded">
-              <Footer />
-            </div>
-          </div>
-      </HoverCardContent>
-    </HoverCard>
-    </div>
-  );
-};
-
-/**
- * Renders localized MDX explaining the interactions supported by a Vis. Interface component.
- *
- * @param props - Optional MDX body and footer components.
- * @returns An interaction icon with a documentation hover card.
- */
-export const HoverCardInteractionInfo: React.FC<{ MDXContent?: React.FC; Footer?: React.FC; }> = ({
-  MDXContent = "",
-  Footer = "",
-}) => {
-    const t = useTranslations("component_infoCard");
-
-  const locale = useLocale();
-  const MDXContext = MDXContentProvider[locale];
-  if (!MDXContent) MDXContent = MDXContext.DummyContent;
-  if (!Footer) Footer = MDXContext.FooterContent;
+  if (!Info && !Interaction) return null;
 
   return (
-    <>
-    <HoverCard openDelay={50} closeDelay={400}>
-      <HoverCardTrigger asChild>
-        <OpenInBrowser className="h-5 w-5 cursor-pointer text-white transition-colors duration-200 hover:text-amber-500 hover:scale-110" />
-      </HoverCardTrigger>
-      <HoverCardContent className="legacy-mdx-info-card max-w-[30vw] min-w-[400px] max-h-[80vh] overflow-y-auto z-1000 rounded-lg shadow-lg bg-white border-4 border-gray-200 p-4">
-         
-        <div className="flex items-start gap-3">
-          <div className="shrink-0 mt-[12px] bg-amber-200 rounded-full p-3 shadow">
-            <OpenInBrowser className="h-4 w-4 text-amber-700" />
-          </div>
-        <div className="flex-1 flex items-center justify-between pb-2 pt-4">
-            <div className="text-md text-amber-700 pb-4">{t.rich("headingInteractions")}</div>
-            <Button
-          asChild
-          variant="outline"
-          className="px-4 py-2 rounded-lg shadow hover:bg-amber-50 hover:text-amber-700 transition-colors duration-200 flex items-center gap-2 mb-4"
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={t('openCardInfo', { title })}
+          className="h-8 w-8 shrink-0 text-white hover:text-slate-900 focus-visible:ring-white"
         >
-          <Link href={`/docs#MapInteractions`}  target="" rel="noopener noreferrer">
-            <GoogleDocs className="h-4 w-4 text-amber-700" />
-            <span className="font-medium">{t.rich("openFullDocs")}</span>
-          </Link>
+          <InfoIcon className="h-5 w-5" aria-hidden="true" />
         </Button>
-          </div>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        aria-labelledby={titleId}
+        className="legacy-mdx-info-card flex max-h-[min(80vh,42rem)] w-[min(28rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-0 shadow-[0_24px_70px_-24px_rgba(15,23,42,0.5)] dark:border-slate-700 dark:bg-slate-900"
+      >
+        <div className="flex shrink-0 items-start gap-3 border-b border-slate-200/80 bg-linear-to-br from-slate-50 to-blue-50/80 px-5 py-4 dark:border-slate-700 dark:from-slate-800 dark:to-slate-800/70">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm dark:bg-blue-500">
+            <InfoIcon className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <h2 id={titleId} className="min-w-0 flex-1 break-words pt-1 text-base font-semibold leading-snug text-slate-900 dark:text-slate-50">
+            {t('panelTitle', { title })}
+          </h2>
+          <PopoverClose asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={t('closeCardInfo')}
+              className="h-8 w-8 shrink-0 text-slate-500 hover:bg-white/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </PopoverClose>
         </div>
-        <div className=" ml-6 mr-6">
-         <MdxLayout >
-                <MDXContent />
-              </MdxLayout>
-              </div>
-          <div className="flex items-center justify-between mt-10 border-t border-slate-200 dark:border-slate-700">
-            <div className="text-xs text-gray-400 px-2 pt-2  rounded">
-              <Footer />
-            </div>
-          </div>
-      </HoverCardContent>
-    </HoverCard>
-    </>
-  )
-};
+        <div className="min-h-0 space-y-3 overflow-y-auto px-5 py-4">
+          {Info && (
+            <section className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/50">
+              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                <BarChart3 className="h-4 w-4 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+                {t('headingComponentInfo')}
+              </h3>
+              <MdxLayout><Info /></MdxLayout>
+              {InfoFooter && <div className="mt-3 border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400"><InfoFooter /></div>}
+            </section>
+          )}
+          {Interaction && (
+            <section className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/50">
+              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                <MousePointerClick className="h-4 w-4 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+                {t('headingInteractions')}
+              </h3>
+              <MdxLayout><Interaction /></MdxLayout>
+              {InteractionFooter && <div className="mt-3 border-t border-slate-200 pt-3 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400"><InteractionFooter /></div>}
+            </section>
+          )}
+        </div>
+        <div className="shrink-0 border-t border-slate-200/80 bg-slate-50/80 px-5 py-3 dark:border-slate-700 dark:bg-slate-800/70">
+          <Link href="/docs" className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-blue-700 underline-offset-4 transition-colors hover:text-blue-900 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-blue-300 dark:hover:text-blue-200">
+            {t('openFullDocs')}
+            <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
-
-/**
- * Renders compact localized MDX help suitable for controls and visualization overlays.
- *
- * @param props - Optional MDX body and icon color.
- * @returns An information icon with a high-contrast tooltip card.
- */
+/** Renders compact localized MDX help suitable for controls and visualization overlays. */
 export const HoverCardTooltip: React.FC<{ MDXContent?: React.FC; color?: string }> = ({
-  MDXContent = "",
-  color = "#b1b1b1",
+  MDXContent = '',
+  color = '#b1b1b1',
 }) => {
   const locale = useLocale();
   const MDXContext = MDXContentProvider[locale];
   if (!MDXContent) MDXContent = MDXContext.DummyContent;
-  
+
   return (
-   
-    <HoverCard openDelay={5} closeDelay={5} >
+    <HoverCard openDelay={5} closeDelay={5}>
       <HoverCardTrigger asChild>
         <InfoIcon
           className="h-5 w-5 cursor-pointer transition-colors duration-200 hover:text-blue-500 hover:scale-110"
@@ -161,11 +116,8 @@ export const HoverCardTooltip: React.FC<{ MDXContent?: React.FC; color?: string 
         />
       </HoverCardTrigger>
       <HoverCardContent sideOffset={0} className="max-w-[30vw] min-w-[400px] max-h-[80vh] overflow-y-auto bg-transparent z-1000 border-0 ">
-        <MdxLayoutTooltip  >
-          <MDXContent />
-        </MdxLayoutTooltip>
+        <MdxLayoutTooltip><MDXContent /></MdxLayoutTooltip>
       </HoverCardContent>
     </HoverCard>
-
   );
 };

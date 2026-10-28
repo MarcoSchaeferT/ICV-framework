@@ -17,7 +17,7 @@ import { useUIContext } from '../contexts/UIContext'
  * @example
  * ```ts
  * const dengueNav: nav = {
- *   navLinks: [{ icon: null, title: "Dengue Vis. Interface", href: "/worldView", group: "dengue" }],
+ *   navLinks: [{ icon: null, title: "Dengue Vis. Interface", href: "/PredictionView", group: "dengue" }],
  *   isOpen: true,
  * };
  * ```

@@ -1,5 +1,5 @@
 {
-    "page_domainInfo": {
+    "page_vectorInformation": {
         "MosquitoHeading": "Mückenarten",
         "VectorHeading": "Mücken-übertragbare Krankheiten"
     },
@@ -285,13 +285,18 @@
     },
     "component_infoCard": {
         "openFullDocs": "Dokumentation öffnen",
-        "headingInteractions": "Info",
-        "headingComponentInfo": "Info"
+        "openCardInfo": "Informationen zu {title} öffnen",
+        "closeCardInfo": "Infofenster schließen",
+        "panelTitle": "Über {title}",
+        "headingInteractions": "So verwenden Sie die Ansicht",
+        "headingComponentInfo": "Was wird dargestellt?"
     },
     "component_scrollToButton": {
         "buttontext": "Zurück nach Oben"
     },
     "component_D3MapLayerComponent": {
+        "showMapControls": "Kartensteuerelemente einblenden",
+        "hideMapControls": "Kartensteuerelemente ausblenden",
         "longitude": "Längengrad",
         "latitude": "Breitengrad",
         "data_set": "Datensatz",
@@ -382,8 +387,9 @@
         "headingOverview": "Übersichtskarte",
         "headingDetailView": "Detailkarte"
     },
-    "page_rawDataView": {
+    "page_trainingDataView": {
         "pageContent": {
+            "card_mapView": "Kartenansicht",
             "card_country": "Land",
             "card_feature": "Daten-Mermal",
             "card_colorMap": "Farbschema",
@@ -420,9 +426,7 @@
         "dropdown": "Einträge"
     },
     "component_mainInfo": {
-        "additionalInfo": "Weitere Details finden Sie in den Infokarten, die Sie aufrufen können, indem Sie mit der Maus über die folgenden Symbole in der oberen rechten Ecke jeder Komponente fahren.",
-        "componentInfo": "Komponenten-Info",
-        "interactions": "Interaktionen",
+        "additionalInfo": "Klicken Sie bei Visualisierungskacheln mit zusätzlicher Hilfe auf das Info-Symbol oben rechts. Dort erfahren Sie, was dargestellt wird und wie Sie die Ansicht bedienen können.",
         "button_scroll": "Zur Ansicht scrollen",
         "button_giveFeedback": "Feedback geben"
     },

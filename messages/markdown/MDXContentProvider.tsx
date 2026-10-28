@@ -48,10 +48,14 @@ import  Upload_requirements_en from './pages/Upload/requirements_en.mdx';
 import  Upload_requirements_de from './pages/Upload/requirements_de.mdx';
 
 /***********************
- ***** RawDataView *****
+ ***** TrainingDataView *****
  ***********************/
-import RawDataView_mainInfo_en from './pages/RawDataView/mainInfo_en.mdx';
-import RawDataView_mainInfo_de from './pages/RawDataView/mainInfo_de.mdx';
+import TrainingDataView_mainInfo_en from './pages/TrainingDataView/mainInfo_en.mdx';
+import TrainingDataView_mainInfo_de from './pages/TrainingDataView/mainInfo_de.mdx';
+import TrainingDataView_mapInfo_en from './pages/TrainingDataView/mapInfo_en.mdx';
+import TrainingDataView_mapInfo_de from './pages/TrainingDataView/mapInfo_de.mdx';
+import TrainingDataView_mapInteraction_en from './pages/TrainingDataView/mapInteraction_en.mdx';
+import TrainingDataView_mapInteraction_de from './pages/TrainingDataView/mapInteraction_de.mdx';
 
 /**************************
  ***** CovidWorldView *****
@@ -95,9 +99,13 @@ import SC_HistoricalDataCOVID_de from './pages/ShowCases/HistoricalDataCOVID/mai
 // SuitableMosquitoHabitats
 import SC_SuitableMosquitoHabitats_en from './pages/ShowCases/SuitableMosquitoHabitats/mainInfo_en.mdx';
 import SC_SuitableMosquitoHabitats_de from './pages/ShowCases/SuitableMosquitoHabitats/mainInfo_de.mdx';
+import SC_SuitableMosquitoHabitatsMap_en from './pages/ShowCases/SuitableMosquitoHabitats/cardMap_en.mdx';
+import SC_SuitableMosquitoHabitatsMap_de from './pages/ShowCases/SuitableMosquitoHabitats/cardMap_de.mdx';
 // USAHabitatsSightings
 import SC_USAHabitatsSightings_en from './pages/ShowCases/USAHabitatsSightings/mainInfo_en.mdx';
 import SC_USAHabitatsSightings_de from './pages/ShowCases/USAHabitatsSightings/mainInfo_de.mdx';
+import SC_USAHabitatsSightingsMap_en from './pages/ShowCases/USAHabitatsSightings/cardMap_en.mdx';
+import SC_USAHabitatsSightingsMap_de from './pages/ShowCases/USAHabitatsSightings/cardMap_de.mdx';
 // HabitatsComparison
 import SC_HabitatsComparison_en from './pages/ShowCases/HabitatsComparison/mainInfo_en.mdx';
 import SC_HabitatsComparison_de from './pages/ShowCases/HabitatsComparison/mainInfo_de.mdx';
@@ -107,12 +115,22 @@ import SC_ClimateAndHabitats_de from './pages/ShowCases/ClimateAndHabitats/mainI
 // DengueSerotypeCounts
 import SC_DengueSerotypeCounts_en from './pages/ShowCases/DengueSerotypeCounts/mainInfo_en.mdx';
 import SC_DengueSerotypeCounts_de from './pages/ShowCases/DengueSerotypeCounts/mainInfo_de.mdx';
+import SC_DengueSerotypeCountsMap_en from './pages/ShowCases/DengueSerotypeCounts/cardMap_en.mdx';
+import SC_DengueSerotypeCountsMap_de from './pages/ShowCases/DengueSerotypeCounts/cardMap_de.mdx';
 // Uncertainty_Vis
 import SC_Uncertainty_Vis_en from './pages/ShowCases/Uncertainty_Vis/mainInfo_en.mdx';
 import SC_Uncertainty_Vis_de from './pages/ShowCases/Uncertainty_Vis/mainInfo_de.mdx';
+import SC_UncertaintyMap_en from './pages/ShowCases/Uncertainty_Vis/cardCoefficientMap_en.mdx';
+import SC_UncertaintyMap_de from './pages/ShowCases/Uncertainty_Vis/cardCoefficientMap_de.mdx';
 // ENSO_Suitability
 import SC_ENSO_Suitability_en from './pages/ShowCases/ENSO_Suitability/mainInfo_en.mdx';
 import SC_ENSO_Suitability_de from './pages/ShowCases/ENSO_Suitability/mainInfo_de.mdx';
+import SC_ENSOClimate_en from './pages/ShowCases/ENSO_Suitability/cardClimateFactors_en.mdx';
+import SC_ENSOClimate_de from './pages/ShowCases/ENSO_Suitability/cardClimateFactors_de.mdx';
+import SC_ENSOForecast_en from './pages/ShowCases/ENSO_Suitability/cardForecastMap_en.mdx';
+import SC_ENSOForecast_de from './pages/ShowCases/ENSO_Suitability/cardForecastMap_de.mdx';
+import SC_ENSOReference_en from './pages/ShowCases/ENSO_Suitability/cardReferenceMap_en.mdx';
+import SC_ENSOReference_de from './pages/ShowCases/ENSO_Suitability/cardReferenceMap_de.mdx';
 
 /**
  * Localized MDX content rendered by a map's information and interaction cards.
@@ -128,10 +146,10 @@ import SC_ENSO_Suitability_de from './pages/ShowCases/ENSO_Suitability/mainInfo_
  * ```
  */
 export interface HoverCardsContent {
-    /** General information, usage instructions, and dataset details. */
-    Info: React.FC; // general info + how to (+ data set details)
+    /** Short explanation of the displayed data. */
+    Info: React.FC;
     /** Map gestures and control instructions. */
-    Interaction: React.FC; // interaction + UI elements
+    Interaction: React.FC;
 }
 
 /**
@@ -175,8 +193,9 @@ export interface MDXContentProviderType {
             overview: HoverCardsContent;
             detailView: HoverCardsContent;
         };
-        RawDataView: {
+        TrainingDataView: {
             mainInfo: React.FC;
+            map: HoverCardsContent;
         };
         CovidWorldView: {
             mainInfo: React.FC;
@@ -184,12 +203,19 @@ export interface MDXContentProviderType {
         ShowCases: {
             HistoricalDataCOVID: React.FC;
             SuitableMosquitoHabitats: React.FC;
+            SuitableMosquitoHabitatsMap: React.FC;
             USAHabitatsSightings: React.FC;
+            USAHabitatsSightingsMap: React.FC;
             HabitatsComparison: React.FC;
             ClimateAndHabitats: React.FC;
             DengueSerotypeCounts: React.FC;
+            DengueSerotypeCountsMap: React.FC;
             Uncertainty_Vis: React.FC;
+            UncertaintyMap: React.FC;
             ENSO_Suitability: React.FC;
+            ENSOClimate: React.FC;
+            ENSOForecast: React.FC;
+            ENSOReference: React.FC;
         }
     }
     /** Short descriptions for controls overlaid on a map. */
@@ -268,8 +294,12 @@ export const MDXContentProvider: Record<string, MDXContentProviderType> = {
                     Interaction: PredictionView_detail_mapInteraction_en
                 }
             },
-            RawDataView: {
-                mainInfo: RawDataView_mainInfo_en,
+            TrainingDataView: {
+                mainInfo: TrainingDataView_mainInfo_en,
+                map: {
+                    Info: TrainingDataView_mapInfo_en,
+                    Interaction: TrainingDataView_mapInteraction_en,
+                },
             },
             CovidWorldView: {
                 mainInfo: CovidWorldView_mainInfo_en,
@@ -277,12 +307,19 @@ export const MDXContentProvider: Record<string, MDXContentProviderType> = {
             ShowCases: {
                 HistoricalDataCOVID: SC_HistoricalDataCOVID_en,
                 SuitableMosquitoHabitats: SC_SuitableMosquitoHabitats_en,
+                SuitableMosquitoHabitatsMap: SC_SuitableMosquitoHabitatsMap_en,
                 USAHabitatsSightings: SC_USAHabitatsSightings_en,
+                USAHabitatsSightingsMap: SC_USAHabitatsSightingsMap_en,
                 HabitatsComparison: SC_HabitatsComparison_en,
                 ClimateAndHabitats: SC_ClimateAndHabitats_en,
                 DengueSerotypeCounts: SC_DengueSerotypeCounts_en,
+                DengueSerotypeCountsMap: SC_DengueSerotypeCountsMap_en,
                 Uncertainty_Vis: SC_Uncertainty_Vis_en,
+                UncertaintyMap: SC_UncertaintyMap_en,
                 ENSO_Suitability: SC_ENSO_Suitability_en,
+                ENSOClimate: SC_ENSOClimate_en,
+                ENSOForecast: SC_ENSOForecast_en,
+                ENSOReference: SC_ENSOReference_en,
         }
         },
         MapUI: {
@@ -327,8 +364,12 @@ export const MDXContentProvider: Record<string, MDXContentProviderType> = {
                 Interaction: PredictionView_detail_mapInteraction_de
             },
             },
-            RawDataView: {
-                mainInfo: RawDataView_mainInfo_de,
+            TrainingDataView: {
+                mainInfo: TrainingDataView_mainInfo_de,
+                map: {
+                    Info: TrainingDataView_mapInfo_de,
+                    Interaction: TrainingDataView_mapInteraction_de,
+                },
             },
             CovidWorldView: {
                 mainInfo: CovidWorldView_mainInfo_de,
@@ -336,12 +377,19 @@ export const MDXContentProvider: Record<string, MDXContentProviderType> = {
             ShowCases: {
                 HistoricalDataCOVID: SC_HistoricalDataCOVID_de,
                 SuitableMosquitoHabitats: SC_SuitableMosquitoHabitats_de,
+                SuitableMosquitoHabitatsMap: SC_SuitableMosquitoHabitatsMap_de,
                 USAHabitatsSightings: SC_USAHabitatsSightings_de,
+                USAHabitatsSightingsMap: SC_USAHabitatsSightingsMap_de,
                 HabitatsComparison: SC_HabitatsComparison_de,
                 ClimateAndHabitats: SC_ClimateAndHabitats_de,
                 DengueSerotypeCounts: SC_DengueSerotypeCounts_de,
+                DengueSerotypeCountsMap: SC_DengueSerotypeCountsMap_de,
                 Uncertainty_Vis: SC_Uncertainty_Vis_de,
+                UncertaintyMap: SC_UncertaintyMap_de,
                 ENSO_Suitability: SC_ENSO_Suitability_de,
+                ENSOClimate: SC_ENSOClimate_de,
+                ENSOForecast: SC_ENSOForecast_de,
+                ENSOReference: SC_ENSOReference_de,
             }
         },
         MapUI: {

@@ -305,7 +305,7 @@ async def getDataFromDB():
           return _cache_json_response(cache_key, result, params.relationName)
         return jsonify(result)
 
-      # Dynamic map views such as rawDataView know the relation before they
+      # Dynamic map views such as TrainingDataView know the relation before they
       # have loaded its columns. Select a meaningful numeric value column for
       # that initial compact request and report it in the response so the UI
       # can adopt the exact same feature without a failed bootstrap request.

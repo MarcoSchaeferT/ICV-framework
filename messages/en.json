@@ -1,5 +1,5 @@
 {
-    "page_domainInfo": {
+    "page_vectorInformation": {
         "MosquitoHeading": "Mosquito Species",
         "VectorHeading": "Vector Borne Diseases"
     },
@@ -285,13 +285,18 @@
     },
     "component_infoCard": {
         "openFullDocs": "Open Documentation",
-        "headingInteractions": "Info",
-        "headingComponentInfo": "Info"
+        "openCardInfo": "Open information about {title}",
+        "closeCardInfo": "Close information panel",
+        "panelTitle": "About {title}",
+        "headingInteractions": "How to use it",
+        "headingComponentInfo": "What this shows"
     },
     "component_scrollToButton": {
         "buttontext": "Back to Top"
     },
     "component_D3MapLayerComponent": {
+        "showMapControls": "Show map controls",
+        "hideMapControls": "Hide map controls",
         "longitude": "Longitude",
         "latitude": "Latitude",
         "data_set": "Data Set",
@@ -382,8 +387,9 @@
         "headingOverview": "Overview Map",
         "headingDetailView": "Detail Map"
     },
-    "page_rawDataView": {
+    "page_trainingDataView": {
         "pageContent": {
+            "card_mapView": "Map View",
             "card_country": "Country",
             "card_feature": "Feature",
             "card_colorMap": "Color Map",
@@ -420,9 +426,7 @@
         "dropdown": "Items"
     },
     "component_mainInfo": {
-        "additionalInfo": "Additional details are available through the info cards, which can be accessed by hovering over the following icons in the top-right corner of each component.",
-        "componentInfo": "component info",
-        "interactions": "interactions",
+        "additionalInfo": "Where guidance is available, click the info icon in the top-right corner of a visualization card to learn what it shows and how to use it.",
         "button_scroll": "Scroll to View",
         "button_giveFeedback": "Give Feedback"
     },

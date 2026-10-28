@@ -9,7 +9,8 @@ import {
     CardHeaderGrid,
     CardContentGrid,
   } from "@/components/ui/card"
-import {HoverCardComponentInfo, HoverCardInteractionInfo} from './InfoCards';
+import { CardInfoPopover } from './InfoCards';
+import { CardHeaderActionTarget } from './CardHeaderAction';
 
 /**
  * Presentation and contextual-help contract for one Vis. Interface card.
@@ -55,7 +56,7 @@ export interface CardPropsClass {
 }
 
 /**
- * Creates a complete Vis. Interface card configuration with empty optional information panels.
+ * Creates a Vis. Interface card configuration without optional information panels.
  *
  * @param id - Stable DOM and Swapy slot identifier.
  * @param headline - Visible card title.
@@ -71,8 +72,6 @@ export function CardPropsClass(id: string, headline: string, description: string
         description,
         footer,
         bgColor,
-        infoCard: { content: undefined, footer: undefined },
-        infoCardInteraction: { content: undefined, footer: undefined }
     };
 }
 
@@ -114,29 +113,34 @@ export interface CardWrapperProps {
 const CardWrapper = ({ children, cardProps }: CardWrapperProps) => {
     // fallback to empty cardProps
     if (cardProps === undefined) cardProps = CardPropsClass('', '', '', '');
+    const [headerActionTarget, setHeaderActionTarget] = React.useState<HTMLDivElement | null>(null);
 
     const isClient = React.useSyncExternalStore(
         () => () => {},
         () => true,
         () => false,
     );
+    const hasHeader = cardProps.headline !== undefined && cardProps.description !== undefined && cardProps.headline !== "";
     // return the card
     if(isClient){
     return (
+        <CardHeaderActionTarget.Provider value={hasHeader ? headerActionTarget : null}>
         <CardGrid className={`size-full relative flex flex-col ${cardProps.bgColor} rounded-md border border-surface-light cardWrapper overflow-hidden`}>
-            {cardProps.headline !== undefined && cardProps.description !== undefined && cardProps.headline !== "" ? (
+            {hasHeader ? (
                 <CardHeaderGrid className='text-2xl m-0 pl-2 pt-2 bg-gray-400 text-white rounded-t-md border-b border-gray-200'>
-                {cardProps.headline !== undefined ? (
-                    <>
-                        <div className="flex pb-0 items-center justify-between overflow-hidden">
-                            <CardTitle className='h-6.5'>{cardProps.headline}</CardTitle>
-                            <span className='mr-2 flex flex-row items-center gap-1'>
-                                <HoverCardInteractionInfo MDXContent={cardProps.infoCardInteraction?.content} Footer={cardProps.infoCardInteraction?.footer} />
-                                <HoverCardComponentInfo MDXContent={cardProps.infoCard?.content} Footer={cardProps.infoCard?.footer} />
-                            </span>
+                    <div className="flex items-center justify-between overflow-hidden pb-0">
+                        <CardTitle className='h-6.5 min-w-0 truncate'>{cardProps.headline}</CardTitle>
+                        <div className="mr-2 flex shrink-0 items-center gap-1">
+                            <CardInfoPopover
+                                title={cardProps.headline}
+                                info={cardProps.infoCard?.content}
+                                interaction={cardProps.infoCardInteraction?.content}
+                                infoFooter={cardProps.infoCard?.footer}
+                                interactionFooter={cardProps.infoCardInteraction?.footer}
+                            />
+                            <div ref={setHeaderActionTarget} className="flex items-center gap-1" />
                         </div>
-                    </>
-                ): null}
+                    </div>
                     {cardProps.description !== undefined ? (
                     <CardDescription className='text-sm text-gray-200'>{cardProps.description}</CardDescription> 
                 ): null}
@@ -150,6 +154,7 @@ const CardWrapper = ({ children, cardProps }: CardWrapperProps) => {
                 <CardFooter className='text-sm ml-1 text-gray-500'> <p>{cardProps.footer}</p> </CardFooter>
             ): null} 
         </CardGrid>
+        </CardHeaderActionTarget.Provider>
     );
     } else {
         return <LoadingSpinner />;

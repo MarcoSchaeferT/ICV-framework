@@ -55,6 +55,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { HoverCardTooltip } from '@/components/layout/InfoCards';
+import { CardHeaderAction } from '@/components/layout/CardHeaderAction';
 import { MDXContentProvider } from '@messages/markdown/MDXContentProvider';
 
 // ─── Shared hooks & utils (extracted from nested component definitions) ───
@@ -67,7 +68,6 @@ import {
     useGridDataParser,
     useLayerUpdateDebounce,
     useTooltipCleanup,
-    useDynamicSettingsTop,
 } from './hooks';
 import { clampCoordinates, resetTimeout, removeReusedTooltip, getParamsOfURL } from './utils/mapUtils';
 import MapContentChild from './MapContentChild';
@@ -386,7 +386,6 @@ const LeafD3MapGermanyComponentInner = ({props}: {props: LeafD3MapGermanyProps})
     const activeLayerRef = useRef<L.Path | null>(null);
     const gridcellSizeLatLng = useRef<{ lng: number; lat: number }>({ lng: 0, lat: 0 });
      const [isSettingsOpen, setIsSettingsOpen] = useState(true);
-    const { containerRef: settingsContainerRef, settingsTop: settingsButtonTop } = useDynamicSettingsTop();
     
     const locale = useLocale() as Locale;
     const MDX = MDXContentProvider[locale]?.MapUI || MDXContentProvider["en"].MapUI;
@@ -1178,15 +1177,20 @@ MapMouseEvents();
    // the page
     return (
 
-<div ref={settingsContainerRef} className="@container relative size-full" >
-    <div className="absolute right-14 z-50" style={{ top: `${settingsButtonTop}px` }}>
-        <button
-            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-            className="p-1 rounded-full shadow-md hover:bg-gray-600 bg-black "
-        >
-            <Settings className="text-white " />
-        </button>
-    </div>
+<div className="@container relative size-full" >
+    <CardHeaderAction>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-label={t(isSettingsOpen ? 'hideMapControls' : 'showMapControls')}
+        title={t(isSettingsOpen ? 'hideMapControls' : 'showMapControls')}
+        onClick={() => setIsSettingsOpen((open) => !open)}
+        className="h-8 w-8 text-white hover:text-slate-900 focus-visible:ring-white"
+      >
+        <Settings className="h-5 w-5" aria-hidden="true" />
+      </Button>
+    </CardHeaderAction>
 
     <PrintDataLoadingErrors listOfErrors={collectDataLoadingErrors}/>
     <SizeHook element={element} sizeRef={sizeRef} setSize={setSizes}/>

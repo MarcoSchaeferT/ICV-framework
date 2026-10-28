@@ -114,7 +114,7 @@ let md = MDXContentProvider[locale];
     let d3MapCardProps_overview = CardPropsClass(
       t.rich('headingOverview', {...t_richConfig})?.toString() || '',
       t.rich('headingOverview', {...t_richConfig})?.toString() || '',"","");
-      d3MapCardProps_overview.infoCard = {content: md.pages.PredictionView.overview.Info, footer: undefined};
+      d3MapCardProps_overview.infoCard = {content: md.pages.ShowCases.DengueSerotypeCountsMap};
     let d3MapCardProps2_overveiwDetail = CardPropsClass(
       t.rich('headingDetailView', {...t_richConfig})?.toString() || '',
       t.rich('headingDetailView', {...t_richConfig})?.toString() || '',"","");

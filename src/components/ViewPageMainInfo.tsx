@@ -4,7 +4,6 @@ import { Info, SquareChevronDown, CircleX, MessageSquareShare, InfoIcon } from "
 import { Button } from "@/components/ui/button";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "@/i18n/routing";
-import { OpenInBrowser} from "iconoir-react";
 import { useLocale ,useTranslations } from "next-intl";
 
 
@@ -103,8 +102,9 @@ if (isClosed) {
               </div>
               </div>
                <div className="w-full border-t-2 text-sm text-gray-400 my-2 " >
-                  <div className="">
-                   {t("additionalInfo")}: <InfoIcon className="w-4 h-4 text-gray-600 inline" /> {t("componentInfo")}, <OpenInBrowser className="w-4 h-4 text-gray-600 inline" /> {t("interactions")}.
+                  <div className="flex items-start gap-2">
+                   <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-gray-600" aria-hidden="true" />
+                   <span>{t("additionalInfo")}</span>
                   </div>
                   </div>
               {/* Scroll to view button */}

@@ -18,5 +18,3 @@ export { useWebGLGridLayer } from './useWebGLGridLayer';
 export { useLayerUpdateDebounce } from './useLayerUpdateDebounce';
 /** Cleans up the shared Leaflet tooltip when pointer focus leaves the map. */
 export { useTooltipCleanup } from './useTooltipCleanup';
-/** Computes collision-safe vertical positions for dynamic map-control overlays. */
-export { useDynamicSettingsTop } from './useDynamicSettingsTop';

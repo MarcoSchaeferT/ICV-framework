@@ -18,6 +18,7 @@ import validator from "validator";
 import { Progress } from "@/components/ui/progress"
 import {MdxLayoutAbout} from '@/mdx-layout'
 import {MDXContentProvider} from '@messages/markdown/MDXContentProvider'
+import { version } from '../../../../package.json'
 
 
 /** Returns the localized project description, credits, and feedback surface. */
@@ -215,7 +216,7 @@ export default function Component() {
                 </Button>
                 </div>
                  <div className="min-w-fit flex flex-row items-center gap-2">
-                  <Badge variant="secondary">v0.9.5</Badge>
+                  <Badge variant="secondary">v{version}</Badge>
                   {/*<Badge className="bg-green-100 text-green-800">Active</Badge>*/}
                   </div>
               </div>

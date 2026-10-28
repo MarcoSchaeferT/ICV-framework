@@ -62,7 +62,7 @@ export const Group = {
  * const predictionLink: LINK = {
  *   icon: null,
  *   title: "Prediction View",
- *   href: "/worldView",
+ *   href: "/PredictionView",
  *   group: Group.dengue,
  * };
  * ```
@@ -123,13 +123,13 @@ const nav_LINKS_top: LINKS = {
         {
             icon: InfoIcon,
             title: "Prediction View",
-            href: "/worldView",
+            href: "/PredictionView",
             group: Group.dengue
         },
         {
             icon: CubesIcon,
             title: "Training Data View",
-            href: "/rawDataView",
+            href: "/TrainingDataView",
             group: Group.dengue
         },
        /* {
@@ -146,7 +146,7 @@ const nav_LINKS_top: LINKS = {
         {
             icon: DocumentIcon,
             title: "Vector Information",
-            href: "/domainInfo",
+            href: "/VectorInformation",
             group: Group.dengue
         },
         {
@@ -195,13 +195,13 @@ const nav_LINKS_top: LINKS = {
         {
             icon: InfoIcon,
             title: "Vorhersage Ansicht",
-            href: "/worldView",
+            href: "/PredictionView",
             group: Group.dengue
         },
         {
             icon: CubesIcon,
             title: "Trainingsdaten Ansicht",
-            href: "/rawDataView",
+            href: "/TrainingDataView",
             group: Group.dengue
         },
        /* {
@@ -218,7 +218,7 @@ const nav_LINKS_top: LINKS = {
         {
             icon: DocumentIcon,
             title: "Vektor Informationen",
-            href: "/domainInfo",
+            href: "/VectorInformation",
             group: Group.dengue
         },
          {
