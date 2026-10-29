@@ -87,7 +87,7 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
             {/* Privacy-friendly analytics by Plausible */}
             <Script
               async
-              src="http://168.119.228.102:8100/js/pa-Za_Qqqc2BILDkJGFan2I7.js"
+              src="http://168.119.228.102:8100/js/pa-DxWdE_NG8dlxCFnKaGt1J.js"
               strategy="afterInteractive"
             />
             <Script id="plausible-init" strategy="afterInteractive">

@@ -55,8 +55,11 @@ export default function Home() {
   p1.isApplyContextData = false;
   p1.isApplyTransitions = true;
   p1.isProjection_equirectangular = true;
-  p1.mapUIsettings.filterStringForAvailableDatasetInclude = ["month", "probability"];
-  p1.mapUIsettings.defaultDatasetName = "t_2024_monthly_mean_4_ocsvm_aegypti_predictions_2023_mod_sim";
+  p1.mapUIsettings.filterStringForAvailableDatasetInclude = ["month", "probability", "dummy_data_suitability"];
+  p1.mapUIsettings.defaultDatasetName = [
+    "t_2024_monthly_mean_4_ocsvm_aegypti_predictions_2023_mod_sim",
+    "dummy_data_suitability",
+  ];
   p1.mapUIsettings.defaultFeatureName = "prob_1";
   p1.mapUIsettings.filterStringForAvailableFeature = ["prob"];
   p1.mapUIsettings.isPresenceData = true;

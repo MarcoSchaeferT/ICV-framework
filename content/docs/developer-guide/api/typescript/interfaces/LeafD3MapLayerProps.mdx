@@ -117,6 +117,18 @@ Whether the settings panel starts expanded.
 true
 ```
 
+#### isSettingsToggleVisible?
+
+> `optional` **isSettingsToggleVisible?**: `boolean`
+
+Whether a button for showing and hiding map controls is rendered.
+
+##### Default Value
+
+```ts
+true
+```
+
 #### isSettingsBlendAnimation?
 
 > `optional` **isSettingsBlendAnimation?**: `boolean`
@@ -133,7 +145,7 @@ false
 
 > `optional` **isAutoHideSettingsToggle?**: `boolean`
 
-If `true`, the settings-toggle gear icon auto-hides after the panel closes.
+If `true`, show the setting for automatic control-panel hiding.
 
 ##### Default Value
 
@@ -261,9 +273,10 @@ An empty string or empty array means "show all".
 
 #### defaultDatasetName
 
-> **defaultDatasetName**: `string`
+> **defaultDatasetName**: [`MapStringFilter`](../type-aliases/MapStringFilter)
 
-Database relation name of the initially selected dataset.
+Database relation name of the initially selected dataset, or an array of
+candidate names checked in priority order (first available is selected).
 
 #### defaultFeatureName
 

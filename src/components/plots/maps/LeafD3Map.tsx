@@ -326,8 +326,11 @@ export interface LeafD3MapLayerProps {
          * An empty string or empty array means "show all".
          */
         filterStringForAvailableFeature: MapStringFilter;
-        /** Database relation name of the initially selected dataset. */
-        defaultDatasetName: string;
+        /**
+         * Database relation name of the initially selected dataset, or an array of
+         * candidate names checked in priority order (first available is selected).
+         */
+        defaultDatasetName: MapStringFilter;
         /** Column name of the initially selected feature / variable. */
         defaultFeatureName: string;
         /**
@@ -644,9 +647,9 @@ export function LeafD3MapLayerProps(
             defaultFeatureColorMap: "",
             defaultLayerOpacity: 0.85,
             ...mapUIsettings,
-            defaultDatasetURL: mapUIsettings.defaultDatasetName
+            defaultDatasetURL: getActiveStringFilters(mapUIsettings.defaultDatasetName)[0]
                 ? buildMapDatasetURL(
-                    { relationName: mapUIsettings.defaultDatasetName, feature: mapUIsettings.defaultFeatureName || "" },
+                    { relationName: getActiveStringFilters(mapUIsettings.defaultDatasetName)[0], feature: mapUIsettings.defaultFeatureName || "" },
                     mapDataSets.isGridData !== false && !mapUIsettings.inCovidDataView,
                 )
                 : "",
@@ -866,10 +869,12 @@ const strokeWidth = props.mapStyles?.strokeWidth ?? 1.5;
      
     const mapUIsettings = { ...props.mapUIsettings };
     const useCompactGridResponse = props.mapDataSets.isGridData && !mapUIsettings.inCovidDataView;
+    const defaultCandidates = getActiveStringFilters(mapUIsettings.defaultDatasetName);
+    const primaryDefaultDataset = defaultCandidates[0] || "";
     const resolvedDefaultDatasetURL = mapUIsettings.defaultDatasetURL || (
-        mapUIsettings.defaultDatasetName
+        primaryDefaultDataset
             ? buildMapDatasetURL({
-                relationName: mapUIsettings.defaultDatasetName,
+                relationName: primaryDefaultDataset,
                 feature: mapUIsettings.defaultFeatureName,
                 aggregation_level: mapUIsettings.inCovidDataView ? (mapUIsettings.isCountryLevelData ? 0 : mapUIsettings.isSubregionLevelData ? 1 : undefined) : undefined,
                 startDate: mapUIsettings.inCovidDataView && contextT.dateRange?.from && contextT.dateRange?.to
@@ -996,7 +1001,7 @@ const strokeWidth = props.mapStyles?.strokeWidth ?? 1.5;
     const initialDatasetURL = inheritedDatasetURL || resolvedDefaultDatasetURL;
     const initialFeature = (props.isApplyContextData ? contextT.curFeature : "") || props.mapUIsettings.defaultFeatureName || "";
     const initialColorMap = (syncColorMap ? contextT.curColorMap : "") || props.mapUIsettings.defaultFeatureColorMap || defaultColorMap;
-    const initialRelationName = getRelationNameFromDatasetURL(initialDatasetURL) || props.mapUIsettings.defaultDatasetName || "";
+    const initialRelationName = getRelationNameFromDatasetURL(initialDatasetURL) || getActiveStringFilters(props.mapUIsettings.defaultDatasetName)[0] || "";
 
     const initialCoords: [number, number, number] = (
         (props.isSyncMapCoordsOnTheFly_SETTER || props.isSyncMapCoordsOnTheFly_RECIEVER) &&
@@ -1075,11 +1080,12 @@ const strokeWidth = props.mapStyles?.strokeWidth ?? 1.5;
 
      // column names from database
     const columnNamesURL = useMemo(() => {
-        if (props.mapUIsettings.defaultDatasetName) {
-            return apiRoutes.fetchDbColumnNames({ relationName: props.mapUIsettings.defaultDatasetName });
+        const candidate = getRelationNameFromDatasetURL(selectedDatasetURL) || curDatasetname.current || getActiveStringFilters(props.mapUIsettings.defaultDatasetName)[0];
+        if (candidate) {
+            return apiRoutes.fetchDbColumnNames({ relationName: candidate });
         }
         return "";
-    }, [props.mapUIsettings.defaultDatasetName]);
+    }, [props.mapUIsettings.defaultDatasetName, selectedDatasetURL]);
     const [isLoading_ColumnNames, rawColumnNames] = useGetJSONData(columnNamesURL, props.mapDataSets.isGridData || props.mapUIsettings.inCovidDataView);
 
     const dateColumn = useMemo(() => {
@@ -1145,7 +1151,8 @@ const strokeWidth = props.mapStyles?.strokeWidth ?? 1.5;
     // Synchronize dataset and feature when mapUIsettings change dynamically without remounting
     /* eslint-disable react-hooks/set-state-in-effect -- Prop changes intentionally replace the active map request. */
     useEffect(() => {
-        const nextDataset = props.mapUIsettings.defaultDatasetName;
+        const nextDatasets = getActiveStringFilters(props.mapUIsettings.defaultDatasetName);
+        const nextDataset = nextDatasets[0];
         const nextFeature = props.mapUIsettings.defaultFeatureName;
 
         let needsUpdate = false;
@@ -1708,15 +1715,29 @@ const strokeWidth = props.mapStyles?.strokeWidth ?? 1.5;
             acc[key] = listOfDataSets[key];
             return acc;
         }, {} as { [key: string]: string });
-    if(!props.isApplyContextData && !isLoadingDatalist && selectedDatasetURL === "" && Object.keys(listOfDataSets).length > 0) {
+    const currentRelation = getRelationNameFromDatasetURL(selectedDatasetURL);
+    const isCurrentRelationAvailable = currentRelation ? Boolean(listOfDataSets[currentRelation] || Object.keys(listOfDataSets).some(k => k === currentRelation)) : false;
 
-        let filterStr = props.mapUIsettings.defaultDatasetName !== "" ? props.mapUIsettings.defaultDatasetName : ""; 
-        let key = Object.keys(listOfDataSets).find(key => filterStr === "" || key.includes(filterStr)) ||  "-1";
-        if(key === "-1" || filterStr === "") {
+    if(!props.isApplyContextData && !isLoadingDatalist && (!selectedDatasetURL || !isCurrentRelationAvailable) && Object.keys(listOfDataSets).length > 0) {
+        const defaultCandidates = getActiveStringFilters(props.mapUIsettings.defaultDatasetName);
+        let key = "-1";
+
+        // 1. Try default candidates in priority order (candidate 0, candidate 1, ...)
+        for (const candidate of defaultCandidates) {
+            const foundKey = Object.keys(listOfDataSets).find(k => k === candidate || k.includes(candidate));
+            if (foundKey) {
+                key = foundKey;
+                break;
+            }
+        }
+
+        // 2. If none matched or none given, fallback to filter strings or first available
+        if(key === "-1") {
             key = Object.keys(listOfDataSets).find(k => isDatasetIncluded(k, props.mapUIsettings.filterStringForAvailableDatasetInclude, props.mapUIsettings.filterStringForAvailableDatasetExclude)) || Object.keys(listOfDataSets)[0];
         }
-        console.log("key:", key, "filterStr:", filterStr, "listOfDataSets:", listOfDataSets);
+        console.log("key:", key, "defaultCandidates:", defaultCandidates, "listOfDataSets:", listOfDataSets);
         curDatasetname.current = listOfDataSets[key];
+        setSelectedDatasetKey(listOfDataSets[key]);
         const initialFeature = props.mapUIsettings.defaultFeatureName ||
             (props.isApplyContextData ? contextT.curFeature : "");
         let url = buildMapDatasetURL(
@@ -1724,9 +1745,21 @@ const strokeWidth = props.mapStyles?.strokeWidth ?? 1.5;
             useCompactGridResponse,
         );
         setSelectedDataset(url);
-        // Initial cross-dataset sync is handled by the useEffect below.
-        // Find the first dataset key that contains the filter string, or fallback to the first key
+        if (props.isSetIntialContextDataFromComponent) {
+            contextT.setCurDatasetURL(url);
+            contextT.setCurFeature(initialFeature);
+        }
     }
+
+    /* eslint-disable react-hooks/set-state-in-effect -- Keep dropdown state synchronized with active dataset URL */
+    useEffect(() => {
+        const relation = getRelationNameFromDatasetURL(selectedDatasetURL);
+        if (relation && relation !== selectedDatasetKey) {
+            setSelectedDatasetKey(relation);
+            curDatasetname.current = relation;
+        }
+    }, [selectedDatasetURL]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     // ── Initial Smart Cross-Dataset Filter Sync (useEffect) ─────────────
     // When the component mounts and resolves its initial dataset, parse
@@ -2310,7 +2343,7 @@ const countryCounts = useMemo<{ [key: string]: any }>(() => {
 
             const datasetName =
                 curDatasetname.current ||
-                props.mapUIsettings.defaultDatasetName ||
+                getActiveStringFilters(props.mapUIsettings.defaultDatasetName)[0] ||
                 contextT.curPresenceDatasetName ||
                 (mapUIsettings.inCovidDataView ? "epidemiology_geography_whole_df_w_geometry" : "");
 
@@ -4473,7 +4506,9 @@ useEffect(() => {
                 }
                             } >
                 <SelectTrigger className="w-full">
-                <SelectValue placeholder={ curDatasetname.current} />
+                <SelectValue placeholder={curDatasetname.current || "Select dataset..."}>
+                    {selectedDatasetKey || curDatasetname.current}
+                </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                 <SelectGroup>

@@ -513,8 +513,8 @@ Array of unprotected relation summaries ordered by `table_name`.
 </Tabs>
 
 ```python
-@route_manageDB.route('', methods=['GET'])
 @swag_from(f'{SWAGGER_YAML_PATH}/manage_db_list.yml')
+@route_manageDB.route('', methods=['GET'])
 async def list_relations() -> Response
 ```
 
@@ -592,8 +592,8 @@ Database error while dropping the relation.
 </Tabs>
 
 ```python
-@route_manageDB.route('', methods=['DELETE'])
 @swag_from(f'{SWAGGER_YAML_PATH}/manage_db_delete.yml')
+@route_manageDB.route('', methods=['DELETE'])
 async def delete_relation() -> Response
 ```
 
