@@ -54,7 +54,7 @@ export default async function LocaleLayout({ children }: LocaleLayoutProps) {
       <body className={`${inter.className} overflow-y-scroll overflow-x-clip bg-surface-default`} suppressHydrationWarning={true}>
       <Script
           async 
-          src="http://89.168.106.64:8081/js/pa-BarnYORUkFdXEbz1Bijao.js"
+          src="http://89.168.106.64:8081/js/pa-cMH-amu7ZxaQez_2PyFsA.js"
           strategy="afterInteractive"
         />
         <Script id="plausible-init" strategy="afterInteractive">
