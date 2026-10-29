@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { X } from "lucide-react";
 import { dictStates_mapGermany, dictStates_TableGermany, dictStates_AbbrGermany, dbDATA } from "./const_store";
 
 
@@ -155,19 +156,47 @@ const PrintDataLoadingErrors = ({
   listOfErrors: any[];
   position?: "absolute" | "relative";
 }) => {
+  const [isDismissed, setIsDismissed] = useState(false);
+  const prevErrorsRef = useRef<string>("");
 
   // remove duplicate errors and undefined values
-  const uniqueErrors = [...new Set(listOfErrors.filter(e => e !== undefined && e !== null && e !== ""))];
+  const uniqueErrors = useMemo(
+    () => [...new Set(listOfErrors.filter(e => e !== undefined && e !== null && e !== ""))],
+    [listOfErrors]
+  );
+
+  const errorsKey = uniqueErrors.map(e => (typeof e === "string" ? e : JSON.stringify(e))).join("|");
+  useEffect(() => {
+    if (errorsKey !== prevErrorsRef.current) {
+      prevErrorsRef.current = errorsKey;
+      setIsDismissed(false);
+    }
+  }, [errorsKey]);
+
+  if (isDismissed || uniqueErrors.length === 0) return null;
+
   return (
     <div
-      className={`${position} bottom-0 left-0 m-2 p-2.5 border border-red-300 rounded-lg bg-white/95 backdrop-blur-sm shadow-lg max-h-60 max-w-[calc(100%-1rem)] overflow-x-auto overflow-y-auto z-10000 flex flex-col gap-2 ${
-      uniqueErrors.length > 0 ? "" : "hidden"
-      }`}
+      className={`${position} bottom-0 left-0 m-2 p-2.5 border border-red-300 dark:border-red-800 rounded-lg bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm shadow-lg max-h-60 max-w-[calc(100%-1rem)] overflow-x-auto overflow-y-auto z-10000 flex flex-col gap-2`}
     >
+      <div className="flex items-center justify-between pb-1 border-b border-red-200/60 dark:border-red-900/40 gap-4">
+        <span className="text-xs font-semibold text-red-800 dark:text-red-300 flex items-center gap-1.5 select-none">
+          <span aria-hidden="true">⚠️</span> Loading Errors ({uniqueErrors.length})
+        </span>
+        <button
+          type="button"
+          onClick={() => setIsDismissed(true)}
+          className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-0.5 rounded-sm hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          aria-label="Close error window"
+          title="Close"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
       {uniqueErrors.map((error, index) => (
         <div
           key={index}
-          className="flex items-start gap-2 p-2 rounded-md bg-red-50 border border-red-200 text-xs text-red-700 shadow-xs"
+          className="flex items-start gap-2 p-2 rounded-md bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-xs text-red-700 dark:text-red-300 shadow-xs"
         >
           <span className="text-red-500 shrink-0 select-none font-semibold" aria-hidden="true">
             ⚠️

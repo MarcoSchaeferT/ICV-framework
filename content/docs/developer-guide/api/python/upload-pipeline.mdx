@@ -391,13 +391,13 @@ on success or a `{"error": ...}` dictionary on failure.
 ### `loadMetadata`
 
 ```python
-def loadMetadata() -> List[Dict[str, str]]
+@lru_cache(maxsize=1)
+def loadMetadata() -> dict[str, str]
 ```
 
-Load legacy column-to-datatype metadata into the shared in-memory map.
+Load English column datatypes from the shared metadata CSV reader.
 
-The mapping is populated from the configured CSV only when empty and then
-reused by subsequent table-creation calls in the same process.
+Cache the mapping for subsequent uploads in the same process.
 
 ### `getColumnSQLdataType`
 
